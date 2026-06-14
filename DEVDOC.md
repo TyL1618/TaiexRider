@@ -189,7 +189,7 @@ create policy "anyone can read" on daily_tracks for select using (true);
 | 階段 | 內容 | 目標 |
 |---|---|---|
 | Phase 0 | 專案初始化（Vite + React + TS + PWA plugin） | repo 可跑起來 |
-| Phase 1 | 物理 prototype，用 hardcode 假資料陣列做出可玩的機車 + 地形 | 先驗證「好玩」 |
+| Phase 1 | ✅ 物理 prototype（2026-06-14）：假資料→霓虹賽道、Matter.js 機車、單指操控（著地驅動/空中後翻）、鏡頭跟隨、後空翻計分、摔車偵測、HUD。待真人試玩 tune 手感（`src/game/constants.ts`） | 先驗證「好玩」 |
 | Phase 2 | 手動寫腳本抓 STOCK_DAY_ALL / STOCK_DAY / MI_5MINS_INDEX，轉換成賽道格式，肉眼檢查地形是否合理，調整正規化參數 | 確認資料 → 賽道的轉換品質 |
 | Phase 3 | 三種模式（每日挑戰/個股/經典）UI 與資料切換 | 遊玩內容完整 |
 | Phase 4 | Supabase table + Edge Function + `pg_cron` 自動化排程 | 每日資料自動更新 |
