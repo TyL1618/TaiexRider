@@ -4,7 +4,7 @@ import "./GameCanvas.css";
 import { pricesToTrack, buildTerrainBodies, type Track } from "./terrain";
 import { createBike, resetBike, type Bike } from "./bike";
 import { CAMERA, COLOR, DRIVE, RULES } from "./constants";
-import { SAMPLE_PRICES } from "../data/fakeData";
+import { CURRENT_PRICES } from "../data/currentTrack";
 
 interface Hud {
   distance: number;
@@ -62,7 +62,7 @@ export default function GameCanvas() {
     engine.gravity.y = 1;
     const world = engine.world;
 
-    const track: Track = pricesToTrack(SAMPLE_PRICES);
+    const track: Track = pricesToTrack(CURRENT_PRICES);
     Composite.add(world, buildTerrainBodies(track));
 
     const spawnX = track.startX;
