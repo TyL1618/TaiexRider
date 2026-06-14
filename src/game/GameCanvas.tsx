@@ -136,10 +136,9 @@ export default function GameCanvas() {
     let points = 0;
     let wasGrounded = false;
     let hudTick = 0;
-    // 完美落地確認窗
-    let perfectPending = false;
-    let perfectWindow = 0;
-    let landedBoth = false;
+    // 完美落地雙輪特效（剩餘幀數 + 觸發時兩輪世界座標）
+    let perfectFxFrames = 0;
+    let perfectFxPts: { x: number; y: number }[] = [];
     let toastId = 0;
     const showToast = (text: string) => setToast({ text, id: ++toastId });
 
@@ -155,9 +154,8 @@ export default function GameCanvas() {
       crashTimer = 0;
       points = 0;
       wasGrounded = false;
-      perfectPending = false;
-      perfectWindow = 0;
-      landedBoth = false;
+      perfectFxFrames = 0;
+      perfectFxPts = [];
       setCrashed(false);
       setFinished(false);
       setToast(null);
@@ -203,7 +201,7 @@ export default function GameCanvas() {
       // 正立判定：車身上向量 = (sin a, -cos a)，朝上 ⇔ cos a > threshold
       const upright = Math.cos(c.angle) > RULES.uprightCosThreshold;
 
-      // 落地瞬間結算後空翻
+      // 落地瞬間結算後空翻 + 完美落地
       if (groundedNow && !wasGrounded) {
         const flips = Math.floor(Math.abs(airRotation) / (2 * Math.PI));
         const realAir = airTime > RULES.minAirSec;
@@ -212,28 +210,21 @@ export default function GameCanvas() {
           points += gained;
           showToast(`${flips} 圈 +${gained}`);
         }
-        // 真實跳躍才啟動「完美雙輪落地」確認窗
-        if (upright && realAir) {
-          perfectPending = true;
-          perfectWindow = 8;
-          landedBoth = false;
+        // 完美落地：真實跳躍後車身接近水平著地（≈雙輪同時觸地）
+        const levelRad = Math.abs(Math.atan2(Math.sin(c.angle), Math.cos(c.angle)));
+        if (realAir && levelRad < RULES.perfectLevelRad) {
+          points += RULES.perfectBonus;
+          showToast(`完美落地 +${RULES.perfectBonus}`);
+          perfectFxFrames = 30;
+          perfectFxPts = [
+            { x: bike.rearWheel.position.x, y: bike.rearWheel.position.y },
+            { x: bike.frontWheel.position.x, y: bike.frontWheel.position.y },
+          ];
         }
         airRotation = 0;
         airTime = 0;
       }
       if (groundedNow) airRotation = 0;
-
-      // 完美落地確認：短窗內前後輪同時觸地且維持正立 → 加分
-      if (perfectPending) {
-        if (rearContacts > 0 && frontContacts > 0) landedBoth = true;
-        if (--perfectWindow <= 0) {
-          if (landedBoth && Math.cos(c.angle) > RULES.uprightCosThreshold) {
-            points += RULES.perfectBonus;
-            showToast(`完美落地 +${RULES.perfectBonus}`);
-          }
-          perfectPending = false;
-        }
-      }
       wasGrounded = groundedNow;
 
       // 摔車：輪朝上（傾倒超過 90°）持續一段時間（DEVDOC 5.4）
@@ -274,6 +265,7 @@ export default function GameCanvas() {
           rc: rearContacts,
           fc: frontContacts,
           points,
+          perfectFx: perfectFxFrames,
         }),
       };
     }
@@ -423,6 +415,36 @@ export default function GameCanvas() {
       );
     };
 
+    // 完美落地雙輪特效：兩輪各冒一圈擴散光環 + 放射火花
+    const drawPerfectFx = () => {
+      if (perfectFxFrames <= 0) return;
+      const p = 1 - perfectFxFrames / 30; // 0→1 進度
+      ctx.save();
+      for (const pt of perfectFxPts) {
+        const sx = wx(pt.x);
+        const sy = wy(pt.y);
+        const r = 6 + p * 28;
+        ctx.globalAlpha = 1 - p;
+        ctx.strokeStyle = COLOR.start; // cyan，與琥珀色車身對比
+        ctx.shadowColor = COLOR.start;
+        ctx.shadowBlur = 16;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(sx, sy, r, 0, Math.PI * 2);
+        ctx.stroke();
+        // 放射火花
+        ctx.lineWidth = 2;
+        for (let i = 0; i < 6; i++) {
+          const a = (Math.PI * 2 * i) / 6 - Math.PI / 2;
+          ctx.beginPath();
+          ctx.moveTo(sx + Math.cos(a) * r * 0.6, sy + Math.sin(a) * r * 0.6);
+          ctx.lineTo(sx + Math.cos(a) * r * 1.2, sy + Math.sin(a) * r * 1.2);
+          ctx.stroke();
+        }
+      }
+      ctx.restore();
+    };
+
     const render = () => {
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, W, H);
@@ -430,6 +452,7 @@ export default function GameCanvas() {
       drawFlag(track.vertices[0].x, track.vertices[0].y, COLOR.start, "START");
       drawFlag(track.finishX, track.vertices[track.vertices.length - 1].y, COLOR.finish, "FIN");
       drawBike();
+      drawPerfectFx();
     };
 
     // ---- 主迴圈（固定步進累加器）----
@@ -466,6 +489,7 @@ export default function GameCanvas() {
       camY += (ty - camY) * CAMERA.ease;
 
       render();
+      if (perfectFxFrames > 0) perfectFxFrames--;
 
       // HUD（節流更新，避免每幀 setState）
       if (++hudTick % 5 === 0) {

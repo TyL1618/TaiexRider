@@ -37,10 +37,10 @@ export const DRIVE = {
   rearWheelSpin: 0.014, // 後輪驅動扭矩 (讓輪子實際轉動、視覺與抓地)
   // 空中後翻：直接以角速度(rad/step)控制，逼近目標角速度（負=逆時針=後空翻）
   airSpinAccel: 0.006, // 每 step 朝目標角速度逼近的量
-  airSpinMax: 0.1, // 後翻最大角速度（≈0.17 的 60%，旋轉變慢好控制）
-  // 騰空寬限：離地連續超過這麼多 step（≈0.08s）才開始後翻，
+  airSpinMax: 0.12, // 後翻最大角速度
+  // 騰空寬限：離地連續超過這麼多 step（≈0.07s）才開始後翻，
   // 避免小坡細微彈跳就被觸發後翻；數字越小後翻反應越靈敏
-  airSpinDelaySteps: 5,
+  airSpinDelaySteps: 4,
 } as const;
 
 export const RULES = {
@@ -50,7 +50,8 @@ export const RULES = {
   flipBaseScore: 100, // 第1圈分數
   flipScoreStep: 150, // 每多一圈遞增量 (1圈100/2圈250/3圈450...)
   minAirSec: 0.3, // 騰空超過幾秒才算「真實跳躍」（過濾微跳）
-  perfectBonus: 200, // 雙輪同時著地的完美落地獎勵
+  perfectBonus: 200, // 完美落地獎勵
+  perfectLevelRad: 0.5, // 落地時車身與水平夾角 < 此值(≈28°)算完美（≈雙輪幾乎同時觸地）；越小越嚴格
 } as const;
 
 export const CAMERA = {
