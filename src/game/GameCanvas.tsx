@@ -131,6 +131,7 @@ export default function GameCanvas() {
     let prevAngle = bike.chassis.angle;
     let airRotation = 0;
     let airTime = 0; // 連續騰空時間（雙輪皆離地）
+    let airborneSteps = 0; // 連續離地 step 數（後翻寬限用）
     let crashTimer = 0;
     let points = 0;
     let wasGrounded = false;
@@ -150,6 +151,7 @@ export default function GameCanvas() {
       prevAngle = bike.chassis.angle;
       airRotation = 0;
       airTime = 0;
+      airborneSteps = 0;
       crashTimer = 0;
       points = 0;
       wasGrounded = false;
@@ -174,8 +176,8 @@ export default function GameCanvas() {
           c.force.y += Math.sin(c.angle) * f;
         }
         bike.rearWheel.torque += DRIVE.rearWheelSpin;
-      } else {
-        // 空中：直接逼近後翻角速度（負=逆時針=後空翻）
+      } else if (airborneSteps >= DRIVE.airSpinDelaySteps) {
+        // 空中且已過寬限：才開始後翻（避免小坡微彈跳就被觸發）
         const nv = Math.max(-DRIVE.airSpinMax, c.angularVelocity - DRIVE.airSpinAccel);
         Body.setAngularVelocity(c, nv);
       }
@@ -183,6 +185,7 @@ export default function GameCanvas() {
 
     const step = (dtMs: number) => {
       const grounded = rearContacts > 0 || frontContacts > 0;
+      airborneSteps = grounded ? 0 : airborneSteps + 1;
       applyControls(grounded);
       Engine.update(engine, STEP);
 

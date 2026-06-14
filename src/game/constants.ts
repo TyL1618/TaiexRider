@@ -36,8 +36,11 @@ export const DRIVE = {
   maxSpeed: 16, // 車身水平速度上限 (px/step) ×1.2
   rearWheelSpin: 0.014, // 後輪驅動扭矩 (讓輪子實際轉動、視覺與抓地)
   // 空中後翻：直接以角速度(rad/step)控制，逼近目標角速度（負=逆時針=後空翻）
-  airSpinAccel: 0.012, // 每 step 朝目標角速度逼近的量
-  airSpinMax: 0.22, // 後翻最大角速度 (≈2 圈/秒)
+  airSpinAccel: 0.009, // 每 step 朝目標角速度逼近的量（調soft）
+  airSpinMax: 0.17, // 後翻最大角速度（調soft，較好控制）
+  // 騰空寬限：離地連續超過這麼多 step（≈0.15s）才開始後翻，
+  // 避免小坡細微彈跳就被觸發後翻，導致無法前進
+  airSpinDelaySteps: 9,
 } as const;
 
 export const RULES = {
