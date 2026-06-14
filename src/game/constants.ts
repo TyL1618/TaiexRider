@@ -38,9 +38,9 @@ export const DRIVE = {
   // 空中後翻：直接以角速度(rad/step)控制，逼近目標角速度（負=逆時針=後空翻）
   airSpinAccel: 0.006, // 每 step 朝目標角速度逼近的量
   airSpinMax: 0.1, // 後翻最大角速度（≈0.17 的 60%，旋轉變慢好控制）
-  // 騰空寬限：離地連續超過這麼多 step（≈0.15s）才開始後翻，
-  // 避免小坡細微彈跳就被觸發後翻，導致無法前進
-  airSpinDelaySteps: 9,
+  // 騰空寬限：離地連續超過這麼多 step（≈0.08s）才開始後翻，
+  // 避免小坡細微彈跳就被觸發後翻；數字越小後翻反應越靈敏
+  airSpinDelaySteps: 5,
 } as const;
 
 export const RULES = {
