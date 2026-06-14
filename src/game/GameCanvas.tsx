@@ -4,7 +4,12 @@ import "./GameCanvas.css";
 import { pricesToTrack, buildTerrainBodies, type Track } from "./terrain";
 import { createBike, resetBike, type Bike } from "./bike";
 import { CAMERA, COLOR, DRIVE, RULES } from "./constants";
-import { CURRENT_PRICES } from "../data/currentTrack";
+
+interface GameCanvasProps {
+  prices: number[];
+  label: string;
+  onExit: () => void;
+}
 
 interface Hud {
   distance: number;
@@ -31,7 +36,7 @@ function flipScore(flips: number): number {
   return total;
 }
 
-export default function GameCanvas() {
+export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [hud, setHud] = useState<Hud>({
     distance: 0,
@@ -62,7 +67,7 @@ export default function GameCanvas() {
     engine.gravity.y = 1;
     const world = engine.world;
 
-    const track: Track = pricesToTrack(CURRENT_PRICES);
+    const track: Track = pricesToTrack(prices);
     Composite.add(world, buildTerrainBodies(track));
 
     const spawnX = track.startX;
@@ -522,7 +527,7 @@ export default function GameCanvas() {
       Events.off(engine, "collisionEnd", collEnd);
       Engine.clear(engine);
     };
-  }, []);
+  }, [prices]);
 
   return (
     <div className="game-root">
@@ -537,7 +542,13 @@ export default function GameCanvas() {
       </div>
 
       {/* 角落小資訊 */}
-      <div className="hud-corner">距離 {hud.distance}m</div>
+      <div className="hud-corner">
+        {label}　距離 {hud.distance}m
+      </div>
+
+      <button className="exit-btn" onClick={onExit}>
+        選賽道
+      </button>
 
       {/* 得分提示（後空翻 / 完美落地）*/}
       {toast && (
@@ -556,6 +567,9 @@ export default function GameCanvas() {
           <div className="overlay-score">{hud.points} 分</div>
           <button className="overlay-btn" onClick={requestReset}>
             再玩一次 (R)
+          </button>
+          <button className="overlay-btn ghost" onClick={onExit}>
+            換賽道
           </button>
         </div>
       )}

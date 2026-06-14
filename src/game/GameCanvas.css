@@ -110,6 +110,32 @@
   box-shadow: 0 0 16px var(--neon-cyan);
 }
 
+.exit-btn {
+  position: absolute;
+  top: 0.9rem;
+  right: 1rem;
+  padding: 0.4rem 0.8rem;
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+  color: var(--text-dim);
+  background: rgba(5, 8, 15, 0.5);
+  border: 1px solid var(--text-dim);
+  border-radius: 7px;
+  cursor: pointer;
+}
+
+.exit-btn:hover {
+  color: var(--neon-cyan);
+  border-color: var(--neon-cyan);
+}
+
+.overlay-btn.ghost {
+  background: transparent;
+  color: var(--neon-cyan);
+  border: 1px solid var(--neon-cyan);
+  box-shadow: none;
+}
+
 .ctrl-hint {
   position: absolute;
   bottom: 1.1rem;

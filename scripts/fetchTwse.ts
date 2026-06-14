@@ -1,75 +1,108 @@
 // Phase 2：抓真實台股資料，驗證「資料 → 賽道」品質
-// 用法：node scripts/fetchTwse.ts 2330 3    （股票代號 月數，預設 2330 3）
-// Node 24 原生支援 TS 型別剝除，可直接用 node 執行，無需編譯。
+// Node 24 原生支援 TS 型別剝除，可直接 node 執行，無需編譯。後端/腳本抓無 CORS 問題。
 //
-// 資料源＝TWSE STOCK_DAY（個股每日，一次回傳一個月）。後端/腳本抓沒有 CORS 問題。
+// 用法：
+//   node scripts/fetchTwse.ts stock 2330 3      個股近 3 個月日線
+//   node scripts/fetchTwse.ts taiex 20260612    大盤盤中(每5秒)，自動降採樣成賽道
+//
+// 輸出統一格式：src/data/sample-<label>.json = { label, kind, prices }
 
 import { writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
-interface StockDay {
+const UA = { "User-Agent": "Mozilla/5.0 TaiexRider/0.1" };
+const TARGET_POINTS = 110; // 賽道目標資料點數（降採樣到此數）
+
+interface TwseResp {
   stat: string;
   fields: string[];
   data: string[][];
 }
 
-const STOCK_NO = process.argv[2] ?? "2330";
-const MONTHS = Number(process.argv[3] ?? "3");
+const num = (s: string) => parseFloat((s ?? "").replace(/,/g, ""));
 
-// 產生最近 N 個月的 date 參數（YYYYMM01，西元）
-function recentMonths(n: number): string[] {
-  const out: string[] = [];
-  const now = new Date();
-  for (let i = n - 1; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    out.push(`${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}01`);
+// 均勻降採樣到 target 點（保留頭尾），資料夠多時用
+function downsample(arr: number[], target: number): number[] {
+  if (arr.length <= target) return arr;
+  const out: number[] = [];
+  for (let i = 0; i < target; i++) {
+    out.push(arr[Math.round((i * (arr.length - 1)) / (target - 1))]);
   }
   return out;
 }
 
-async function fetchMonthCloses(date: string): Promise<number[]> {
-  const url = `https://www.twse.com.tw/exchangeReport/STOCK_DAY?response=json&date=${date}&stockNo=${STOCK_NO}`;
-  const res = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0 TaiexRider/0.1" } });
-  const j = (await res.json()) as StockDay;
+// 個股：STOCK_DAY 一次回傳一個月，抓最近 N 個月收盤
+async function fetchStock(code: string, months: number): Promise<number[]> {
+  const now = new Date();
+  const prices: number[] = [];
+  for (let i = months - 1; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const date = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}01`;
+    const url = `https://www.twse.com.tw/exchangeReport/STOCK_DAY?response=json&date=${date}&stockNo=${code}`;
+    const j = (await (await fetch(url, { headers: UA })).json()) as TwseResp;
+    if (j.stat === "OK" && Array.isArray(j.data)) {
+      const ci = j.fields.indexOf("收盤價");
+      const m = j.data.map((r) => num(r[ci])).filter((v) => Number.isFinite(v) && v > 0);
+      console.log(`  ${date.slice(0, 6)}: ${m.length} 個交易日`);
+      prices.push(...m);
+    }
+    await new Promise((r) => setTimeout(r, 600));
+  }
+  return prices;
+}
+
+// 大盤：MI_5MINS_INDEX 每5秒，欄位1=發行量加權股價指數，降採樣成賽道
+async function fetchTaiex(date: string): Promise<number[]> {
+  const url = `https://www.twse.com.tw/exchangeReport/MI_5MINS_INDEX?response=json&date=${date}`;
+  const j = (await (await fetch(url, { headers: UA })).json()) as TwseResp;
   if (j.stat !== "OK" || !Array.isArray(j.data)) return [];
-  const closeIdx = j.fields.indexOf("收盤價");
-  return j.data
-    .map((row) => parseFloat((row[closeIdx] ?? "").replace(/,/g, "")))
-    .filter((v) => Number.isFinite(v) && v > 0);
+  const raw = j.data.map((r) => num(r[1])).filter((v) => Number.isFinite(v) && v > 0);
+  console.log(`  盤中原始 ${raw.length} 點(每5秒) → 降採樣 ${TARGET_POINTS} 點`);
+  return downsample(raw, TARGET_POINTS);
+}
+
+function report(prices: number[]) {
+  const min = Math.min(...prices);
+  const max = Math.max(...prices);
+  const ch = prices.slice(1).map((p, i) => ((p - prices[i]) / prices[i]) * 100);
+  const avgAbs = ch.reduce((s, c) => s + Math.abs(c), 0) / ch.length;
+  console.log(`${prices.length} 點｜區間 ${min} ~ ${max}（振幅 ${(((max - min) / min) * 100).toFixed(1)}%）`);
+  console.log(`點間最大上升 +${Math.max(...ch).toFixed(2)}%、最大下降 ${Math.min(...ch).toFixed(2)}%、平均 ${avgAbs.toFixed(2)}%`);
 }
 
 async function main() {
-  console.log(`抓取 ${STOCK_NO} 最近 ${MONTHS} 個月日線…`);
-  const prices: number[] = [];
-  for (const m of recentMonths(MONTHS)) {
-    const p = await fetchMonthCloses(m);
-    console.log(`  ${m.slice(0, 6)}: ${p.length} 個交易日`);
-    prices.push(...p);
-    await new Promise((r) => setTimeout(r, 600)); // 禮貌延遲，避免限流
+  const mode = process.argv[2] ?? "stock";
+  let label: string;
+  let kind: string;
+  let prices: number[];
+
+  if (mode === "taiex") {
+    const date = process.argv[3] ?? "20260612";
+    console.log(`抓大盤盤中 ${date}…`);
+    kind = "taiex";
+    label = "TAIEX";
+    prices = await fetchTaiex(date);
+  } else {
+    const code = process.argv[3] ?? "2330";
+    const months = Number(process.argv[4] ?? "3");
+    console.log(`抓個股 ${code} 近 ${months} 個月…`);
+    kind = "stock";
+    label = code;
+    prices = await fetchStock(code, months);
   }
 
   if (prices.length === 0) {
-    console.error("沒抓到資料（代號錯誤或被限流？）");
+    console.error("沒抓到資料（代號/日期錯誤或被限流？）");
     process.exit(1);
   }
 
-  // 統計：賽道品質檢查
-  const min = Math.min(...prices);
-  const max = Math.max(...prices);
-  const changes = prices.slice(1).map((p, i) => ((p - prices[i]) / prices[i]) * 100);
-  const maxUp = Math.max(...changes);
-  const maxDown = Math.min(...changes);
-  const avgAbs = changes.reduce((s, c) => s + Math.abs(c), 0) / changes.length;
+  console.log(`\n=== ${label} ===`);
+  report(prices);
 
-  console.log(`\n=== ${STOCK_NO}｜${prices.length} 個交易日 ===`);
-  console.log(`收盤區間：${min} ~ ${max}（振幅 ${(((max - min) / min) * 100).toFixed(1)}%）`);
-  console.log(`單日最大漲 +${maxUp.toFixed(2)}%、最大跌 ${maxDown.toFixed(2)}%、平均單日波動 ${avgAbs.toFixed(2)}%`);
-
-  // 輸出供 app 使用
   const here = dirname(fileURLToPath(import.meta.url));
-  const outPath = join(here, "..", "src", "data", `sample-${STOCK_NO}.json`);
-  writeFileSync(outPath, JSON.stringify({ stockNo: STOCK_NO, prices }));
+  const outPath = join(here, "..", "src", "data", `sample-${label}.json`);
+  writeFileSync(outPath, JSON.stringify({ label, kind, prices }));
   console.log(`\n已寫入 ${outPath}`);
 }
 
