@@ -42,6 +42,7 @@ export default function GameCanvas() {
   });
   const [crashed, setCrashed] = useState(false);
   const [finished, setFinished] = useState(false);
+  const [toast, setToast] = useState<{ text: string; id: number } | null>(null);
   // 讓事件處理可讀到最新的結束狀態
   const overRef = useRef(false);
   overRef.current = crashed || finished;
@@ -129,10 +130,17 @@ export default function GameCanvas() {
     let camY = spawnY - H * CAMERA.offsetYRatio;
     let prevAngle = bike.chassis.angle;
     let airRotation = 0;
+    let airTime = 0; // 連續騰空時間（雙輪皆離地）
     let crashTimer = 0;
     let points = 0;
     let wasGrounded = false;
     let hudTick = 0;
+    // 完美落地確認窗
+    let perfectPending = false;
+    let perfectWindow = 0;
+    let landedBoth = false;
+    let toastId = 0;
+    const showToast = (text: string) => setToast({ text, id: ++toastId });
 
     const doReset = () => {
       resetBike(bike);
@@ -141,11 +149,16 @@ export default function GameCanvas() {
       throttle = false;
       prevAngle = bike.chassis.angle;
       airRotation = 0;
+      airTime = 0;
       crashTimer = 0;
       points = 0;
       wasGrounded = false;
+      perfectPending = false;
+      perfectWindow = 0;
+      landedBoth = false;
       setCrashed(false);
       setFinished(false);
+      setToast(null);
     };
 
     // ---- 物理步進 ----
@@ -175,11 +188,13 @@ export default function GameCanvas() {
 
       const c = bike.chassis;
       const groundedNow = rearContacts > 0 || frontContacts > 0;
+      const airborneFully = rearContacts === 0 && frontContacts === 0;
 
-      // 空中累積旋轉
+      // 空中累積旋轉 / 滯空時間
       if (!groundedNow) {
         airRotation += angleDelta(prevAngle, c.angle);
       }
+      if (airborneFully) airTime += dtMs / 1000;
       prevAngle = c.angle;
 
       // 正立判定：車身上向量 = (sin a, -cos a)，朝上 ⇔ cos a > threshold
@@ -188,10 +203,34 @@ export default function GameCanvas() {
       // 落地瞬間結算後空翻
       if (groundedNow && !wasGrounded) {
         const flips = Math.floor(Math.abs(airRotation) / (2 * Math.PI));
-        if (upright && flips > 0) points += flipScore(flips);
+        const realAir = airTime > RULES.minAirSec;
+        if (upright && flips > 0) {
+          const gained = flipScore(flips);
+          points += gained;
+          showToast(`${flips} 圈 +${gained}`);
+        }
+        // 真實跳躍才啟動「完美雙輪落地」確認窗
+        if (upright && realAir) {
+          perfectPending = true;
+          perfectWindow = 8;
+          landedBoth = false;
+        }
         airRotation = 0;
+        airTime = 0;
       }
       if (groundedNow) airRotation = 0;
+
+      // 完美落地確認：短窗內前後輪同時觸地且維持正立 → 加分
+      if (perfectPending) {
+        if (rearContacts > 0 && frontContacts > 0) landedBoth = true;
+        if (--perfectWindow <= 0) {
+          if (landedBoth && Math.cos(c.angle) > RULES.uprightCosThreshold) {
+            points += RULES.perfectBonus;
+            showToast(`完美落地 +${RULES.perfectBonus}`);
+          }
+          perfectPending = false;
+        }
+      }
       wasGrounded = groundedNow;
 
       // 摔車：輪朝上（傾倒超過 90°）持續一段時間（DEVDOC 5.4）
@@ -210,6 +249,31 @@ export default function GameCanvas() {
       }
       return { grounded: groundedNow, upright };
     };
+
+    // [DEV] 手動步進測試鉤子（隱藏分頁 rAF 被暫停時用來驗證物理/計分）
+    if (import.meta.env.DEV) {
+      (window as unknown as { __test: unknown }).__test = {
+        step: (n = 1) => {
+          for (let i = 0; i < n; i++) step(STEP);
+        },
+        press: () => {
+          throttle = true;
+        },
+        release: () => {
+          throttle = false;
+        },
+        reset: () => doReset(),
+        state: () => ({
+          x: Math.round(bike.chassis.position.x),
+          vx: +bike.chassis.velocity.x.toFixed(2),
+          ang: Math.round((bike.chassis.angle * 180) / Math.PI),
+          grounded: rearContacts > 0 || frontContacts > 0,
+          rc: rearContacts,
+          fc: frontContacts,
+          points,
+        }),
+      };
+    }
 
     // ---- 渲染（neon）----
     const wx = (x: number) => x - camX;
@@ -263,55 +327,85 @@ export default function GameCanvas() {
       ctx.restore();
     };
 
-    const drawWheel = (
-      px: number,
-      py: number,
-      angle: number,
-      r: number,
-    ) => {
+    const drawWheel = (px: number, py: number, angle: number, r: number) => {
       ctx.save();
       ctx.translate(wx(px), wy(py));
       ctx.rotate(angle);
+      // 輪胎（深色實心）
+      ctx.beginPath();
+      ctx.arc(0, 0, r, 0, Math.PI * 2);
+      ctx.fillStyle = "#0a0f18";
+      ctx.fill();
+      // 霓虹輪框
       ctx.strokeStyle = COLOR.wheel;
       ctx.shadowColor = COLOR.bikeGlow;
       ctx.shadowBlur = 8;
       ctx.lineWidth = 2.5;
-      ctx.beginPath();
-      ctx.arc(0, 0, r, 0, Math.PI * 2);
       ctx.stroke();
-      // 輪輻（顯示轉動）
+      // 輪轂 + 輪輻（顯示轉動）
       ctx.beginPath();
+      ctx.arc(0, 0, r * 0.34, 0, Math.PI * 2);
       ctx.moveTo(0, 0);
       ctx.lineTo(r, 0);
-      ctx.lineWidth = 1.5;
+      ctx.lineWidth = 1.4;
       ctx.stroke();
       ctx.restore();
     };
 
+    // 敞篷跑車側面輪廓（local：+x 為車頭朝右，y 負為上）
     const drawBike = () => {
       const c = bike.chassis;
-      // 車身
       ctx.save();
       ctx.translate(wx(c.position.x), wy(c.position.y));
       ctx.rotate(c.angle);
+
       ctx.strokeStyle = COLOR.bike;
       ctx.shadowColor = COLOR.bikeGlow;
       ctx.shadowBlur = 12;
+      ctx.lineJoin = "round";
+      ctx.lineCap = "round";
       ctx.lineWidth = 3;
+
+      // 車體：低扁楔形 + 中段敞篷凹陷
       ctx.beginPath();
-      ctx.roundRect(-34, -8, 68, 16, 6);
+      ctx.moveTo(-46, 7); // 車尾下緣
+      ctx.lineTo(-44, -6); // 車尾
+      ctx.lineTo(-30, -11); // 後甲板
+      ctx.lineTo(-16, -11); // 座艙後緣
+      ctx.lineTo(-9, -1); // ↓ 凹入敞篷座艙
+      ctx.lineTo(7, -1); // 座艙底
+      ctx.lineTo(15, -13); // ↑ 擋風玻璃
+      ctx.lineTo(34, -8); // 引擎蓋
+      ctx.lineTo(46, -1); // 車頭上緣
+      ctx.lineTo(47, 7); // 車頭下緣
+      ctx.closePath();
+      // 車身淡填色
+      ctx.fillStyle = "rgba(255, 179, 0, 0.10)";
+      ctx.fill();
       ctx.stroke();
-      // 騎士（簡單線條）
+
+      // 擋風玻璃斜柱
       ctx.beginPath();
-      ctx.moveTo(-6, -8);
-      ctx.lineTo(2, -26);
-      ctx.lineTo(18, -14); // 手臂往把手
-      ctx.moveTo(2, -26);
-      ctx.arc(2, -32, 6, 0, Math.PI * 2); // 頭
+      ctx.moveTo(7, -1);
+      ctx.lineTo(15, -13);
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // 駕駛：頭露出敞篷外 + 肩
       ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.moveTo(-6, -1); // 身體
+      ctx.lineTo(-3, -16);
       ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(-3, -22, 6, 0, Math.PI * 2); // 頭
+      ctx.fillStyle = "#05080f";
+      ctx.fill();
+      ctx.stroke();
+
       ctx.restore();
-      // 輪子
+
+      // 輪子（小輪）
       drawWheel(
         bike.rearWheel.position.x,
         bike.rearWheel.position.y,
@@ -407,18 +501,23 @@ export default function GameCanvas() {
     <div className="game-root">
       <canvas ref={canvasRef} className="game-canvas" />
 
-      <div className="hud">
-        <div className="hud-row hud-big">{hud.points}</div>
-        <div className="hud-row hud-dim">分數 ・ 距離 {hud.distance}m</div>
-        <div className="hud-row hud-dim">
-          空中：
-          {hud.airborne ? (
-            <span className="hud-air">飛行中 {hud.airFlips > 0 ? `${hud.airFlips}圈` : ""}</span>
-          ) : (
-            <span>著地</span>
-          )}
-        </div>
+      {/* 分數：螢幕正中央偏上 */}
+      <div className="score-center">
+        <div className="score-num">{hud.points}</div>
+        {hud.airborne && hud.airFlips > 0 && (
+          <div className="score-air">空中 {hud.airFlips} 圈</div>
+        )}
       </div>
+
+      {/* 角落小資訊 */}
+      <div className="hud-corner">距離 {hud.distance}m</div>
+
+      {/* 得分提示（後空翻 / 完美落地）*/}
+      {toast && (
+        <div key={toast.id} className="toast">
+          {toast.text}
+        </div>
+      )}
 
       <div className={`throttle-dot ${hud.throttle ? "on" : ""}`} />
 

@@ -5,21 +5,22 @@
 
 export const TRACK = {
   segmentWidth: 95, // 每個資料點的水平間距 (px)
-  heightRange: 280, // 價格 min~max 對應的垂直高度 (px)
+  heightRange: 340, // 價格 min~max 對應的垂直高度 (px)（加大起伏做跳台）
   baselineY: 560, // 賽道基準線 (世界座標 y，越大越下面)
   startFlat: 4, // 起點平台補幾個平坦點
   endFlat: 3, // 終點平台補幾個平坦點
   // 斜率限制：相鄰兩點高度差上限 = tan(maxSlopeDeg) * segmentWidth
-  // 超過就夾平，確保一定爬得上去（陡牆設計之後再開放）
-  maxSlopeDeg: 52,
+  // 放寬到 60° 讓漲停/跌停級的尖峰形成真正的跳台 kicker
+  maxSlopeDeg: 60,
 } as const;
 
+// 車輛＝敞篷跑車（低重心、寬輪距 → 較穩；輪子較小）
 export const BIKE = {
-  chassisW: 72,
-  chassisH: 16,
-  wheelRadius: 14,
-  wheelBaseHalf: 27, // 前後輪距離車身中心的水平距離
-  wheelDropY: 16, // 輪軸相對車身中心往下的距離
+  chassisW: 92, // 車身較長
+  chassisH: 20,
+  wheelRadius: 11, // 跑車小輪
+  wheelBaseHalf: 34, // 前後輪距車身中心的水平距離（寬輪距=穩）
+  wheelDropY: 13, // 輪軸相對車身中心往下的距離
   chassisDensity: 0.0016,
   wheelDensity: 0.0012,
   wheelFriction: 0.95,
@@ -31,9 +32,9 @@ export const BIKE = {
 
 export const DRIVE = {
   // 著地時：沿車身朝向施加前進力（force=mass*accel，效果≈每step加速度）
-  accel: 0.0016,
-  maxSpeed: 13, // 車身水平速度上限 (px/step)，避免暴衝
-  rearWheelSpin: 0.012, // 後輪驅動扭矩 (讓輪子實際轉動、視覺與抓地)
+  accel: 0.0019, // ×1.2（起步更快）
+  maxSpeed: 16, // 車身水平速度上限 (px/step) ×1.2
+  rearWheelSpin: 0.014, // 後輪驅動扭矩 (讓輪子實際轉動、視覺與抓地)
   // 空中後翻：直接以角速度(rad/step)控制，逼近目標角速度（負=逆時針=後空翻）
   airSpinAccel: 0.012, // 每 step 朝目標角速度逼近的量
   airSpinMax: 0.22, // 後翻最大角速度 (≈2 圈/秒)
@@ -45,6 +46,8 @@ export const RULES = {
   crashUpsideDownSec: 2.0, // 輪朝上持續幾秒判定摔車 (DEVDOC 5.4)
   flipBaseScore: 100, // 第1圈分數
   flipScoreStep: 150, // 每多一圈遞增量 (1圈100/2圈250/3圈450...)
+  minAirSec: 0.3, // 騰空超過幾秒才算「真實跳躍」（過濾微跳）
+  perfectBonus: 200, // 雙輪同時著地的完美落地獎勵
 } as const;
 
 export const CAMERA = {

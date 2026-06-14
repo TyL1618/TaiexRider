@@ -12,35 +12,81 @@
   touch-action: none;
 }
 
-/* ---- HUD ---- */
-.hud {
+/* ---- 分數：螢幕正中央偏上 ---- */
+.score-center {
   position: absolute;
-  top: 1rem;
-  left: 1.25rem;
+  top: 8%;
+  left: 0;
+  right: 0;
+  text-align: center;
   pointer-events: none;
   user-select: none;
 }
 
-.hud-row {
-  letter-spacing: 0.08em;
-  line-height: 1.4;
-}
-
-.hud-big {
-  font-size: 2.4rem;
+.score-num {
+  font-size: 3rem;
   font-weight: 800;
+  line-height: 1;
   color: var(--neon-amber);
-  text-shadow: 0 0 14px rgba(255, 179, 0, 0.55);
+  text-shadow:
+    0 0 14px rgba(255, 179, 0, 0.55),
+    0 0 30px rgba(255, 179, 0, 0.3);
 }
 
-.hud-dim {
-  font-size: 0.8rem;
-  color: var(--text-dim);
-}
-
-.hud-air {
+.score-air {
+  margin-top: 0.25rem;
+  font-size: 0.85rem;
+  letter-spacing: 0.15em;
   color: var(--neon-cyan);
   text-shadow: 0 0 10px rgba(45, 226, 230, 0.6);
+}
+
+/* 角落小資訊 */
+.hud-corner {
+  position: absolute;
+  top: 1rem;
+  left: 1.25rem;
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
+  pointer-events: none;
+  user-select: none;
+}
+
+/* 得分提示 toast（中央彈出後淡出上飄）*/
+.toast {
+  position: absolute;
+  top: 22%;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--neon-cyan);
+  text-shadow: 0 0 16px rgba(45, 226, 230, 0.7);
+  pointer-events: none;
+  user-select: none;
+  animation: toast-pop 1s ease-out forwards;
+}
+
+@keyframes toast-pop {
+  0% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.9);
+  }
+  20% {
+    opacity: 1;
+    transform: translateY(0) scale(1.05);
+  }
+  70% {
+    opacity: 1;
+    transform: translateY(-6px) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-22px) scale(1);
+  }
 }
 
 /* 油門指示燈 */
