@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Engine, Events, Composite, Body, type IEventCollision } from "matter-js";
 import "./GameCanvas.css";
-import { pricesToTrack, buildTerrainBodies, type Track } from "./terrain";
+import { pricesToTrack, buildTerrainBodies, SMOOTH_STEPS, type Track } from "./terrain";
 import { createBike, resetBike, type Bike } from "./bike";
 import { CAMERA, COLOR, DRIVE, RULES } from "./constants";
 
@@ -203,10 +203,11 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
         // 後輪觸地：後輪視覺扭矩（低值，純視覺；主驅動靠底盤力）
         bike.rearWheel.torque += DRIVE.rearWheelSpin;
 
-        // 底盤推力：沿車身方向（坡面平順），後輪觸地即施加
+        // 底盤推力：沿車身方向，速度越接近上限力越小（軟切斷，避免頓挫）
         if (c.velocity.x < DRIVE.maxSpeed) {
+          const speedRatio = Math.max(0, 1 - c.velocity.x / DRIVE.maxSpeed);
           const uphillBoost = (c.angle < -0.12 && c.velocity.x < DRIVE.uphillMaxSpeed) ? DRIVE.uphillBoost : 1;
-          const f = c.mass * DRIVE.accel * uphillBoost;
+          const f = c.mass * DRIVE.accel * uphillBoost * speedRatio;
           c.force.x += Math.cos(c.angle) * f;
           c.force.y += Math.sin(c.angle) * f;
         }
@@ -224,6 +225,10 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
       const uprightNow = Math.cos(bike.chassis.angle) > RULES.uprightCosThreshold;
       airborneSteps = grounded ? 0 : airborneSteps + 1;
       applyControls(rearGrounded, frontGrounded, uprightNow);
+      // 著地且正立時壓制角速度，防止撞坡/開場瞬間翻滾
+      if (grounded && uprightNow) {
+        Body.setAngularVelocity(bike.chassis, bike.chassis.angularVelocity * 0.78);
+      }
       Engine.update(engine, STEP);
 
       const c = bike.chassis;
@@ -315,7 +320,14 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
     const wy = (y: number) => (y - camY) * scale;
 
     const drawTrack = () => {
-      const v = track.vertices;
+      // 結束拉遠時顯示原始股市折線圖，騎乘時用平滑頂點
+      const isOverview = overRef.current;
+      const v = isOverview ? track.vertices : track.smoothVertices;
+      // 顏色：原始每段 1 個色；平滑版每段重複 SMOOTH_STEPS 個色
+      const getColor = isOverview
+        ? (i: number) => track.colors[i]
+        : (i: number) => track.colors[Math.min(Math.floor(i / SMOOTH_STEPS), track.colors.length - 1)];
+
       ctx.save();
       // 線下漸層填色
       ctx.beginPath();
@@ -329,23 +341,23 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
       grad.addColorStop(1, COLOR.fillBottom);
       ctx.fillStyle = grad;
       ctx.fill();
-      // 霓虹線（漲=紅/跌=綠，連續同色段合為一條 path 減少 draw call）
+      // 霓虹線（連續同色段合為一條 path 減少 draw call）
       let si = 0;
       while (si < v.length - 1) {
-        const col = track.colors[si];
+        const col = getColor(si);
         const glow = col === COLOR.trackUp ? COLOR.trackUpGlow
           : col === COLOR.trackDown ? COLOR.trackDownGlow
           : COLOR.trackGlow;
         ctx.beginPath();
         ctx.moveTo(wx(v[si].x), wy(v[si].y));
-        while (si < v.length - 1 && track.colors[si] === col) {
+        while (si < v.length - 1 && getColor(si) === col) {
           ctx.lineTo(wx(v[si + 1].x), wy(v[si + 1].y));
           si++;
         }
-        ctx.lineWidth = 3;
+        ctx.lineWidth = isOverview ? 2 : 3;
         ctx.strokeStyle = col;
         ctx.shadowColor = glow;
-        ctx.shadowBlur = 16;
+        ctx.shadowBlur = isOverview ? 8 : 16;
         ctx.lineJoin = "round";
         ctx.lineCap = "round";
         ctx.stroke();
