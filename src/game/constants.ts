@@ -18,11 +18,11 @@ export const TRACK = {
 
 // 車輛＝敞篷跑車（低重心、寬輪距 → 較穩；輪子較小）
 export const BIKE = {
-  chassisW: 92, // 車身較長
-  chassisH: 20,
-  wheelRadius: 11, // 跑車小輪
-  wheelBaseHalf: 34, // 前後輪距車身中心的水平距離（寬輪距=穩）
-  wheelDropY: 13, // 輪軸相對車身中心往下的距離
+  chassisW: 48, // 車身（縮至 52%，接近 Rider 比例）
+  chassisH: 10,
+  wheelRadius: 6, // 跑車小輪
+  wheelBaseHalf: 18, // 前後輪距車身中心的水平距離
+  wheelDropY: 7, // 輪軸相對車身中心往下的距離
   chassisDensity: 0.0016,
   wheelDensity: 0.0012,
   wheelFriction: 0.95,
@@ -41,8 +41,8 @@ export const DRIVE = {
   rideableCos: 0.3, // 著地定速鎖定的門檻：cos(車身角) > 此值才鎖（≈72°內都算貼坡，避免陡坡失鎖）
   // 空中後翻：單指唯一作用 — 直接以角速度(rad/step)控制（負=逆時針=後空翻）
   // 重力調重(1.5)後滯空變短，故後翻轉速一併調快避免翻不起來
-  airSpinAccel: 0.009, // 每 step 朝目標角速度逼近的量
-  airSpinMax: 0.18, // 後翻最大角速度
+  airSpinAccel: 0.006, // 每 step 朝目標角速度逼近的量
+  airSpinMax: 0.12, // 後翻最大角速度
 } as const;
 
 export const RULES = {

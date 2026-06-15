@@ -76,7 +76,7 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
 
     // ---- 建立世界 ----
     const engine = Engine.create();
-    engine.gravity.y = 1.5; // 調重：車落地乾脆、翹起砸下有份量（連帶滯空變短）
+    engine.gravity.y = 1;
     const world = engine.world;
 
     const track: Track = pricesToTrack(prices);
@@ -154,6 +154,7 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
     let airborneSteps = 0; // 連續離地 step 數（後翻寬限用）
     let crashTimer = 0;
     let points = 0;
+    let bonusPoints = 0; // 特技分（後翻＋完美落地），行進分另算疊加
     let wasGrounded = false;
     let hudTick = 0;
     let raceTimeMs = 0;
@@ -174,6 +175,7 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
       airborneSteps = 0;
       crashTimer = 0;
       points = 0;
+      bonusPoints = 0;
       raceTimeMs = 0;
       wasGrounded = false;
       perfectFxFrames = 0;
@@ -205,14 +207,6 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
           const along = c.velocity.x * dirX + c.velocity.y * dirY;
           const newAlong = along + (DRIVE.cruiseSpeed - along) * DRIVE.groundLockEase;
           Body.setVelocity(c, { x: newAlong * dirX, y: newAlong * dirY });
-        }
-        // 角速度阻尼 + 硬夾上限（不論按不按）：防立車/甩晃/撞坡翻滾
-        if (Math.cos(c.angle) > DRIVE.rideableCos) {
-          let av = c.angularVelocity * 0.5;
-          const AV_MAX = 0.12;
-          if (av > AV_MAX) av = AV_MAX;
-          else if (av < -AV_MAX) av = -AV_MAX;
-          Body.setAngularVelocity(c, av);
         }
       } else if (throttle && Math.cos(c.angle) > 0) {
         // 雙輪離地 + 按住 + 未翻過頭 → 後空翻
@@ -250,13 +244,13 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
         const realAir = airTime > RULES.minAirSec;
         if (upright && flips > 0) {
           const gained = flipScore(flips);
-          points += gained;
+          bonusPoints += gained;
           showToast(`${flips} 圈 +${gained}`);
         }
         // 完美落地：真實跳躍後「雙輪同時觸地」+ 車身正立（不再只看角度，避免坡上誤判）
         const bothWheels = rearContacts > 0 && frontContacts > 0;
         if (realAir && bothWheels && upright) {
-          points += RULES.perfectBonus;
+          bonusPoints += RULES.perfectBonus;
           showToast(`完美落地 +${RULES.perfectBonus}`);
           perfectFxFrames = 30;
           perfectFxPts = [
@@ -269,6 +263,11 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
       }
       if (groundedNow) airRotation = 0;
       wasGrounded = groundedNow;
+
+      // 行進分：到終點剛好 1000，即時疊加在特技分上
+      const traveled = Math.max(0, c.position.x - track.startX);
+      const distScore = Math.min(1000, Math.round((traveled / (track.finishX - track.startX)) * 1000));
+      points = bonusPoints + distScore;
 
       // 摔車：倒地 0.5s 立判、空中倒置 2s 判（倒地不可按壓翻回）
       if (Math.cos(c.angle) < 0) {
@@ -407,6 +406,7 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
       ctx.save();
       ctx.translate(wx(c.position.x), wy(c.position.y));
       ctx.rotate(c.angle);
+      ctx.scale(0.52, 0.52); // 車身縮至 52%（對應 chassisW 92→48）
 
       ctx.strokeStyle = COLOR.bike;
       ctx.shadowColor = COLOR.bikeGlow;
