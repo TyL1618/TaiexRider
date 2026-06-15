@@ -195,17 +195,16 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
       if (Math.cos(c.angle) < 0) return;
 
       const grounded = rearGrounded || frontGrounded;
-      const bothGrounded = rearGrounded && frontGrounded;
 
       // 著地但傾斜 > 57° → 不給力
       if (grounded && !upright) return;
 
       if (rearGrounded) {
-        // 後輪觸地：後輪扭矩提供抓地推力
+        // 後輪觸地：後輪視覺扭矩（低值，純視覺；主驅動靠底盤力）
         bike.rearWheel.torque += DRIVE.rearWheelSpin;
 
-        // 底盤推力：只在雙輪都觸地才施加，防止 wheelie
-        if (bothGrounded && c.velocity.x < DRIVE.maxSpeed) {
+        // 底盤推力：沿車身方向（坡面平順），後輪觸地即施加
+        if (c.velocity.x < DRIVE.maxSpeed) {
           const uphillBoost = (c.angle < -0.12 && c.velocity.x < DRIVE.uphillMaxSpeed) ? DRIVE.uphillBoost : 1;
           const f = c.mass * DRIVE.accel * uphillBoost;
           c.force.x += Math.cos(c.angle) * f;
