@@ -7,39 +7,12 @@ export interface Vec2 {
 }
 
 export interface Track {
-  vertices: Vec2[];       // 原始折線頂點（股市圖，結束畫面用）
-  smoothVertices: Vec2[]; // Catmull-Rom 平滑頂點（物理碰撞 + 騎乘渲染）
-  colors: string[];       // 每段顏色（對應 vertices 間段）：漲=紅/跌=綠/平=青
-  startX: number;         // 起點平台中段 x（機車生成處）
-  finishX: number;        // 終點 x
-  minY: number;           // 用於鏡頭/渲染範圍
+  vertices: Vec2[]; // 賽道頂點（世界座標，y 向下為正）＝原始股市折線
+  colors: string[]; // 每段顏色（長度 = vertices.length - 1）：漲=紅/跌=綠/平=青
+  startX: number;   // 起點平台中段 x（機車生成處）
+  finishX: number;  // 終點 x
+  minY: number;     // 用於鏡頭/渲染範圍
   maxY: number;
-}
-
-// Catmull-Rom spline 插值：在每對原始頂點之間插入 STEPS 個中間點
-export const SMOOTH_STEPS = 4;
-
-function catmullRomSmooth(pts: Vec2[]): Vec2[] {
-  if (pts.length < 2) return [...pts];
-  const result: Vec2[] = [];
-  const n = pts.length;
-  for (let i = 0; i < n - 1; i++) {
-    const p0 = pts[Math.max(0, i - 1)];
-    const p1 = pts[i];
-    const p2 = pts[i + 1];
-    const p3 = pts[Math.min(n - 1, i + 2)];
-    for (let j = 0; j < SMOOTH_STEPS; j++) {
-      const t = j / SMOOTH_STEPS;
-      const t2 = t * t;
-      const t3 = t2 * t;
-      result.push({
-        x: 0.5 * (2*p1.x + (-p0.x+p2.x)*t + (2*p0.x-5*p1.x+4*p2.x-p3.x)*t2 + (-p0.x+3*p1.x-3*p2.x+p3.x)*t3),
-        y: 0.5 * (2*p1.y + (-p0.y+p2.y)*t + (2*p0.y-5*p1.y+4*p2.y-p3.y)*t2 + (-p0.y+3*p1.y-3*p2.y+p3.y)*t3),
-      });
-    }
-  }
-  result.push(pts[n - 1]);
-  return result;
 }
 
 // 價格陣列 → 賽道頂點（DEVDOC 第 4 節）
@@ -94,11 +67,9 @@ export function pricesToTrack(prices: number[]): Track {
     else colors.push(COLOR.track);
   }
 
-  const smoothVertices = catmullRomSmooth(vertices);
-  const ys = smoothVertices.map((v) => v.y);
+  const ys = vertices.map((v) => v.y);
   return {
     vertices,
-    smoothVertices,
     colors,
     startX: (startFlat * segmentWidth) / 2,
     finishX: vertices[vertices.length - 1].x,
@@ -110,10 +81,10 @@ export function pricesToTrack(prices: number[]): Track {
 // 賽道頂點 → 一串靜態碰撞體（每段一個旋轉矩形，略為重疊避免接縫卡頓）
 export function buildTerrainBodies(track: Track, thickness = 26): Body[] {
   const bodies: Body[] = [];
-  const { smoothVertices } = track;
-  for (let i = 0; i < smoothVertices.length - 1; i++) {
-    const a = smoothVertices[i];
-    const b = smoothVertices[i + 1];
+  const { vertices } = track;
+  for (let i = 0; i < vertices.length - 1; i++) {
+    const a = vertices[i];
+    const b = vertices[i + 1];
     const dx = b.x - a.x;
     const dy = b.y - a.y;
     const len = Math.hypot(dx, dy) + 2; // +2 略為重疊

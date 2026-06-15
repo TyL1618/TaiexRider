@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Engine, Events, Composite, Body, type IEventCollision } from "matter-js";
 import "./GameCanvas.css";
-import { pricesToTrack, buildTerrainBodies, SMOOTH_STEPS, type Track } from "./terrain";
+import { pricesToTrack, buildTerrainBodies, type Track } from "./terrain";
 import { createBike, resetBike, type Bike } from "./bike";
 import { CAMERA, COLOR, DRIVE, RULES } from "./constants";
 
@@ -187,32 +187,24 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
 
     // ---- 物理步進 ----
     const STEP = 1000 / 60;
-    const applyControls = (rearGrounded: boolean, frontGrounded: boolean, upright: boolean) => {
-      if (!throttle || overRef.current) return;
+    // 定速模型（Rider 風格）：
+    //  著地 → 把水平速度鎖定為 cruiseSpeed（恆速，任何坡都爬得上、不卡頓、不 wheelie）
+    //  空中按住 → 唯一作用：後空翻
+    const applyControls = (grounded: boolean, upright: boolean) => {
+      if (overRef.current) return;
       const c = bike.chassis;
 
-      // 翻超過 90°（車頂朝地）→ 完全不給力，不管接觸狀態
-      if (Math.cos(c.angle) < 0) return;
-
-      const grounded = rearGrounded || frontGrounded;
-
-      // 著地但傾斜 > 57° → 不給力
-      if (grounded && !upright) return;
-
-      if (rearGrounded) {
-        // 後輪觸地：後輪視覺扭矩（低值，純視覺；主驅動靠底盤力）
-        bike.rearWheel.torque += DRIVE.rearWheelSpin;
-
-        // 底盤推力：沿車身方向，速度越接近上限力越小（軟切斷，避免頓挫）
-        if (c.velocity.x < DRIVE.maxSpeed) {
-          const speedRatio = Math.max(0, 1 - c.velocity.x / DRIVE.maxSpeed);
-          const uphillBoost = (c.angle < -0.12 && c.velocity.x < DRIVE.uphillMaxSpeed) ? DRIVE.uphillBoost : 1;
-          const f = c.mass * DRIVE.accel * uphillBoost * speedRatio;
-          c.force.x += Math.cos(c.angle) * f;
-          c.force.y += Math.sin(c.angle) * f;
+      if (grounded) {
+        // 著地恆速：平滑趨近 cruiseSpeed（落地不硬切）
+        if (upright) {
+          const target = DRIVE.cruiseSpeed;
+          const vx = c.velocity.x + (target - c.velocity.x) * DRIVE.groundLockEase;
+          Body.setVelocity(c, { x: vx, y: c.velocity.y });
+          // 著地壓制角速度，防止撞坡/開場瞬間翻滾
+          Body.setAngularVelocity(c, c.angularVelocity * 0.78);
         }
-      } else if (!grounded && airborneSteps >= DRIVE.airSpinDelaySteps) {
-        // 雙輪完全離地且過寬限 → 空中後翻
+      } else if (throttle && Math.cos(c.angle) > 0) {
+        // 雙輪離地 + 按住 + 未翻過頭 → 後空翻
         const nv = Math.max(-DRIVE.airSpinMax, c.angularVelocity - DRIVE.airSpinAccel);
         Body.setAngularVelocity(c, nv);
       }
@@ -224,11 +216,7 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
       const grounded = rearGrounded || frontGrounded;
       const uprightNow = Math.cos(bike.chassis.angle) > RULES.uprightCosThreshold;
       airborneSteps = grounded ? 0 : airborneSteps + 1;
-      applyControls(rearGrounded, frontGrounded, uprightNow);
-      // 著地且正立時壓制角速度，防止撞坡/開場瞬間翻滾
-      if (grounded && uprightNow) {
-        Body.setAngularVelocity(bike.chassis, bike.chassis.angularVelocity * 0.78);
-      }
+      applyControls(grounded, uprightNow);
       Engine.update(engine, STEP);
 
       const c = bike.chassis;
@@ -320,14 +308,7 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
     const wy = (y: number) => (y - camY) * scale;
 
     const drawTrack = () => {
-      // 結束拉遠時顯示原始股市折線圖，騎乘時用平滑頂點
-      const isOverview = overRef.current;
-      const v = isOverview ? track.vertices : track.smoothVertices;
-      // 顏色：原始每段 1 個色；平滑版每段重複 SMOOTH_STEPS 個色
-      const getColor = isOverview
-        ? (i: number) => track.colors[i]
-        : (i: number) => track.colors[Math.min(Math.floor(i / SMOOTH_STEPS), track.colors.length - 1)];
-
+      const v = track.vertices;
       ctx.save();
       // 線下漸層填色
       ctx.beginPath();
@@ -341,23 +322,23 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
       grad.addColorStop(1, COLOR.fillBottom);
       ctx.fillStyle = grad;
       ctx.fill();
-      // 霓虹線（連續同色段合為一條 path 減少 draw call）
+      // 霓虹折線（漲=紅/跌=綠，連續同色段合為一條 path 減少 draw call）
       let si = 0;
       while (si < v.length - 1) {
-        const col = getColor(si);
+        const col = track.colors[si];
         const glow = col === COLOR.trackUp ? COLOR.trackUpGlow
           : col === COLOR.trackDown ? COLOR.trackDownGlow
           : COLOR.trackGlow;
         ctx.beginPath();
         ctx.moveTo(wx(v[si].x), wy(v[si].y));
-        while (si < v.length - 1 && getColor(si) === col) {
+        while (si < v.length - 1 && track.colors[si] === col) {
           ctx.lineTo(wx(v[si + 1].x), wy(v[si + 1].y));
           si++;
         }
-        ctx.lineWidth = isOverview ? 2 : 3;
+        ctx.lineWidth = 3;
         ctx.strokeStyle = col;
         ctx.shadowColor = glow;
-        ctx.shadowBlur = isOverview ? 8 : 16;
+        ctx.shadowBlur = 16;
         ctx.lineJoin = "round";
         ctx.lineCap = "round";
         ctx.stroke();

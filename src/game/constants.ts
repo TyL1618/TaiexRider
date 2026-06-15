@@ -33,16 +33,14 @@ export const BIKE = {
 } as const;
 
 export const DRIVE = {
-  // 著地時：沿車身朝向施加前進力（force=mass*accel，效果≈每step加速度）
-  accel: 0.0026, // 底盤推力（沿車身方向，後輪觸地即施加）
-  maxSpeed: 16, // 車身水平速度上限 (px/step)
-  uphillBoost: 4.0, // 上坡低速時的驅動力倍數
-  uphillMaxSpeed: 8, // 上坡 boost 介入的水平速度門檻（px/step）
-  rearWheelSpin: 0.006, // 後輪視覺扭矩（純視覺旋轉，極低避免反力矩造成 wheelie）
-  // 空中後翻：直接以角速度(rad/step)控制，逼近目標角速度（負=逆時針=後空翻）
+  // ── 定速模型（Rider 風格）──
+  // 著地時直接把水平速度鎖定為定值（不用 force 驅動），所以：
+  // 任何坡都恆速爬得上、永遠不卡頓、不會 wheelie 後翻。
+  cruiseSpeed: 7.5, // 著地時鎖定的水平速度 (px/step)，越大越快
+  groundLockEase: 0.25, // 速度趨近 cruiseSpeed 的平滑度 (0~1)，避免落地瞬間硬切
+  // 空中後翻：單指唯一作用 — 直接以角速度(rad/step)控制（負=逆時針=後空翻）
   airSpinAccel: 0.006, // 每 step 朝目標角速度逼近的量
   airSpinMax: 0.12, // 後翻最大角速度
-  airSpinDelaySteps: 0, // 騰空寬限已拔除（不再需要延遲，改靠其他機制）
 } as const;
 
 export const RULES = {
