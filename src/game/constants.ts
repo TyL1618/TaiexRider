@@ -39,15 +39,15 @@ export const BIKE = {
 } as const;
 
 export const DRIVE = {
-  // ── 真物理模型（Route B，Rider 風格）──
-  // 著地按住 → 驅動「後輪」轉速（用 setAngularVelocity，避免 torque 被 ×delta² 爆量）；
-  // 只在低於目標轉速時加速 → 下坡靠重力自然超速、保留動量；放開＝滑行（不主動煞車）。
-  driveWheelSpin: 1.9, // 後輪目標角速度 (rad/step)，×輪半徑≈巡航速度；越大越快
-  driveAccel: 0.08, // 後輪每 step 朝目標轉速逼近量（油門加速感）
-  maxSpeed: 22, // 著地速度上限 (px/step)，避免陡下坡暴衝失控
+  // ── 定速引擎（Rider 風格街機手感，刻意「非真實物理」）──
+  // 著地按住 → 把車身+雙輪速度沿「坡面切線方向」鎖成定值：
+  //   任何坡都爬得上、上下坡平地同速；一離地變拋體（靠離地速度+坡角決定飛多高遠）。
+  // 沿坡面切線而非車身角度 → 不重演「速度方向綁車身角→翹頭正回饋」。
+  cruiseSpeed: 12, // 沿坡面鎖定速度 (px/step)，越大越快也飛越遠（pull 版 15 的 80%）
+  groundLockEase: 0.35, // 速度趨近 cruiseSpeed 的平滑度 (0~1)，避免落地瞬間硬切
   groundAlignGain: 0.3, // 著地時車身角速度朝「坡面切線」修正的比例（平滑貼地，治本翹頭/落地翻車）
   groundedAvMax: 0.28, // 著地角速度上限（修正量的硬上限，阻止翻滾累積）
-  airSpinAccel: 0.030, // 空中後翻每 step 逼近量（由 0.010 加快→短滯空也轉得動）
+  airSpinAccel: 0.030, // 空中後翻每 step 逼近量（短滯空也轉得動）
   airSpinMax: 0.24, // 後翻最大角速度（配合地形變陡＝滯空變長→可轉兩圈）
 } as const;
 
