@@ -48,11 +48,11 @@ export const DRIVE = {
   launchBoost: 1.67, // 離地目標速度倍率 → 目標離地速 = cruiseSpeed×此值 ≈12（解耦：地面慢、飛得遠）
   minGroundedStepsForBoost: 5, // 離地前要在地面連續待夠幾 step 才給 boost（擋轉折點微彈疊乘爆衝）
   groundAlignGain: 0.3, // 著地時車身角速度朝「坡面切線」修正的比例（平滑貼地，治本翹頭/落地翻車）
-  groundedAvMax: 0.28, // 著地角速度上限（修正量的硬上限，阻止翻滾累積）
+  groundedAvMax: 0.10, // 著地角速度上限（壓低→只緩緩貼坡；過高會去追到不了的目標而狂轉翻過頭）
   airSpinAccel: 0.030, // 空中「按住」後空翻每 step 逼近量（短滯空也轉得動）
   airSpinMax: 0.24, // 後空翻最大角速度（配合地形變陡＝滯空變長→可轉兩圈）
-  airNoseForwardAccel: 0.006, // 空中「放開」車頭往前壓每 step 逼近量（緩）
-  airNoseForwardMax: 0.08, // 空中車頭前壓最大角速度（設上限→只緩緩低頭、不自己翻整圈）
+  airNoseForwardAccel: 0.0006, // 空中「放開」車頭往前壓每 step 逼近量（÷10，很緩）
+  airNoseForwardMax: 0.008, // 空中車頭前壓最大角速度（÷10，只極緩低頭備降）
 } as const;
 
 export const RULES = {

@@ -234,17 +234,16 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
         const dirX = Math.cos(slope);
         const dirY = Math.sin(slope);
         if (throttle) {
-          // 只調沿坡切線分量、保留法線(垂直)分量→過凸點不被抹掉，能自然彈飛
           const nx = -dirY;
           const ny = dirX;
           const along = c.velocity.x * dirX + c.velocity.y * dirY;
           const perp = c.velocity.x * nx + c.velocity.y * ny;
           const newAlong = along + (DRIVE.cruiseSpeed - along) * DRIVE.groundLockEase;
-          const vx = newAlong * dirX + perp * nx;
-          const vy = newAlong * dirY + perp * ny;
-          Body.setVelocity(c, { x: vx, y: vy });
-          Body.setVelocity(bike.rearWheel, { x: vx, y: vy });
-          Body.setVelocity(bike.frontWheel, { x: vx, y: vy });
+          // 車身：保留法線(垂直)分量→過凸點不被抹掉，能自然彈飛
+          Body.setVelocity(c, { x: newAlong * dirX + perp * nx, y: newAlong * dirY + perp * ny });
+          // 輪子：只給沿坡切線分量（不保留垂直）→ 緊貼坡面、不被垂直分量掀起
+          Body.setVelocity(bike.rearWheel, { x: newAlong * dirX, y: newAlong * dirY });
+          Body.setVelocity(bike.frontWheel, { x: newAlong * dirX, y: newAlong * dirY });
         }
         // 對齊弦坡：以比例修正車身角速度（gain），並夾在 groundedAvMax 內
         const da = angleDelta(c.angle, slope);
@@ -321,9 +320,10 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
         airTime = 0;
       } else if (!groundedNow && wasGrounded) {
         // 離地瞬間：
-        //  ① 拉到目標離地速 (≤target，永不超過→不疊乘爆衝)，且要在地面待夠才給（擋轉折點微彈）
+        //  ① boost：只有「有按油門 + 朝前(vx>0) + 在地面待夠」才給，拉到目標速且永不超過
+        //     → 沒按/往後/轉折點微彈一律不加速，杜絕自己亂飛/往後甩
         //  ② 歸零殘留角速度（消除爬坡貼坡帶上來的「莫名往後翻」）
-        if (groundedStreak >= DRIVE.minGroundedStepsForBoost) {
+        if (throttle && c.velocity.x > 0 && groundedStreak >= DRIVE.minGroundedStepsForBoost) {
           const sp = Math.hypot(c.velocity.x, c.velocity.y);
           const target = DRIVE.cruiseSpeed * DRIVE.launchBoost;
           if (sp > 0.001 && sp < target) {
