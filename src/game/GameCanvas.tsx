@@ -191,18 +191,23 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
     // 定速模型（Rider 風格）：
     //  著地 → 把水平速度鎖定為 cruiseSpeed（恆速，任何坡都爬得上、不卡頓、不 wheelie）
     //  空中按住 → 唯一作用：後空翻
-    const applyControls = (grounded: boolean, upright: boolean) => {
+    const applyControls = (grounded: boolean, _upright: boolean) => {
       if (overRef.current) return;
       const c = bike.chassis;
 
       if (grounded) {
-        // 著地恆速：平滑趨近 cruiseSpeed（落地不硬切）
-        if (upright) {
+        // 著地恆速：只要車身還算貼著坡（未翻倒）就鎖定水平速度，平滑趨近 cruiseSpeed
+        // 用較寬的 rideableCos 門檻，讓陡坡也能恆速貼滑（不再失鎖彈跳）
+        if (Math.cos(c.angle) > DRIVE.rideableCos) {
           const target = DRIVE.cruiseSpeed;
           const vx = c.velocity.x + (target - c.velocity.x) * DRIVE.groundLockEase;
           Body.setVelocity(c, { x: vx, y: c.velocity.y });
-          // 著地壓制角速度，防止撞坡/開場瞬間翻滾
-          Body.setAngularVelocity(c, c.angularVelocity * 0.78);
+          // 著地強力壓制角速度 + 硬夾上限，防止立車/甩晃/撞坡翻滾
+          let av = c.angularVelocity * 0.5;
+          const AV_MAX = 0.12;
+          if (av > AV_MAX) av = AV_MAX;
+          else if (av < -AV_MAX) av = -AV_MAX;
+          Body.setAngularVelocity(c, av);
         }
       } else if (throttle && Math.cos(c.angle) > 0) {
         // 雙輪離地 + 按住 + 未翻過頭 → 後空翻
@@ -243,9 +248,9 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
           points += gained;
           showToast(`${flips} 圈 +${gained}`);
         }
-        // 完美落地：真實跳躍後車身接近水平著地（≈雙輪同時觸地）
-        const levelRad = Math.abs(Math.atan2(Math.sin(c.angle), Math.cos(c.angle)));
-        if (realAir && levelRad < RULES.perfectLevelRad) {
+        // 完美落地：真實跳躍後「雙輪同時觸地」+ 車身正立（不再只看角度，避免坡上誤判）
+        const bothWheels = rearContacts > 0 && frontContacts > 0;
+        if (realAir && bothWheels && upright) {
           points += RULES.perfectBonus;
           showToast(`完美落地 +${RULES.perfectBonus}`);
           perfectFxFrames = 30;
