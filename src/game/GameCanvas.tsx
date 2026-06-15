@@ -758,16 +758,20 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
       )}
 
       {(crashed || finished) && (
-        <div className="overlay">
-          <div className="overlay-title">{finished ? "完賽！" : "摔車"}</div>
-          <div className="overlay-score">{hud.points} 分</div>
-          <div className="overlay-time">{hud.timer}</div>
-          <button className="overlay-btn" onClick={requestReset}>
-            再玩一次
-          </button>
-          <button className="overlay-btn ghost" onClick={onExit}>
-            返回主選單
-          </button>
+        <div className="overlay-result">
+          <div className="overlay-top">
+            <div className="overlay-title">{finished ? "完賽！" : "摔車"}</div>
+            <div className="overlay-score">{hud.points} 分</div>
+            <div className="overlay-time">{hud.timer}</div>
+          </div>
+          <div className="overlay-bottom">
+            <button className="overlay-btn" onClick={requestReset}>
+              再玩一次
+            </button>
+            <button className="overlay-btn ghost" onClick={onExit}>
+              返回主選單
+            </button>
+          </div>
         </div>
       )}
     </div>

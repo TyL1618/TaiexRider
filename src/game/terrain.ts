@@ -108,10 +108,15 @@ export function buildTerrainBodies(track: Track, thickness = 26): Body[] {
     const b = vertices[i + 1];
     const dx = b.x - a.x;
     const dy = b.y - a.y;
-    const len = Math.hypot(dx, dy) + 2; // +2 略為重疊
+    const segLen = Math.hypot(dx, dy) || 1;
+    const len = segLen + 2; // +2 略為重疊
     const angle = Math.atan2(dy, dx);
-    const cx = (a.x + b.x) / 2;
-    const cy = (a.y + b.y) / 2 + thickness / 2; // 矩形中心壓在線段下方
+    // 沿「線段法線往下」偏移半厚度 → 矩形頂面精準貼在線上（各斜率皆然）。
+    // 之前用世界 Y 偏移：斜段頂面會橫移/下沉，接縫出現落差小台階→小前輪卡山峰。
+    const downNx = -dy / segLen;
+    const downNy = dx / segLen;
+    const cx = (a.x + b.x) / 2 + downNx * (thickness / 2);
+    const cy = (a.y + b.y) / 2 + downNy * (thickness / 2);
     bodies.push(
       Bodies.rectangle(cx, cy, len, thickness, {
         isStatic: true,

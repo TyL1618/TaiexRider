@@ -63,7 +63,7 @@ export const RULES = {
   flipScoreStep: 150, // 每多一圈遞增量 (1圈100/2圈250/3圈450...)
   minAirSec: 0.3, // 騰空超過幾秒才算「真實跳躍」（過濾微跳）
   perfectBonus: 200, // 完美落地獎勵
-  perfectLevelRad: 0.5, // 落地時車身與水平夾角 < 此值(≈28°)算完美（≈雙輪幾乎同時觸地）；越小越嚴格
+  perfectLevelRad: 0.7, // 落地時車身與坡面夾角 < 此值(≈40°)算完美；放寬(原0.5/28°太嚴)
 } as const;
 
 export const CAMERA = {
