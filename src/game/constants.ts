@@ -39,8 +39,7 @@ export const DRIVE = {
   cruiseSpeed: 9, // 按住時鎖定的「沿坡面」速度 (px/step)，越大越快
   groundLockEase: 0.3, // 速度趨近 cruiseSpeed 的平滑度 (0~1)，避免落地瞬間硬切
   rideableCos: 0.3, // 著地定速鎖定的門檻：cos(車身角) > 此值才鎖（≈72°內都算貼坡，避免陡坡失鎖）
-  // 空中後翻：單指唯一作用 — 直接以角速度(rad/step)控制（負=逆時針=後空翻）
-  // 重力調重(1.5)後滯空變短，故後翻轉速一併調快避免翻不起來
+  groundedAvMax: 0.28, // 著地時角速度上限（允許跟坡緩轉，阻止翻滾累積）
   airSpinAccel: 0.006, // 每 step 朝目標角速度逼近的量
   airSpinMax: 0.12, // 後翻最大角速度
 } as const;

@@ -93,8 +93,8 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
       for (const pair of e.pairs) {
         const labels = [pair.bodyA.label, pair.bodyB.label];
         if (!labels.includes("terrain")) continue;
-        if (labels.includes("rearWheel")) rearContacts += delta;
-        if (labels.includes("frontWheel")) frontContacts += delta;
+        if (labels.includes("rearWheel")) rearContacts = Math.max(0, rearContacts + delta);
+        if (labels.includes("frontWheel")) frontContacts = Math.max(0, frontContacts + delta);
       }
     };
     const collStart = onCollision(1);
@@ -207,6 +207,11 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
           const along = c.velocity.x * dirX + c.velocity.y * dirY;
           const newAlong = along + (DRIVE.cruiseSpeed - along) * DRIVE.groundLockEase;
           Body.setVelocity(c, { x: newAlong * dirX, y: newAlong * dirY });
+        }
+        // 溫和版 AV 夾：只阻止高速翻滾，允許正常跟坡傾斜
+        const av = c.angularVelocity;
+        if (Math.abs(av) > DRIVE.groundedAvMax) {
+          Body.setAngularVelocity(c, Math.sign(av) * DRIVE.groundedAvMax);
         }
       } else if (throttle && Math.cos(c.angle) > 0) {
         // 雙輪離地 + 按住 + 未翻過頭 → 後空翻

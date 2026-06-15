@@ -34,7 +34,7 @@ export function createBike(world: World, x: number, y: number): Bike {
     frictionAir: chassisFrictionAir,
     friction: 0.4,
     label: "chassis",
-    chamfer: { radius: 6 },
+    chamfer: { radius: 2 },
   });
 
   const makeWheel = (ox: number, label: string) =>
