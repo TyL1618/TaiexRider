@@ -236,8 +236,8 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
         const nv = Math.max(-DRIVE.airSpinMax, c.angularVelocity - DRIVE.airSpinAccel);
         Body.setAngularVelocity(c, nv);
       } else if (!grounded && !throttle) {
-        // 空中放開：車頭自然前傾（模擬車頭配重，讓車頭往下轉）
-        const nv = Math.min(DRIVE.airNoseDiveMax, c.angularVelocity + DRIVE.airNoseDive);
+        // 空中放開：車頭自然上揚（放開=輕鼻，逆時鐘讓車頭朝上）
+        const nv = Math.max(-DRIVE.airNoseLiftMax, c.angularVelocity - DRIVE.airNoseLift);
         Body.setAngularVelocity(c, nv);
       }
     };
@@ -303,11 +303,11 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
       const distScore = Math.min(1000, Math.round((traveled / (track.finishX - track.startX)) * 1000));
       points = bonusPoints + distScore;
 
-      // 摔車：車身碰地 + 兩輪皆離地，持續 0.4s
-      const bikeDowned = chassisContacts > 0 && rearContacts === 0 && frontContacts === 0;
-      if (bikeDowned) {
+      // 卡住判定：按油門但幾乎不動（V 谷卡死 / 翻車壓地），或車身著地但速度為零
+      const isStuck = Math.abs(c.velocity.x) < 0.5 && (throttle || chassisContacts > 0);
+      if (isStuck && !overRef.current) {
         crashTimer += dtMs / 1000;
-        if (crashTimer >= 2.0 && !overRef.current) {
+        if (crashTimer >= 2.0) {
           setCrashed(true);
         }
       } else {
@@ -441,65 +441,135 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
       ctx.restore();
     };
 
-    // 敞篷跑車側面輪廓（local：+x 為車頭朝右，y 負為上）
+    // 摩托車側面輪廓（local：+x 為車頭朝右，y 負為上）
+    // 物理輪子中心在 local drawing space ≈ (±35, +13)，0.52 scale 後對齊物理體
     const drawBike = (alpha: number) => {
       const c = bike.chassis;
-      // 插值：在上一步與本步之間取 alpha 位置，消除固定步進造成的車身鋸齒
       const cx = prevChassisPos.x + (c.position.x - prevChassisPos.x) * alpha;
       const cy = prevChassisPos.y + (c.position.y - prevChassisPos.y) * alpha;
       const cAngle = prevChassisAngle + (c.angle - prevChassisAngle) * alpha;
       ctx.save();
       ctx.translate(wx(cx), wy(cy));
       ctx.rotate(cAngle);
-      ctx.scale(0.52, 0.52); // 車身縮至 52%（對應 chassisW 92→48）
+      ctx.scale(0.52, 0.52);
 
       ctx.shadowBlur = 0;
       ctx.lineJoin = "round";
       ctx.lineCap = "round";
 
-      // 車體：低扁楔形 + 中段敞篷凹陷
+      // ── 車架主體（engine + frame）──────────────────────────────
       ctx.beginPath();
-      ctx.moveTo(-46, 7); // 車尾下緣
-      ctx.lineTo(-44, -6); // 車尾
-      ctx.lineTo(-30, -11); // 後甲板
-      ctx.lineTo(-16, -11); // 座艙後緣
-      ctx.lineTo(-9, -1); // ↓ 凹入敞篷座艙
-      ctx.lineTo(7, -1); // 座艙底
-      ctx.lineTo(15, -13); // ↑ 擋風玻璃
-      ctx.lineTo(34, -8); // 引擎蓋
-      ctx.lineTo(46, -1); // 車頭上緣
-      ctx.lineTo(47, 7); // 車頭下緣
+      ctx.moveTo(-32, 10);  // 後輪軸附近
+      ctx.lineTo(-22, -4);  // 後車架
+      ctx.lineTo(-6, -15);  // 座位後緣
+      ctx.lineTo(8, -14);   // 油箱頂
+      ctx.lineTo(22, -7);   // 頭管上端
+      ctx.lineTo(26, 4);    // 頭管下端
+      ctx.lineTo(16, 11);   // 引擎底前
+      ctx.lineTo(-18, 11);  // 引擎底後
       ctx.closePath();
       ctx.fillStyle = "rgba(255, 179, 0, 0.10)";
       ctx.fill();
-      // 光暈層
       ctx.strokeStyle = COLOR.bikeGlow;
       ctx.lineWidth = 8;
       ctx.globalAlpha = 0.4;
       ctx.stroke();
-      // 實線層
       ctx.strokeStyle = COLOR.bike;
       ctx.lineWidth = 3;
       ctx.globalAlpha = 1;
       ctx.stroke();
 
-      // 擋風玻璃斜柱
+      // ── 前叉（頭管 → 前輪）──────────────────────────────────
       ctx.beginPath();
-      ctx.moveTo(7, -1);
-      ctx.lineTo(15, -13);
-      ctx.lineWidth = 2;
+      ctx.moveTo(20, -5);
+      ctx.lineTo(32, 12);
+      ctx.strokeStyle = COLOR.bikeGlow;
+      ctx.lineWidth = 7;
+      ctx.globalAlpha = 0.35;
+      ctx.stroke();
+      ctx.strokeStyle = COLOR.bike;
+      ctx.lineWidth = 2.5;
+      ctx.globalAlpha = 1;
       ctx.stroke();
 
-      // 駕駛：頭露出敞篷外 + 肩
-      ctx.lineWidth = 2.5;
+      // ── 後搖臂（樞軸 → 後輪）────────────────────────────────
       ctx.beginPath();
-      ctx.moveTo(-6, -1); // 身體
-      ctx.lineTo(-3, -16);
+      ctx.moveTo(-22, 6);
+      ctx.lineTo(-32, 12);
+      ctx.strokeStyle = COLOR.bikeGlow;
+      ctx.lineWidth = 7;
+      ctx.globalAlpha = 0.35;
       ctx.stroke();
+      ctx.strokeStyle = COLOR.bike;
+      ctx.lineWidth = 2.5;
+      ctx.globalAlpha = 1;
+      ctx.stroke();
+
+      // ── 低扶把（clip-on 競速把手）───────────────────────────
       ctx.beginPath();
-      ctx.arc(-3, -22, 6, 0, Math.PI * 2); // 頭
+      ctx.moveTo(20, -9);
+      ctx.lineTo(14, -18);
+      ctx.moveTo(20, -9);
+      ctx.lineTo(26, -15);
+      ctx.strokeStyle = COLOR.bikeGlow;
+      ctx.lineWidth = 5;
+      ctx.globalAlpha = 0.3;
+      ctx.stroke();
+      ctx.strokeStyle = COLOR.bike;
+      ctx.lineWidth = 2;
+      ctx.globalAlpha = 1;
+      ctx.stroke();
+
+      // ── 排氣管（引擎底向後低伏）─────────────────────────────
+      ctx.beginPath();
+      ctx.moveTo(10, 11);
+      ctx.lineTo(-8, 13);
+      ctx.lineTo(-24, 18);
+      ctx.strokeStyle = COLOR.bikeGlow;
+      ctx.lineWidth = 5;
+      ctx.globalAlpha = 0.25;
+      ctx.stroke();
+      ctx.strokeStyle = COLOR.bike;
+      ctx.lineWidth = 1.5;
+      ctx.globalAlpha = 0.6;
+      ctx.stroke();
+
+      // ── 騎士（前傾競速姿勢）────────────────────────────────
+      ctx.globalAlpha = 1;
+      // 驅幹（臀 → 肩，前傾）
+      ctx.beginPath();
+      ctx.moveTo(-5, -15);
+      ctx.lineTo(0, -28);
+      ctx.lineTo(10, -33);
+      ctx.strokeStyle = COLOR.bikeGlow;
+      ctx.lineWidth = 6;
+      ctx.globalAlpha = 0.3;
+      ctx.stroke();
+      ctx.strokeStyle = COLOR.bike;
+      ctx.lineWidth = 2.5;
+      ctx.globalAlpha = 1;
+      ctx.stroke();
+      // 手臂（肩 → 把手）
+      ctx.beginPath();
+      ctx.moveTo(8, -30);
+      ctx.lineTo(18, -18);
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      // 頭盔（深色填滿 + neon 邊）
+      ctx.beginPath();
+      ctx.arc(12, -38, 7, 0, Math.PI * 2);
       ctx.fillStyle = "#05080f";
       ctx.fill();
+      ctx.strokeStyle = COLOR.bike;
+      ctx.lineWidth = 2.5;
+      ctx.globalAlpha = 1;
+      ctx.stroke();
+      // 護目鏡
+      ctx.beginPath();
+      ctx.arc(14, -37, 4, -0.5, 0.5);
+      ctx.strokeStyle = COLOR.bikeGlow;
+      ctx.lineWidth = 1.5;
+      ctx.globalAlpha = 0.8;
       ctx.stroke();
 
       ctx.restore();

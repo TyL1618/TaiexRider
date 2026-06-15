@@ -4,18 +4,18 @@
 // ============================================================
 
 export const TRACK = {
-  segmentWidth: 95, // 每個資料點的水平間距 (px)
-  heightRange: 340, // 基準 heightRange（對應 REF_PCT=3% 的單步漲幅）
-  heightMin: 180,   // 最平穩賽道的最小高度（不讓 TAIEX 完全變水平）
-  heightMax: 600,   // 最狂野賽道的高度上限
+  segmentWidth: 120, // 每個資料點的水平間距 (px)
+  heightRange: 340,  // 基準 heightRange（對應 REF_PCT=3% 的單步漲幅）
+  heightMin: 250,    // 最平穩賽道的最小高度（不讓 TAIEX 完全變水平）
+  heightMax: 1000,   // 最狂野賽道的高度上限
   baselineY: 560, // 賽道基準線 (世界座標 y，越大越下面)
   startFlat: 4, // 起點平台補幾個平坦點
   endFlat: 3, // 終點平台補幾個平坦點
   // 斜率限制：相鄰兩點高度差上限 = tan(maxSlopeDeg) * segmentWidth
-  maxSlopeDeg: 55,
+  maxSlopeDeg: 75,
 } as const;
 
-// 車輛＝敞篷跑車（低重心、寬輪距 → 較穩；輪子較小）
+// 車輛＝摩托車（chassis = 車架物理體；drawBike 繪製摩托車外觀）
 export const BIKE = {
   chassisW: 48, // 車身（縮至 52%，接近 Rider 比例）
   chassisH: 10,
@@ -35,14 +35,14 @@ export const DRIVE = {
   // ── 定速模型（Rider 風格）──
   // 著地時直接把水平速度鎖定為定值（不用 force 驅動），所以：
   // 任何坡都恆速爬得上、永遠不卡頓、不會 wheelie 後翻。
-  cruiseSpeed: 9, // 按住時鎖定的「沿坡面」速度 (px/step)，越大越快
+  cruiseSpeed: 15, // 按住時鎖定的「沿坡面」速度 (px/step)，越大越快
   groundLockEase: 0.3, // 速度趨近 cruiseSpeed 的平滑度 (0~1)，避免落地瞬間硬切
   rideableCos: 0.3, // 著地定速鎖定的門檻：cos(車身角) > 此值才鎖（≈72°內都算貼坡，避免陡坡失鎖）
   groundedAvMax: 0.28, // 著地時角速度上限（允許跟坡緩轉，阻止翻滾累積）
   airSpinAccel: 0.006, // 每 step 朝目標角速度逼近的量
   airSpinMax: 0.12, // 後翻最大角速度
-  airNoseDive: 0.006,    // 空中放開時每 step 車頭前傾偏移量（正值=順時鐘=車頭往下）
-  airNoseDiveMax: 0.10,  // 車頭前傾最大角速度
+  airNoseLift: 0.006,    // 空中放開時每 step 車頭上揚偏移量（負角速度=逆時鐘=車頭往上）
+  airNoseLiftMax: 0.10,  // 車頭上揚最大角速度
 } as const;
 
 export const RULES = {
