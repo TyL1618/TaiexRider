@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Engine, Events, Composite, Body, type IEventCollision } from "matter-js";
 import "./GameCanvas.css";
-import { pricesToTrack, buildTerrainBodies, slopeAt, type Track } from "./terrain";
+import { pricesToTrack, buildTerrainBodies, terrainYAt, type Track } from "./terrain";
 import { createBike, resetBike, type Bike } from "./bike";
 import { BIKE, CAMERA, COLOR, DRIVE, RULES } from "./constants";
 
@@ -217,36 +217,52 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
 
     // ---- 物理步進 ----
     const STEP = 1000 / 60;
+    // 前後輪所踩地形連線(弦)的傾角 → 前輪上陡坡時整台車跟著轉上去（不用鼻頭水平爬）
+    const chordSlope = (): number => {
+      const xr = bike.rearWheel.position.x;
+      const xf = bike.frontWheel.position.x;
+      const yr = terrainYAt(track, xr);
+      const yf = terrainYAt(track, xf);
+      return Math.atan2(yf - yr, xf - xr);
+    };
+
     // 定速引擎（Rider 風格街機手感）：
-    //  著地按住 → 把車身+雙輪速度沿「坡面切線方向」鎖成 cruiseSpeed（任何坡都爬得上、同速）
-    //  著地恆時 → 車身角速度朝「坡面切線」比例修正（平滑貼地，不翹頭、落地不翻）
-    //  離地 → 不再鎖速 = 拋體，靠離地速度+坡角自然飛出去；空中按住＝後空翻
+    //  著地按住 → 沿「兩輪取坡」方向鎖速（只改切線分量、保留垂直分量→過坡頂自然飛出去）
+    //  著地恆時 → 車身角速度朝弦坡比例修正（平滑貼地，不翹頭、落地不翻）
+    //  離地：按住＝後空翻、放開＝車頭緩緩往前壓（準備落地）
     const applyControls = (grounded: boolean, _upright: boolean) => {
       if (overRef.current) return;
       const c = bike.chassis;
 
       if (grounded) {
-        const slope = slopeAt(track, c.position.x);
+        const slope = chordSlope();
+        const dirX = Math.cos(slope);
+        const dirY = Math.sin(slope);
         if (throttle) {
-          // 沿坡面切線方向鎖速（不沿車身角度→不重演翹頭正回饋）；直接設速度→任何坡都爬得上
-          const dirX = Math.cos(slope);
-          const dirY = Math.sin(slope);
+          // 只調沿坡切線分量、保留法線(垂直)分量→過凸點不被抹掉，能自然彈飛
+          const nx = -dirY;
+          const ny = dirX;
           const along = c.velocity.x * dirX + c.velocity.y * dirY;
+          const perp = c.velocity.x * nx + c.velocity.y * ny;
           const newAlong = along + (DRIVE.cruiseSpeed - along) * DRIVE.groundLockEase;
-          const vx = newAlong * dirX;
-          const vy = newAlong * dirY;
+          const vx = newAlong * dirX + perp * nx;
+          const vy = newAlong * dirY + perp * ny;
           Body.setVelocity(c, { x: vx, y: vy });
           Body.setVelocity(bike.rearWheel, { x: vx, y: vy });
           Body.setVelocity(bike.frontWheel, { x: vx, y: vy });
         }
-        // 對齊坡面切線：以比例修正車身角速度（gain），並夾在 groundedAvMax 內
+        // 對齊弦坡：以比例修正車身角速度（gain），並夾在 groundedAvMax 內
         const da = angleDelta(c.angle, slope);
         let av = da * DRIVE.groundAlignGain;
         if (Math.abs(av) > DRIVE.groundedAvMax) av = Math.sign(av) * DRIVE.groundedAvMax;
         Body.setAngularVelocity(c, av);
       } else if (throttle && Math.cos(c.angle) > 0) {
-        // 雙輪離地 + 按住 + 未翻過頭 → 後空翻
+        // 空中按住 + 未翻過頭 → 後空翻（負向＝車頭往上後翻）
         const nv = Math.max(-DRIVE.airSpinMax, c.angularVelocity - DRIVE.airSpinAccel);
+        Body.setAngularVelocity(c, nv);
+      } else if (!throttle) {
+        // 空中放開 → 車頭緩緩往前壓（正向＝nose-down），設上限不自己翻整圈
+        const nv = Math.min(DRIVE.airNoseForwardMax, c.angularVelocity + DRIVE.airNoseForwardAccel);
         Body.setAngularVelocity(c, nv);
       }
     };
@@ -290,10 +306,14 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
           bonusPoints += gained;
           showToast(`${flips} 圈 +${gained}`);
         }
-        // 完美落地：要先在空中做過翻滾(flips>0) + 真實跳躍 + 雙輪同時觸地 + 正立
-        // （否則車身輕輕彈起、雙輪一碰就觸發＝沒意思，故必須有完成翻滾）
-        const bothWheels = rearContacts > 0 && frontContacts > 0;
-        if (realAir && bothWheels && upright && flips > 0) {
+        // 完美落地：先在空中做過翻滾(flips>0) + 真實跳躍 + 正立 + 車身與坡面平行
+        // 用「車身角≈坡面角」取代「同 step 雙輪觸地」→ 不受兩輪觸地那幾毫秒時間差影響
+        const landSlope = Math.atan2(
+          terrainYAt(track, bike.frontWheel.position.x) - terrainYAt(track, bike.rearWheel.position.x),
+          bike.frontWheel.position.x - bike.rearWheel.position.x,
+        );
+        const levelOk = Math.abs(angleDelta(c.angle, landSlope)) < RULES.perfectLevelRad;
+        if (realAir && upright && flips > 0 && levelOk) {
           bonusPoints += RULES.perfectBonus;
           showToast(`完美落地 +${RULES.perfectBonus}`);
           perfectFxFrames = 30;
@@ -304,6 +324,11 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
         }
         airRotation = 0;
         airTime = 0;
+      } else if (!groundedNow && wasGrounded) {
+        // 離地瞬間：① 速度 ×launchBoost（解耦：地面慢、飛行距離保持）
+        //           ② 歸零殘留角速度（消除爬坡貼坡帶上來的「莫名往後翻」）
+        Body.setVelocity(c, { x: c.velocity.x * DRIVE.launchBoost, y: c.velocity.y * DRIVE.launchBoost });
+        Body.setAngularVelocity(c, 0);
       }
       if (groundedNow) airRotation = 0;
       wasGrounded = groundedNow;

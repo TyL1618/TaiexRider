@@ -86,6 +86,19 @@ export function slopeAt(track: Track, x: number): number {
   return Math.atan2(v[i + 1].y - v[i].y, v[i + 1].x - v[i].x);
 }
 
+// 取得賽道在世界 x 處的地形高度 y（線性內插），供「前後輪取坡」用
+export function terrainYAt(track: Track, x: number): number {
+  const v = track.vertices;
+  const seg = TRACK.segmentWidth;
+  let i = Math.floor(x / seg);
+  if (i < 0) i = 0;
+  if (i > v.length - 2) i = v.length - 2;
+  const a = v[i];
+  const b = v[i + 1];
+  const t = Math.max(0, Math.min(1, (x - a.x) / (b.x - a.x)));
+  return a.y + (b.y - a.y) * t;
+}
+
 // 賽道頂點 → 一串靜態碰撞體（每段一個旋轉矩形，略為重疊避免接縫卡頓）
 export function buildTerrainBodies(track: Track, thickness = 26): Body[] {
   const bodies: Body[] = [];
