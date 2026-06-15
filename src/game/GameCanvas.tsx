@@ -76,7 +76,7 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
 
     // ---- 建立世界 ----
     const engine = Engine.create();
-    engine.gravity.y = 1;
+    engine.gravity.y = 1.5; // 調重：車落地乾脆、翹起砸下有份量（連帶滯空變短）
     const world = engine.world;
 
     const track: Track = pricesToTrack(prices);
@@ -196,12 +196,15 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
       const c = bike.chassis;
 
       if (grounded) {
-        // 著地：按住才驅動 → 平滑恆速（直接設速度，不用 force，避免一頓一頓）
-        // 放開則不給動力，車子依坡度自然滑行/減速/停。
+        // 著地：按住才驅動 → 沿「車身朝向(≈坡面)」方向平滑恆速
+        // 鎖沿坡速度而非水平速度 → 上坡/下坡/平路速度一致（不會坡面變慢）
         if (throttle && Math.cos(c.angle) > DRIVE.rideableCos) {
-          const target = DRIVE.cruiseSpeed;
-          const vx = c.velocity.x + (target - c.velocity.x) * DRIVE.groundLockEase;
-          Body.setVelocity(c, { x: vx, y: c.velocity.y });
+          const dirX = Math.cos(c.angle);
+          const dirY = Math.sin(c.angle);
+          // 目前沿坡方向的速度分量（投影）
+          const along = c.velocity.x * dirX + c.velocity.y * dirY;
+          const newAlong = along + (DRIVE.cruiseSpeed - along) * DRIVE.groundLockEase;
+          Body.setVelocity(c, { x: newAlong * dirX, y: newAlong * dirY });
         }
         // 角速度阻尼 + 硬夾上限（不論按不按）：防立車/甩晃/撞坡翻滾
         if (Math.cos(c.angle) > DRIVE.rideableCos) {

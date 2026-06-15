@@ -36,12 +36,13 @@ export const DRIVE = {
   // ── 定速模型（Rider 風格）──
   // 著地時直接把水平速度鎖定為定值（不用 force 驅動），所以：
   // 任何坡都恆速爬得上、永遠不卡頓、不會 wheelie 後翻。
-  cruiseSpeed: 6.5, // 著地時鎖定的水平速度 (px/step)，越大越快
-  groundLockEase: 0.25, // 速度趨近 cruiseSpeed 的平滑度 (0~1)，避免落地瞬間硬切
+  cruiseSpeed: 9, // 按住時鎖定的「沿坡面」速度 (px/step)，越大越快
+  groundLockEase: 0.3, // 速度趨近 cruiseSpeed 的平滑度 (0~1)，避免落地瞬間硬切
   rideableCos: 0.3, // 著地定速鎖定的門檻：cos(車身角) > 此值才鎖（≈72°內都算貼坡，避免陡坡失鎖）
   // 空中後翻：單指唯一作用 — 直接以角速度(rad/step)控制（負=逆時針=後空翻）
-  airSpinAccel: 0.006, // 每 step 朝目標角速度逼近的量
-  airSpinMax: 0.12, // 後翻最大角速度
+  // 重力調重(1.5)後滯空變短，故後翻轉速一併調快避免翻不起來
+  airSpinAccel: 0.009, // 每 step 朝目標角速度逼近的量
+  airSpinMax: 0.18, // 後翻最大角速度
 } as const;
 
 export const RULES = {
