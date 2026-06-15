@@ -68,6 +68,79 @@
   opacity: 0.7;
 }
 
+/* ---- 工具列：搜尋 + 排序 ---- */
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  width: 100%;
+  max-width: 480px;
+  margin-bottom: 0.9rem;
+}
+
+.search-box {
+  flex: 1 1 100%;
+  padding: 0.55rem 0.9rem;
+  font-size: 0.9rem;
+  color: var(--text);
+  background: rgba(45, 226, 230, 0.04);
+  border: 1px solid rgba(45, 226, 230, 0.25);
+  border-radius: 8px;
+  outline: none;
+}
+
+.search-box::placeholder {
+  color: var(--text-dim);
+}
+
+.search-box:focus {
+  border-color: var(--neon-cyan);
+  box-shadow: 0 0 12px rgba(45, 226, 230, 0.2);
+}
+
+.sort-group {
+  display: flex;
+  gap: 0.4rem;
+  width: 100%;
+}
+
+.sort-btn {
+  flex: 1;
+  padding: 0.4rem 0.5rem;
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+  background: transparent;
+  border: 1px solid rgba(45, 226, 230, 0.2);
+  border-radius: 7px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.sort-btn.active {
+  color: var(--neon-cyan);
+  border-color: var(--neon-cyan);
+  background: rgba(45, 226, 230, 0.08);
+}
+
+.empty-hint {
+  font-size: 0.95rem;
+  color: var(--text);
+  line-height: 1.8;
+}
+
+.empty-sub {
+  font-size: 0.72rem;
+  color: var(--text-dim);
+}
+
+.track-diff {
+  margin-left: auto;
+  font-size: 0.85rem;
+  color: var(--neon-amber);
+  letter-spacing: 0.05em;
+}
+
 /* ---- 賽道卡片列表（直立全寬）---- */
 .track-list {
   display: flex;

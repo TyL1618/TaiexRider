@@ -15,8 +15,28 @@ export interface TrackData {
 }
 
 export const TRACKS: TrackData[] = [
-  { ...taiex, name: "加權指數", mode: "intraday", desc: "昨日盤中・平緩巡航" },
+  { ...taiex, name: "加權指數", mode: "intraday", desc: "前次盤中・平緩巡航" },
   { ...s2330, name: "台積電", mode: "monthly", desc: "近月日線・中等起伏" },
   { ...s0050, name: "元大台灣50", mode: "monthly", desc: "近月日線・中等起伏" },
   { ...s2454, name: "聯發科", mode: "monthly", desc: "近月日線・狂野跳台" },
 ];
+
+// 困難度 = 最大單步漲跌幅（波動度），越大地形越狂野越難
+export function trackDifficulty(prices: number[]): number {
+  let maxStepPct = 0;
+  for (let i = 1; i < prices.length; i++) {
+    const pct = Math.abs(prices[i] / prices[i - 1] - 1);
+    if (pct > maxStepPct) maxStepPct = pct;
+  }
+  return maxStepPct;
+}
+
+// 1~5 星難度（依波動度分級）
+export function difficultyStars(prices: number[]): number {
+  const d = trackDifficulty(prices);
+  if (d < 0.005) return 1;
+  if (d < 0.02) return 2;
+  if (d < 0.05) return 3;
+  if (d < 0.085) return 4;
+  return 5;
+}
