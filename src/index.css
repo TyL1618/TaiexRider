@@ -15,6 +15,11 @@
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+  /* 消除手機點擊時整片反藍（Android tap 高亮 / iOS 選取） */
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 html,

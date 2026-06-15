@@ -50,11 +50,11 @@
   opacity: 0.75;
 }
 
-/* 角落小資訊 */
+/* 角落小資訊（移到設定 icon 下方）*/
 .hud-corner {
   position: absolute;
-  top: 1rem;
-  left: 1.25rem;
+  top: 3.2rem;
+  left: 1.1rem;
   font-size: 0.8rem;
   letter-spacing: 0.08em;
   color: var(--text-dim);
@@ -136,6 +136,56 @@
 .exit-btn:hover {
   color: var(--neon-cyan);
   border-color: var(--neon-cyan);
+}
+
+/* 左上設定 icon */
+.icon-btn {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.1rem;
+  height: 2.1rem;
+  font-size: 1.1rem;
+  color: var(--text-dim);
+  background: rgba(5, 8, 15, 0.5);
+  border: 1px solid var(--text-dim);
+  border-radius: 7px;
+  cursor: pointer;
+}
+
+.icon-btn:hover {
+  color: var(--neon-cyan);
+  border-color: var(--neon-cyan);
+}
+
+.settings-btn {
+  top: 0.9rem;
+  left: 1rem;
+}
+
+/* 設定面板 */
+.settings-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.9rem;
+  padding: 2rem 2.6rem;
+  background: rgba(5, 8, 15, 0.9);
+  border: 1px solid var(--neon-cyan);
+  border-radius: 12px;
+  box-shadow: 0 0 24px rgba(45, 226, 230, 0.25);
+}
+
+.settings-row {
+  font-size: 0.95rem;
+  letter-spacing: 0.08em;
+  color: var(--text);
+}
+
+.settings-row.dim {
+  font-size: 0.8rem;
+  color: var(--text-dim);
 }
 
 .overlay-btn.ghost {

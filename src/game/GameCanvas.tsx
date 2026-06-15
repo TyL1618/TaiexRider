@@ -35,6 +35,8 @@ function angleDelta(prev: number, next: number): number {
   return d;
 }
 
+export const APP_VERSION = "0.2.0";
+
 // 累積 flips 的遞增總分：1圈100 / 2圈250 / 3圈450 ...
 function flipScore(flips: number): number {
   let total = 0;
@@ -57,6 +59,7 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
   const [crashed, setCrashed] = useState(false);
   const [finished, setFinished] = useState(false);
   const [toast, setToast] = useState<{ text: string; id: number } | null>(null);
+  const [showSettings, setShowSettings] = useState(false);
   // 讓事件處理可讀到最新的結束狀態
   const overRef = useRef(false);
   overRef.current = crashed || finished;
@@ -112,8 +115,6 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
       if (ev.code === "Space") {
         ev.preventDefault();
         press();
-      } else if (ev.key === "r" || ev.key === "R") {
-        requestReset();
       }
     };
     const onKeyUp = (ev: KeyboardEvent) => {
@@ -601,8 +602,14 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
         {label}　距離 {hud.distance}m
       </div>
 
+      {/* 左上：設定 */}
+      <button className="icon-btn settings-btn" onClick={() => setShowSettings(true)} aria-label="設定">
+        ⚙
+      </button>
+
+      {/* 右上：返回主選單 */}
       <button className="exit-btn" onClick={onExit}>
-        選賽道
+        返回主選單
       </button>
 
       {/* 得分提示（後空翻 / 完美落地）*/}
@@ -614,7 +621,20 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
 
       <div className={`throttle-dot ${hud.throttle ? "on" : ""}`} />
 
-      <div className="ctrl-hint">按住畫面任一處 = 油門 ・ 空中按住 = 後空翻 ・ R 重來</div>
+      <div className="ctrl-hint">空中按住畫面 = 後空翻</div>
+
+      {showSettings && (
+        <div className="overlay" onClick={() => setShowSettings(false)}>
+          <div className="settings-panel" onClick={(e) => e.stopPropagation()}>
+            <div className="overlay-title">設定</div>
+            <div className="settings-row">音量（待實作）</div>
+            <div className="settings-row dim">版本 v{APP_VERSION}</div>
+            <button className="overlay-btn ghost" onClick={() => setShowSettings(false)}>
+              關閉
+            </button>
+          </div>
+        </div>
+      )}
 
       {(crashed || finished) && (
         <div className="overlay">
@@ -622,10 +642,10 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
           <div className="overlay-score">{hud.points} 分</div>
           <div className="overlay-time">{hud.timer}</div>
           <button className="overlay-btn" onClick={requestReset}>
-            再玩一次 (R)
+            再玩一次
           </button>
           <button className="overlay-btn ghost" onClick={onExit}>
-            換賽道
+            返回主選單
           </button>
         </div>
       )}
