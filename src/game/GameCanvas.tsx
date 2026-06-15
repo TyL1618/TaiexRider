@@ -196,13 +196,15 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
       const c = bike.chassis;
 
       if (grounded) {
-        // 著地恆速：只要車身還算貼著坡（未翻倒）就鎖定水平速度，平滑趨近 cruiseSpeed
-        // 用較寬的 rideableCos 門檻，讓陡坡也能恆速貼滑（不再失鎖彈跳）
-        if (Math.cos(c.angle) > DRIVE.rideableCos) {
+        // 著地：按住才驅動 → 平滑恆速（直接設速度，不用 force，避免一頓一頓）
+        // 放開則不給動力，車子依坡度自然滑行/減速/停。
+        if (throttle && Math.cos(c.angle) > DRIVE.rideableCos) {
           const target = DRIVE.cruiseSpeed;
           const vx = c.velocity.x + (target - c.velocity.x) * DRIVE.groundLockEase;
           Body.setVelocity(c, { x: vx, y: c.velocity.y });
-          // 著地強力壓制角速度 + 硬夾上限，防止立車/甩晃/撞坡翻滾
+        }
+        // 角速度阻尼 + 硬夾上限（不論按不按）：防立車/甩晃/撞坡翻滾
+        if (Math.cos(c.angle) > DRIVE.rideableCos) {
           let av = c.angularVelocity * 0.5;
           const AV_MAX = 0.12;
           if (av > AV_MAX) av = AV_MAX;
@@ -626,7 +628,7 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
 
       <div className={`throttle-dot ${hud.throttle ? "on" : ""}`} />
 
-      <div className="ctrl-hint">空中按住畫面 = 後空翻</div>
+      <div className="ctrl-hint">按住畫面 = 前進 ・ 空中按住 = 後空翻</div>
 
       {showSettings && (
         <div className="overlay" onClick={() => setShowSettings(false)}>
