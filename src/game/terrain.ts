@@ -1,5 +1,5 @@
 import { Bodies, type Body } from "matter-js";
-import { TRACK } from "./constants";
+import { COLOR, TRACK } from "./constants";
 
 export interface Vec2 {
   x: number;
@@ -8,6 +8,7 @@ export interface Vec2 {
 
 export interface Track {
   vertices: Vec2[]; // 賽道頂點（世界座標，y 向下為正）
+  colors: string[]; // 每段顏色（長度 = vertices.length - 1）：漲=紅/跌=綠/平=青
   startX: number; // 起點平台中段 x（機車生成處）
   finishX: number; // 終點 x
   minY: number; // 用於鏡頭/渲染範圍
@@ -16,14 +17,26 @@ export interface Track {
 
 // 價格陣列 → 賽道頂點（DEVDOC 第 4 節）
 export function pricesToTrack(prices: number[]): Track {
-  const { segmentWidth, heightRange, baselineY, startFlat, endFlat, maxSlopeDeg } =
+  const { segmentWidth, heightRange, heightMin, heightMax, baselineY, startFlat, endFlat, maxSlopeDeg } =
     TRACK;
 
-  // 1. 正規化高度
+  // 1. 正規化高度（依波動度動態縮放：越狂野的股票地形越高）
   const min = Math.min(...prices);
   const max = Math.max(...prices);
   const span = max - min || 1;
-  const toY = (p: number) => baselineY - ((p - min) / span) * heightRange;
+
+  // 以最大單步漲跌幅決定 scaledHeight（3% 基準=340px，9.8% 漲停≈600px）
+  let maxStepPct = 0;
+  for (let i = 1; i < prices.length; i++) {
+    const pct = Math.abs(prices[i] / prices[i - 1] - 1);
+    if (pct > maxStepPct) maxStepPct = pct;
+  }
+  const REF_PCT = 0.03;
+  const scaledHeight = maxStepPct > 0
+    ? Math.max(heightMin, Math.min(heightMax, heightRange * (maxStepPct / REF_PCT)))
+    : heightRange;
+
+  const toY = (p: number) => baselineY - ((p - min) / span) * scaledHeight;
 
   // 頭尾加平坦緩衝（用首/末價的高度）
   const padded: number[] = [
@@ -46,9 +59,18 @@ export function pricesToTrack(prices: number[]): Track {
     prevY = y;
   }
 
+  // 每段顏色：比較 padded 相鄰兩值方向（漲=紅/跌=綠/平=青）
+  const colors: string[] = [];
+  for (let i = 0; i < padded.length - 1; i++) {
+    if (padded[i + 1] > padded[i]) colors.push(COLOR.trackUp);
+    else if (padded[i + 1] < padded[i]) colors.push(COLOR.trackDown);
+    else colors.push(COLOR.track);
+  }
+
   const ys = vertices.map((v) => v.y);
   return {
     vertices,
+    colors,
     startX: (startFlat * segmentWidth) / 2,
     finishX: vertices[vertices.length - 1].x,
     minY: Math.min(...ys),

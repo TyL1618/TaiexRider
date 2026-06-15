@@ -133,6 +133,11 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
     // ---- 遊戲狀態 ----
     let camX = spawnX - W * CAMERA.offsetXRatio;
     let camY = spawnY - H * CAMERA.offsetYRatio;
+    let scale = 1;
+    let targetScale = 1;
+    let overviewCamX = 0;
+    let overviewCamY = 0;
+    let overviewComputed = false;
     let prevAngle = bike.chassis.angle;
     let airRotation = 0;
     let airTime = 0; // 連續騰空時間（雙輪皆離地）
@@ -161,6 +166,9 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
       wasGrounded = false;
       perfectFxFrames = 0;
       perfectFxPts = [];
+      scale = 1;
+      targetScale = 1;
+      overviewComputed = false;
       setCrashed(false);
       setFinished(false);
       setToast(null);
@@ -174,7 +182,8 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
       if (grounded) {
         // 著地：沿車身朝向施前進力 + 後輪轉動（不主動翻身，確保穩定前進）
         if (c.velocity.x < DRIVE.maxSpeed) {
-          const f = c.mass * DRIVE.accel;
+          const uphillBoost = (c.angle < -0.12 && c.velocity.x < 2.5) ? DRIVE.uphillBoost : 1;
+          const f = c.mass * DRIVE.accel * uphillBoost;
           c.force.x += Math.cos(c.angle) * f;
           c.force.y += Math.sin(c.angle) * f;
         }
@@ -276,8 +285,8 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
     }
 
     // ---- 渲染（neon）----
-    const wx = (x: number) => x - camX;
-    const wy = (y: number) => y - camY;
+    const wx = (x: number) => (x - camX) * scale;
+    const wy = (y: number) => (y - camY) * scale;
 
     const drawTrack = () => {
       const v = track.vertices;
@@ -294,17 +303,27 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
       grad.addColorStop(1, COLOR.fillBottom);
       ctx.fillStyle = grad;
       ctx.fill();
-      // 霓虹線
-      ctx.beginPath();
-      ctx.moveTo(wx(v[0].x), wy(v[0].y));
-      for (let i = 1; i < v.length; i++) ctx.lineTo(wx(v[i].x), wy(v[i].y));
-      ctx.lineWidth = 3;
-      ctx.strokeStyle = COLOR.track;
-      ctx.shadowColor = COLOR.trackGlow;
-      ctx.shadowBlur = 16;
-      ctx.lineJoin = "round";
-      ctx.lineCap = "round";
-      ctx.stroke();
+      // 霓虹線（漲=紅/跌=綠，連續同色段合為一條 path 減少 draw call）
+      let si = 0;
+      while (si < v.length - 1) {
+        const col = track.colors[si];
+        const glow = col === COLOR.trackUp ? COLOR.trackUpGlow
+          : col === COLOR.trackDown ? COLOR.trackDownGlow
+          : COLOR.trackGlow;
+        ctx.beginPath();
+        ctx.moveTo(wx(v[si].x), wy(v[si].y));
+        while (si < v.length - 1 && track.colors[si] === col) {
+          ctx.lineTo(wx(v[si + 1].x), wy(v[si + 1].y));
+          si++;
+        }
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = col;
+        ctx.shadowColor = glow;
+        ctx.shadowBlur = 16;
+        ctx.lineJoin = "round";
+        ctx.lineCap = "round";
+        ctx.stroke();
+      }
       ctx.restore();
     };
 
@@ -486,12 +505,26 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
         acc -= STEP;
       }
 
-      // 鏡頭跟隨
+      // 鏡頭跟隨 / 終點全覽
       const c = bike.chassis;
-      const tx = c.position.x - W * CAMERA.offsetXRatio;
-      const ty = c.position.y - H * CAMERA.offsetYRatio;
-      camX += (Math.max(0, tx) - camX) * CAMERA.ease;
-      camY += (ty - camY) * CAMERA.ease;
+      if (overRef.current) {
+        if (!overviewComputed) {
+          const trackW = track.finishX;
+          const trackH = track.maxY - track.minY + 60; // +60 for flags
+          targetScale = Math.min((W - 80) / trackW, (H - 100) / trackH);
+          overviewCamX = trackW / 2 - W / (2 * targetScale);
+          overviewCamY = (track.minY - 60 + track.maxY) / 2 - H / (2 * targetScale);
+          overviewComputed = true;
+        }
+        scale += (targetScale - scale) * 0.04;
+        camX += (overviewCamX - camX) * 0.04;
+        camY += (overviewCamY - camY) * 0.04;
+      } else {
+        const tx = c.position.x - W * CAMERA.offsetXRatio;
+        const ty = c.position.y - H * CAMERA.offsetYRatio;
+        camX += (Math.max(0, tx) - camX) * CAMERA.ease;
+        camY += (ty - camY) * CAMERA.ease;
+      }
 
       render();
       if (perfectFxFrames > 0) perfectFxFrames--;
