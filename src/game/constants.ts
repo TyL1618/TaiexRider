@@ -39,10 +39,8 @@ export const DRIVE = {
   groundLockEase: 0.3, // 速度趨近 cruiseSpeed 的平滑度 (0~1)，避免落地瞬間硬切
   rideableCos: 0.3, // 著地定速鎖定的門檻：cos(車身角) > 此值才鎖（≈72°內都算貼坡，避免陡坡失鎖）
   groundedAvMax: 0.28, // 著地時角速度上限（允許跟坡緩轉，阻止翻滾累積）
-  airSpinAccel: 0.006, // 每 step 朝目標角速度逼近的量
-  airSpinMax: 0.12, // 後翻最大角速度
-  airNoseLift: 0.006,    // 空中放開時每 step 車頭上揚偏移量（負角速度=逆時鐘=車頭往上）
-  airNoseLiftMax: 0.10,  // 車頭上揚最大角速度
+  airSpinAccel: 0.010, // 每 step 朝目標角速度逼近的量
+  airSpinMax: 0.22, // 後翻最大角速度（×2，讓翻轉感明顯）
 } as const;
 
 export const RULES = {
