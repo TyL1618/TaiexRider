@@ -12,8 +12,7 @@ export const TRACK = {
   startFlat: 4, // 起點平台補幾個平坦點
   endFlat: 3, // 終點平台補幾個平坦點
   // 斜率限制：相鄰兩點高度差上限 = tan(maxSlopeDeg) * segmentWidth
-  // 定速模型下坡度 > ~45° 車子會立起來甩晃，故夾到 40°（cos40≈0.77 > upright 門檻，車能貼坡恆速滑行）
-  maxSlopeDeg: 40,
+  maxSlopeDeg: 55,
 } as const;
 
 // 車輛＝敞篷跑車（低重心、寬輪距 → 較穩；輪子較小）

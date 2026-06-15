@@ -89,12 +89,14 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
     // ---- 著地偵測（輪子 vs terrain 計數）----
     let rearContacts = 0;
     let frontContacts = 0;
+    let chassisContacts = 0;
     const onCollision = (delta: number) => (e: IEventCollision<Engine>) => {
       for (const pair of e.pairs) {
         const labels = [pair.bodyA.label, pair.bodyB.label];
         if (!labels.includes("terrain")) continue;
         if (labels.includes("rearWheel")) rearContacts = Math.max(0, rearContacts + delta);
         if (labels.includes("frontWheel")) frontContacts = Math.max(0, frontContacts + delta);
+        if (labels.includes("chassis")) chassisContacts = Math.max(0, chassisContacts + delta);
       }
     };
     const collStart = onCollision(1);
@@ -168,6 +170,7 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
       resetBike(bike);
       rearContacts = 0;
       frontContacts = 0;
+      chassisContacts = 0;
       throttle = false;
       prevAngle = bike.chassis.angle;
       airRotation = 0;
@@ -274,11 +277,11 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
       const distScore = Math.min(1000, Math.round((traveled / (track.finishX - track.startX)) * 1000));
       points = bonusPoints + distScore;
 
-      // 摔車：倒地 0.5s 立判、空中倒置 2s 判（倒地不可按壓翻回）
-      if (Math.cos(c.angle) < 0) {
+      // 摔車：車身碰地 + 兩輪皆離地，持續 0.4s
+      const bikeDowned = chassisContacts > 0 && rearContacts === 0 && frontContacts === 0;
+      if (bikeDowned) {
         crashTimer += dtMs / 1000;
-        const crashTimeout = groundedNow ? 0.5 : RULES.crashUpsideDownSec;
-        if (crashTimer >= crashTimeout && !overRef.current) {
+        if (crashTimer >= 0.4 && !overRef.current) {
           setCrashed(true);
         }
       } else {
@@ -338,6 +341,9 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
       ctx.fillStyle = grad;
       ctx.fill();
       // 霓虹折線（漲=紅/跌=綠，連續同色段合為一條 path 減少 draw call）
+      ctx.lineJoin = "round";
+      ctx.lineCap = "round";
+      ctx.shadowBlur = 0;
       let si = 0;
       while (si < v.length - 1) {
         const col = track.colors[si];
@@ -350,12 +356,15 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
           ctx.lineTo(wx(v[si + 1].x), wy(v[si + 1].y));
           si++;
         }
-        ctx.lineWidth = 3;
+        // 光暈層（寬半透明線，取代 shadowBlur）
+        ctx.strokeStyle = glow;
+        ctx.lineWidth = 10;
+        ctx.globalAlpha = 0.35;
+        ctx.stroke();
+        // 實線層
         ctx.strokeStyle = col;
-        ctx.shadowColor = glow;
-        ctx.shadowBlur = 16;
-        ctx.lineJoin = "round";
-        ctx.lineCap = "round";
+        ctx.lineWidth = 3;
+        ctx.globalAlpha = 1;
         ctx.stroke();
       }
       ctx.restore();
@@ -365,8 +374,7 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
       ctx.save();
       ctx.strokeStyle = color;
       ctx.fillStyle = color;
-      ctx.shadowColor = color;
-      ctx.shadowBlur = 12;
+      ctx.shadowBlur = 0;
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.moveTo(wx(x), wy(y));
@@ -375,7 +383,6 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
       ctx.fillRect(wx(x), wy(y) - 60, 34, 18);
       ctx.fillStyle = "#05080f";
       ctx.font = "bold 11px system-ui";
-      ctx.shadowBlur = 0;
       ctx.fillText(label, wx(x) + 3, wy(y) - 47);
       ctx.restore();
     };
@@ -389,11 +396,14 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
       ctx.arc(0, 0, r, 0, Math.PI * 2);
       ctx.fillStyle = "#0a0f18";
       ctx.fill();
-      // 霓虹輪框
+      // 霓虹輪框（雙描邊取代 shadowBlur）
+      ctx.strokeStyle = COLOR.bikeGlow;
+      ctx.lineWidth = 7;
+      ctx.globalAlpha = 0.4;
+      ctx.stroke();
       ctx.strokeStyle = COLOR.wheel;
-      ctx.shadowColor = COLOR.bikeGlow;
-      ctx.shadowBlur = 8;
       ctx.lineWidth = 2.5;
+      ctx.globalAlpha = 1;
       ctx.stroke();
       // 輪轂 + 輪輻（顯示轉動）
       ctx.beginPath();
@@ -413,12 +423,9 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
       ctx.rotate(c.angle);
       ctx.scale(0.52, 0.52); // 車身縮至 52%（對應 chassisW 92→48）
 
-      ctx.strokeStyle = COLOR.bike;
-      ctx.shadowColor = COLOR.bikeGlow;
-      ctx.shadowBlur = 12;
+      ctx.shadowBlur = 0;
       ctx.lineJoin = "round";
       ctx.lineCap = "round";
-      ctx.lineWidth = 3;
 
       // 車體：低扁楔形 + 中段敞篷凹陷
       ctx.beginPath();
@@ -433,9 +440,17 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
       ctx.lineTo(46, -1); // 車頭上緣
       ctx.lineTo(47, 7); // 車頭下緣
       ctx.closePath();
-      // 車身淡填色
       ctx.fillStyle = "rgba(255, 179, 0, 0.10)";
       ctx.fill();
+      // 光暈層
+      ctx.strokeStyle = COLOR.bikeGlow;
+      ctx.lineWidth = 8;
+      ctx.globalAlpha = 0.4;
+      ctx.stroke();
+      // 實線層
+      ctx.strokeStyle = COLOR.bike;
+      ctx.lineWidth = 3;
+      ctx.globalAlpha = 1;
       ctx.stroke();
 
       // 擋風玻璃斜柱
@@ -483,16 +498,18 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
         const sx = wx(pt.x);
         const sy = wy(pt.y);
         const r = 6 + p * 28;
-        ctx.globalAlpha = 1 - p;
-        ctx.strokeStyle = COLOR.start; // cyan，與琥珀色車身對比
-        ctx.shadowColor = COLOR.start;
-        ctx.shadowBlur = 16;
-        ctx.lineWidth = 3;
+        ctx.strokeStyle = COLOR.start; // cyan
+        ctx.shadowBlur = 0;
+        // 光環（光暈 + 實線）
+        ctx.lineWidth = 8;
+        ctx.globalAlpha = (1 - p) * 0.3;
         ctx.beginPath();
         ctx.arc(sx, sy, r, 0, Math.PI * 2);
         ctx.stroke();
-        // 放射火花
         ctx.lineWidth = 2;
+        ctx.globalAlpha = 1 - p;
+        ctx.stroke();
+        // 放射火花
         for (let i = 0; i < 6; i++) {
           const a = (Math.PI * 2 * i) / 6 - Math.PI / 2;
           ctx.beginPath();
