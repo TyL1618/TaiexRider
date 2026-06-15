@@ -201,17 +201,20 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
       const c = bike.chassis;
 
       if (grounded) {
-        // 雙輪同時著地才鎖速：坡頂單輪過渡時不介入，保留向上速度讓車子自然飛出
-        if (throttle && rearContacts > 0 && frontContacts > 0 && Math.cos(c.angle) > DRIVE.rideableCos) {
+        // 著地：按住才驅動 → 沿「車身朝向(≈坡面)」方向平滑恆速
+        // 鎖沿坡速度而非水平速度 → 上坡/下坡/平路速度一致（不會坡面變慢）
+        if (throttle && Math.cos(c.angle) > DRIVE.rideableCos) {
           const dirX = Math.cos(c.angle);
           const dirY = Math.sin(c.angle);
+          // 目前沿坡方向的速度分量（投影）
           const along = c.velocity.x * dirX + c.velocity.y * dirY;
           const newAlong = along + (DRIVE.cruiseSpeed - along) * DRIVE.groundLockEase;
           Body.setVelocity(c, { x: newAlong * dirX, y: newAlong * dirY });
         }
-        // 單向 AV 阻尼：只壓後翻方向（負=車頭上翹），正方向跟坡傾斜自由
-        if (c.angularVelocity < -DRIVE.groundedAvMax) {
-          Body.setAngularVelocity(c, -DRIVE.groundedAvMax);
+        // 溫和版 AV 夾：只阻止高速翻滾，允許正常跟坡傾斜
+        const av = c.angularVelocity;
+        if (Math.abs(av) > DRIVE.groundedAvMax) {
+          Body.setAngularVelocity(c, Math.sign(av) * DRIVE.groundedAvMax);
         }
       } else if (throttle && Math.cos(c.angle) > 0) {
         // 雙輪離地 + 按住 + 未翻過頭 → 後空翻
