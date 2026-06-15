@@ -17,7 +17,7 @@ export interface Track {
 
 // 價格陣列 → 賽道頂點（DEVDOC 第 4 節）
 export function pricesToTrack(prices: number[]): Track {
-  const { segmentWidth, heightRange, heightMin, heightMax, baselineY, startFlat, endFlat, maxSlopeDeg } =
+  const { segmentWidth, heightRange, heightMin, heightMax, refPct, baselineY, startFlat, endFlat, maxSlopeDeg } =
     TRACK;
 
   // 1. 正規化高度（依波動度動態縮放：越狂野的股票地形越高）
@@ -31,9 +31,8 @@ export function pricesToTrack(prices: number[]): Track {
     const pct = Math.abs(prices[i] / prices[i - 1] - 1);
     if (pct > maxStepPct) maxStepPct = pct;
   }
-  const REF_PCT = 0.03;
   const scaledHeight = maxStepPct > 0
-    ? Math.max(heightMin, Math.min(heightMax, heightRange * (maxStepPct / REF_PCT)))
+    ? Math.max(heightMin, Math.min(heightMax, heightRange * (maxStepPct / refPct)))
     : heightRange;
 
   const toY = (p: number) => baselineY - ((p - min) / span) * scaledHeight;
@@ -76,6 +75,15 @@ export function pricesToTrack(prices: number[]): Track {
     minY: Math.min(...ys),
     maxY: Math.max(...ys),
   };
+}
+
+// 取得賽道在世界 x 處的坡面傾角 (rad)，供著地時把車身對齊坡面切線
+export function slopeAt(track: Track, x: number): number {
+  const v = track.vertices;
+  let i = Math.floor(x / TRACK.segmentWidth);
+  if (i < 0) i = 0;
+  if (i > v.length - 2) i = v.length - 2;
+  return Math.atan2(v[i + 1].y - v[i].y, v[i + 1].x - v[i].x);
 }
 
 // 賽道頂點 → 一串靜態碰撞體（每段一個旋轉矩形，略為重疊避免接縫卡頓）

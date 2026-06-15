@@ -20,12 +20,14 @@ export function createBike(world: World, x: number, y: number): Bike {
     wheelBaseHalf,
     wheelDropY,
     chassisDensity,
-    wheelDensity,
+    rearWheelDensity,
+    frontWheelDensity,
     wheelFriction,
     wheelFrictionStatic,
     chassisFrictionAir,
     wheelFrictionAir,
     axleStiffness,
+    restitution,
   } = BIKE;
 
   const chassis = Bodies.rectangle(x, y, chassisW, chassisH, {
@@ -33,22 +35,25 @@ export function createBike(world: World, x: number, y: number): Bike {
     density: chassisDensity,
     frictionAir: chassisFrictionAir,
     friction: 0.4,
+    restitution,
     label: "chassis",
     chamfer: { radius: 2 },
   });
 
-  const makeWheel = (ox: number, label: string) =>
+  const makeWheel = (ox: number, label: string, density: number) =>
     Bodies.circle(x + ox, y + wheelDropY, wheelRadius, {
       collisionFilter: filter,
-      density: wheelDensity,
+      density,
       frictionAir: wheelFrictionAir,
       friction: wheelFriction,
       frictionStatic: wheelFrictionStatic,
+      restitution,
       label,
     });
 
-  const rearWheel = makeWheel(-wheelBaseHalf, "rearWheel");
-  const frontWheel = makeWheel(wheelBaseHalf, "frontWheel");
+  // 後輪＝驅動輪（輕）；前輪加重→重心前移，車頭自然下壓（治本翹頭後翻）
+  const rearWheel = makeWheel(-wheelBaseHalf, "rearWheel", rearWheelDensity);
+  const frontWheel = makeWheel(wheelBaseHalf, "frontWheel", frontWheelDensity);
 
   // 軸約束：把輪心釘在車身的軸點（length 0 → 只能轉動的轉軸）
   const axle = (wheel: Body, ox: number) =>

@@ -4,10 +4,11 @@
 // ============================================================
 
 export const TRACK = {
-  segmentWidth: 120, // 每個資料點的水平間距 (px)
-  heightRange: 340,  // 基準 heightRange（對應 REF_PCT=3% 的單步漲幅）
+  segmentWidth: 80, // 每個資料點的水平間距 (px)，越小坡越陡（Route B 由 120 收窄）
+  heightRange: 420,  // 基準 heightRange（對應 REF_PCT 的單步漲幅，越大地形越高）
   heightMin: 250,    // 最平穩賽道的最小高度（不讓 TAIEX 完全變水平）
   heightMax: 1000,   // 最狂野賽道的高度上限
+  refPct: 0.022,     // 對應 heightRange 的「基準單步漲幅」，越小越放大地形起伏
   baselineY: 560, // 賽道基準線 (世界座標 y，越大越下面)
   startFlat: 4, // 起點平台補幾個平坦點
   endFlat: 3, // 終點平台補幾個平坦點
@@ -15,32 +16,39 @@ export const TRACK = {
   maxSlopeDeg: 75,
 } as const;
 
-// 車輛＝摩托車（chassis = 車架物理體；drawBike 繪製摩托車外觀）
+// 車輛＝摩托車（chassis = 車架物理體；drawBike 貼 public/bike.png，缺檔則畫向量備援）
 export const BIKE = {
   chassisW: 48, // 車身（縮至 52%，接近 Rider 比例）
   chassisH: 10,
   wheelRadius: 6, // 跑車小輪
-  wheelBaseHalf: 18, // 前後輪距車身中心的水平距離
+  wheelBaseHalf: 22, // 前後輪距車身中心的水平距離（加大→前輪突出車頭，利於頂上坡）
   wheelDropY: 7, // 輪軸相對車身中心往下的距離
   chassisDensity: 0.0016,
-  wheelDensity: 0.0012,
+  rearWheelDensity: 0.0012, // 後輪＝驅動輪，較輕
+  frontWheelDensity: 0.0030, // 前輪加重→重心前移，車頭自然下壓（非自動旋轉，純配重）
   wheelFriction: 0.95,
   wheelFrictionStatic: 0.9, // 過高(>3)輪子會黏住不滾動
   chassisFrictionAir: 0.012,
   wheelFrictionAir: 0.012,
   axleStiffness: 0.9, // 輪軸剛性 (1=完全剛體，過高會抖)
+  restitution: 0.05, // 車輪彈性（低→落地不彈跳，穩穩貼地）
+  // ── 貼圖（決定①：整張含輪的去背 PNG，輪子不轉）──
+  spriteW: 64, // 貼圖寬度 (px)，依物理輪距微調
+  spriteOffsetX: 0, // 貼圖相對車身中心水平偏移（修正圖中車體不置中，如左側速度線）
+  spriteOffsetY: -2, // 貼圖相對車身中心垂直偏移（輪子在中心下方→圖略上移）
 } as const;
 
 export const DRIVE = {
-  // ── 定速模型（Rider 風格）──
-  // 著地時直接把水平速度鎖定為定值（不用 force 驅動），所以：
-  // 任何坡都恆速爬得上、永遠不卡頓、不會 wheelie 後翻。
-  cruiseSpeed: 15, // 按住時鎖定的「沿坡面」速度 (px/step)，越大越快
-  groundLockEase: 0.3, // 速度趨近 cruiseSpeed 的平滑度 (0~1)，避免落地瞬間硬切
-  rideableCos: 0.3, // 著地定速鎖定的門檻：cos(車身角) > 此值才鎖（≈72°內都算貼坡，避免陡坡失鎖）
-  groundedAvMax: 0.28, // 著地時角速度上限（允許跟坡緩轉，阻止翻滾累積）
-  airSpinAccel: 0.010, // 每 step 朝目標角速度逼近的量
-  airSpinMax: 0.22, // 後翻最大角速度（×2，讓翻轉感明顯）
+  // ── 真物理模型（Route B，Rider 風格）──
+  // 著地按住 → 驅動「後輪」轉速（用 setAngularVelocity，避免 torque 被 ×delta² 爆量）；
+  // 只在低於目標轉速時加速 → 下坡靠重力自然超速、保留動量；放開＝滑行（不主動煞車）。
+  driveWheelSpin: 1.9, // 後輪目標角速度 (rad/step)，×輪半徑≈巡航速度；越大越快
+  driveAccel: 0.08, // 後輪每 step 朝目標轉速逼近量（油門加速感）
+  maxSpeed: 22, // 著地速度上限 (px/step)，避免陡下坡暴衝失控
+  groundAlignGain: 0.3, // 著地時車身角速度朝「坡面切線」修正的比例（平滑貼地，治本翹頭/落地翻車）
+  groundedAvMax: 0.28, // 著地角速度上限（修正量的硬上限，阻止翻滾累積）
+  airSpinAccel: 0.030, // 空中後翻每 step 逼近量（由 0.010 加快→短滯空也轉得動）
+  airSpinMax: 0.24, // 後翻最大角速度（配合地形變陡＝滯空變長→可轉兩圈）
 } as const;
 
 export const RULES = {

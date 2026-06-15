@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Engine, Events, Composite, Body, type IEventCollision } from "matter-js";
 import "./GameCanvas.css";
-import { pricesToTrack, buildTerrainBodies, type Track } from "./terrain";
+import { pricesToTrack, buildTerrainBodies, slopeAt, type Track } from "./terrain";
 import { createBike, resetBike, type Bike } from "./bike";
 import { BIKE, CAMERA, COLOR, DRIVE, RULES } from "./constants";
 
@@ -73,6 +73,15 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
   useEffect(() => {
     const canvas = canvasRef.current!;
     const ctx = canvas.getContext("2d")!;
+
+    // ---- 車體貼圖（決定①：整張含輪去背 PNG，輪子不轉）----
+    // 放 public/bike.png；缺檔時 onload 不觸發 → drawBike 自動退回向量備援，不會壞 build
+    const bikeImg = new Image();
+    let bikeImgReady = false;
+    bikeImg.onload = () => {
+      bikeImgReady = true;
+    };
+    bikeImg.src = `${import.meta.env.BASE_URL}bike.png`;
 
     // ---- 建立世界 ----
     const engine = Engine.create();
@@ -208,32 +217,37 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
 
     // ---- 物理步進 ----
     const STEP = 1000 / 60;
-    // 定速模型（Rider 風格）：
-    //  著地 → 把水平速度鎖定為 cruiseSpeed（恆速，任何坡都爬得上、不卡頓、不 wheelie）
+    // 真物理模型（Route B，Rider 風格）：
+    //  著地按住 → 驅動「後輪」轉速（friction 帶動前進；下坡靠重力自然超速＝保留動量）
+    //  著地恆時 → 車身角速度朝「坡面切線」比例修正（平滑貼地，不翹頭、落地不翻）
     //  空中按住 → 唯一作用：後空翻
     const applyControls = (grounded: boolean, _upright: boolean) => {
       if (overRef.current) return;
       const c = bike.chassis;
 
       if (grounded) {
-        // 著地：按住才驅動 → 沿「車身朝向(≈坡面)」方向平滑恆速
-        // 鎖沿坡速度而非水平速度 → 上坡/下坡/平路速度一致（不會坡面變慢）
-        if (throttle && Math.cos(c.angle) > DRIVE.rideableCos) {
-          const dirX = Math.cos(c.angle);
-          const dirY = Math.sin(c.angle);
-          // 目前沿坡方向的速度分量（投影）
-          const along = c.velocity.x * dirX + c.velocity.y * dirY;
-          const newAlong = along + (DRIVE.cruiseSpeed - along) * DRIVE.groundLockEase;
-          Body.setVelocity(c, { x: newAlong * dirX, y: newAlong * dirY });
-          // AWD：前後輪也直接鎖速，確保陡坡雙輪都能推進
-          Body.setVelocity(bike.rearWheel, { x: newAlong * dirX, y: newAlong * dirY });
-          Body.setVelocity(bike.frontWheel, { x: newAlong * dirX, y: newAlong * dirY });
+        // 後輪扭矩驅動：只在低於目標轉速時加速 → 下坡不被鎖住，保留動量
+        if (throttle) {
+          const rw = bike.rearWheel;
+          if (rw.angularVelocity < DRIVE.driveWheelSpin) {
+            Body.setAngularVelocity(
+              rw,
+              Math.min(DRIVE.driveWheelSpin, rw.angularVelocity + DRIVE.driveAccel),
+            );
+          }
         }
-        // 溫和版 AV 夾：只阻止高速翻滾，允許正常跟坡傾斜
-        const av = c.angularVelocity;
-        if (Math.abs(av) > DRIVE.groundedAvMax) {
-          Body.setAngularVelocity(c, Math.sign(av) * DRIVE.groundedAvMax);
+        // 速度上限：避免陡下坡暴衝失控
+        const sp = Math.hypot(c.velocity.x, c.velocity.y);
+        if (sp > DRIVE.maxSpeed) {
+          const k = DRIVE.maxSpeed / sp;
+          Body.setVelocity(c, { x: c.velocity.x * k, y: c.velocity.y * k });
         }
+        // 對齊坡面切線：以比例修正車身角速度（gain），並夾在 groundedAvMax 內
+        const slope = slopeAt(track, c.position.x);
+        const da = angleDelta(c.angle, slope);
+        let av = da * DRIVE.groundAlignGain;
+        if (Math.abs(av) > DRIVE.groundedAvMax) av = Math.sign(av) * DRIVE.groundedAvMax;
+        Body.setAngularVelocity(c, av);
       } else if (throttle && Math.cos(c.angle) > 0) {
         // 雙輪離地 + 按住 + 未翻過頭 → 後空翻
         const nv = Math.max(-DRIVE.airSpinMax, c.angularVelocity - DRIVE.airSpinAccel);
@@ -447,6 +461,19 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
       const cx = prevChassisPos.x + (c.position.x - prevChassisPos.x) * alpha;
       const cy = prevChassisPos.y + (c.position.y - prevChassisPos.y) * alpha;
       const cAngle = prevChassisAngle + (c.angle - prevChassisAngle) * alpha;
+
+      // 有貼圖：整張圖（含輪）貼到車身，不另畫向量輪（決定①：輪子不轉）
+      if (bikeImgReady) {
+        const w = BIKE.spriteW;
+        const h = w * (bikeImg.naturalHeight / bikeImg.naturalWidth);
+        ctx.save();
+        ctx.translate(wx(cx), wy(cy));
+        ctx.rotate(cAngle);
+        ctx.drawImage(bikeImg, -w / 2 + BIKE.spriteOffsetX, -h / 2 + BIKE.spriteOffsetY, w, h);
+        ctx.restore();
+        return;
+      }
+
       ctx.save();
       ctx.translate(wx(cx), wy(cy));
       ctx.rotate(cAngle);
