@@ -41,6 +41,8 @@ export const DRIVE = {
   groundedAvMax: 0.28, // 著地時角速度上限（允許跟坡緩轉，阻止翻滾累積）
   airSpinAccel: 0.006, // 每 step 朝目標角速度逼近的量
   airSpinMax: 0.12, // 後翻最大角速度
+  airNoseDive: 0.006,    // 空中放開時每 step 車頭前傾偏移量（正值=順時鐘=車頭往下）
+  airNoseDiveMax: 0.10,  // 車頭前傾最大角速度
 } as const;
 
 export const RULES = {

@@ -86,6 +86,14 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
     const spawnY = track.vertices[0].y - 55; // 緊貼起點平台上方，落下即就位
     const bike: Bike = createBike(world, spawnX, spawnY);
 
+    // ---- 插值用：記錄上一物理步的位置/角度，渲染時平滑消除步進鋸齒 ----
+    let prevChassisPos = { x: bike.chassis.position.x, y: bike.chassis.position.y };
+    let prevChassisAngle = bike.chassis.angle;
+    let prevRearPos = { x: bike.rearWheel.position.x, y: bike.rearWheel.position.y };
+    let prevRearAngle = bike.rearWheel.angle;
+    let prevFrontPos = { x: bike.frontWheel.position.x, y: bike.frontWheel.position.y };
+    let prevFrontAngle = bike.frontWheel.angle;
+
     // ---- 著地偵測（輪子 vs terrain 計數）----
     let rearContacts = 0;
     let frontContacts = 0;
@@ -168,6 +176,12 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
 
     const doReset = () => {
       resetBike(bike);
+      prevChassisPos = { x: bike.chassis.position.x, y: bike.chassis.position.y };
+      prevChassisAngle = bike.chassis.angle;
+      prevRearPos = { x: bike.rearWheel.position.x, y: bike.rearWheel.position.y };
+      prevRearAngle = bike.rearWheel.angle;
+      prevFrontPos = { x: bike.frontWheel.position.x, y: bike.frontWheel.position.y };
+      prevFrontAngle = bike.frontWheel.angle;
       rearContacts = 0;
       frontContacts = 0;
       chassisContacts = 0;
@@ -220,6 +234,10 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
         // 雙輪離地 + 按住 + 未翻過頭 → 後空翻
         const nv = Math.max(-DRIVE.airSpinMax, c.angularVelocity - DRIVE.airSpinAccel);
         Body.setAngularVelocity(c, nv);
+      } else if (!grounded && !throttle) {
+        // 空中放開：車頭自然前傾（模擬車頭配重，讓車頭往下轉）
+        const nv = Math.min(DRIVE.airNoseDiveMax, c.angularVelocity + DRIVE.airNoseDive);
+        Body.setAngularVelocity(c, nv);
       }
     };
 
@@ -230,6 +248,13 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
       const uprightNow = Math.cos(bike.chassis.angle) > RULES.uprightCosThreshold;
       airborneSteps = grounded ? 0 : airborneSteps + 1;
       applyControls(grounded, uprightNow);
+      // 存下本步物理狀態，供渲染插值（frame 裡用 alpha=acc/STEP 取中間位置）
+      prevChassisPos = { x: bike.chassis.position.x, y: bike.chassis.position.y };
+      prevChassisAngle = bike.chassis.angle;
+      prevRearPos = { x: bike.rearWheel.position.x, y: bike.rearWheel.position.y };
+      prevRearAngle = bike.rearWheel.angle;
+      prevFrontPos = { x: bike.frontWheel.position.x, y: bike.frontWheel.position.y };
+      prevFrontAngle = bike.frontWheel.angle;
       Engine.update(engine, STEP);
 
       const c = bike.chassis;
@@ -416,11 +441,15 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
     };
 
     // 敞篷跑車側面輪廓（local：+x 為車頭朝右，y 負為上）
-    const drawBike = () => {
+    const drawBike = (alpha: number) => {
       const c = bike.chassis;
+      // 插值：在上一步與本步之間取 alpha 位置，消除固定步進造成的車身鋸齒
+      const cx = prevChassisPos.x + (c.position.x - prevChassisPos.x) * alpha;
+      const cy = prevChassisPos.y + (c.position.y - prevChassisPos.y) * alpha;
+      const cAngle = prevChassisAngle + (c.angle - prevChassisAngle) * alpha;
       ctx.save();
-      ctx.translate(wx(c.position.x), wy(c.position.y));
-      ctx.rotate(c.angle);
+      ctx.translate(wx(cx), wy(cy));
+      ctx.rotate(cAngle);
       ctx.scale(0.52, 0.52); // 車身縮至 52%（對應 chassisW 92→48）
 
       ctx.shadowBlur = 0;
@@ -474,17 +503,17 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
 
       ctx.restore();
 
-      // 輪子（小輪）
+      // 輪子（插值位置）
       drawWheel(
-        bike.rearWheel.position.x,
-        bike.rearWheel.position.y,
-        bike.rearWheel.angle,
+        prevRearPos.x + (bike.rearWheel.position.x - prevRearPos.x) * alpha,
+        prevRearPos.y + (bike.rearWheel.position.y - prevRearPos.y) * alpha,
+        prevRearAngle + (bike.rearWheel.angle - prevRearAngle) * alpha,
         bike.rearWheel.circleRadius!,
       );
       drawWheel(
-        bike.frontWheel.position.x,
-        bike.frontWheel.position.y,
-        bike.frontWheel.angle,
+        prevFrontPos.x + (bike.frontWheel.position.x - prevFrontPos.x) * alpha,
+        prevFrontPos.y + (bike.frontWheel.position.y - prevFrontPos.y) * alpha,
+        prevFrontAngle + (bike.frontWheel.angle - prevFrontAngle) * alpha,
         bike.frontWheel.circleRadius!,
       );
     };
@@ -521,13 +550,13 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
       ctx.restore();
     };
 
-    const render = () => {
+    const render = (alpha: number) => {
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, W, H);
       drawTrack();
       drawFlag(track.vertices[0].x, track.vertices[0].y, COLOR.start, "START");
       drawFlag(track.finishX, track.vertices[track.vertices.length - 1].y, COLOR.finish, "FIN");
-      drawBike();
+      drawBike(alpha);
       drawPerfectFx();
     };
 
@@ -579,7 +608,8 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
         camY += (ty - camY) * CAMERA.ease;
       }
 
-      render();
+      const alpha = Math.min(acc / STEP, 1);
+      render(alpha);
       if (perfectFxFrames > 0) perfectFxFrames--;
 
       // HUD（節流更新，避免每幀 setState）
