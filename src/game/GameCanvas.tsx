@@ -281,7 +281,7 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
       const bikeDowned = chassisContacts > 0 && rearContacts === 0 && frontContacts === 0;
       if (bikeDowned) {
         crashTimer += dtMs / 1000;
-        if (crashTimer >= 0.4 && !overRef.current) {
+        if (crashTimer >= 2.0 && !overRef.current) {
           setCrashed(true);
         }
       } else {
