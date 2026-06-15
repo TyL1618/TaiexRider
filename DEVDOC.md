@@ -5,6 +5,23 @@
 
 ---
 
+## 0. 部署架構
+
+| 項目 | 說明 |
+|---|---|
+| 線上網址 | `taiexrider.pages.dev`（Cloudflare Pages） |
+| CI/CD | GitHub Actions（`.github/workflows/deploy.yml`） |
+| 觸發條件 | push to `main` → 自動 build + deploy |
+| Deploy 指令 | `wrangler pages deploy ./dist --project-name taiexrider` |
+| Token 存放 | GitHub repo → Settings → Secrets → `CLOUDFLARE_API_TOKEN` |
+| Token 權限 | `Account: Cloudflare Pages: Edit` |
+| Cloudflare 帳號 ID | `aa30f8795c349575164c118e5876ec60` |
+
+> ⚠️ **不使用 Cloudflare 本身的 CI**（曾因 Build token 權限問題放棄，改為 GitHub Actions）。
+> Cloudflare Pages 上的 `taiexrider` 專案是用 **Direct Upload** 方式建立，Git integration 未啟用。
+
+---
+
 ## 1. 專案概觀
 
 - **核心玩法**：HTML5 Canvas + 2D 物理，玩家騎機車跨越由台股價格序列轉換出來的地形，操作油門/重心/跳躍，目標是不摔車並做出特技。
