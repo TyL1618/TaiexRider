@@ -187,31 +187,44 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
 
     // ---- 物理步進 ----
     const STEP = 1000 / 60;
-    const applyControls = (grounded: boolean, upright: boolean) => {
+    const applyControls = (rearGrounded: boolean, frontGrounded: boolean, upright: boolean) => {
       if (!throttle || overRef.current) return;
-      if (grounded && !upright) return; // 倒地不給力
       const c = bike.chassis;
-      if (grounded) {
-        // 著地：沿車身朝向施前進力 + 後輪轉動（不主動翻身，確保穩定前進）
-        if (c.velocity.x < DRIVE.maxSpeed) {
+
+      // 翻超過 90°（車頂朝地）→ 完全不給力，不管接觸狀態
+      if (Math.cos(c.angle) < 0) return;
+
+      const grounded = rearGrounded || frontGrounded;
+      const bothGrounded = rearGrounded && frontGrounded;
+
+      // 著地但傾斜 > 57° → 不給力
+      if (grounded && !upright) return;
+
+      if (rearGrounded) {
+        // 後輪觸地：後輪扭矩提供抓地推力
+        bike.rearWheel.torque += DRIVE.rearWheelSpin;
+
+        // 底盤推力：只在雙輪都觸地才施加，防止 wheelie
+        if (bothGrounded && c.velocity.x < DRIVE.maxSpeed) {
           const uphillBoost = (c.angle < -0.12 && c.velocity.x < DRIVE.uphillMaxSpeed) ? DRIVE.uphillBoost : 1;
           const f = c.mass * DRIVE.accel * uphillBoost;
           c.force.x += Math.cos(c.angle) * f;
           c.force.y += Math.sin(c.angle) * f;
         }
-        bike.rearWheel.torque += DRIVE.rearWheelSpin;
-      } else if (airborneSteps >= DRIVE.airSpinDelaySteps) {
-        // 空中且已過寬限：才開始後翻（避免小坡微彈跳就被觸發）
+      } else if (!grounded && airborneSteps >= DRIVE.airSpinDelaySteps) {
+        // 雙輪完全離地且過寬限 → 空中後翻
         const nv = Math.max(-DRIVE.airSpinMax, c.angularVelocity - DRIVE.airSpinAccel);
         Body.setAngularVelocity(c, nv);
       }
     };
 
     const step = (dtMs: number) => {
-      const grounded = rearContacts > 0 || frontContacts > 0;
+      const rearGrounded = rearContacts > 0;
+      const frontGrounded = frontContacts > 0;
+      const grounded = rearGrounded || frontGrounded;
       const uprightNow = Math.cos(bike.chassis.angle) > RULES.uprightCosThreshold;
       airborneSteps = grounded ? 0 : airborneSteps + 1;
-      applyControls(grounded, uprightNow);
+      applyControls(rearGrounded, frontGrounded, uprightNow);
       Engine.update(engine, STEP);
 
       const c = bike.chassis;

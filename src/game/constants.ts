@@ -34,11 +34,11 @@ export const BIKE = {
 
 export const DRIVE = {
   // 著地時：沿車身朝向施加前進力（force=mass*accel，效果≈每step加速度）
-  accel: 0.003, // 基礎推力（上坡需要足夠底力）
+  accel: 0.0025, // 底盤推力（雙輪觸地才施加）
   maxSpeed: 16, // 車身水平速度上限 (px/step)
-  uphillBoost: 5.0, // 上坡低速時的驅動力倍數（保證任何坡都爬得上）
+  uphillBoost: 4.0, // 上坡低速時的驅動力倍數
   uphillMaxSpeed: 8, // 上坡 boost 介入的水平速度門檻（px/step）
-  rearWheelSpin: 0.014, // 後輪驅動扭矩 (讓輪子實際轉動、視覺與抓地)
+  rearWheelSpin: 0.012, // 後輪驅動扭矩（後輪觸地才施加）
   // 空中後翻：直接以角速度(rad/step)控制，逼近目標角速度（負=逆時針=後空翻）
   airSpinAccel: 0.006, // 每 step 朝目標角速度逼近的量
   airSpinMax: 0.12, // 後翻最大角速度
