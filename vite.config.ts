@@ -16,17 +16,12 @@ export default defineConfig({
         theme_color: "#05080f",
         background_color: "#05080f",
         display: "standalone",
-        orientation: "landscape",
+        orientation: "portrait",
         icons: [
           {
-            src: "icon-192.png",
-            sizes: "192x192",
-            type: "image/png",
-          },
-          {
-            src: "icon-512.png",
-            sizes: "512x512",
-            type: "image/png",
+            src: "favicon.svg",
+            sizes: "any",
+            type: "image/svg+xml",
           },
         ],
       },

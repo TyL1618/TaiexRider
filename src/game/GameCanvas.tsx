@@ -17,7 +17,15 @@ interface Hud {
   airborne: boolean;
   airFlips: number;
   throttle: boolean;
+  timer: string;
 }
+
+const fmtTime = (ms: number): string => {
+  const totalSec = ms / 1000;
+  const m = Math.floor(totalSec / 60);
+  const s = (totalSec % 60).toFixed(1);
+  return `${m}:${s.padStart(4, "0")}`;
+};
 
 // 兩角差取最短路徑 (-π, π]
 function angleDelta(prev: number, next: number): number {
@@ -44,6 +52,7 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
     airborne: false,
     airFlips: 0,
     throttle: false,
+    timer: "0:00.0",
   });
   const [crashed, setCrashed] = useState(false);
   const [finished, setFinished] = useState(false);
@@ -146,6 +155,7 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
     let points = 0;
     let wasGrounded = false;
     let hudTick = 0;
+    let raceTimeMs = 0;
     // 完美落地雙輪特效（剩餘幀數 + 觸發時兩輪世界座標）
     let perfectFxFrames = 0;
     let perfectFxPts: { x: number; y: number }[] = [];
@@ -163,6 +173,7 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
       airborneSteps = 0;
       crashTimer = 0;
       points = 0;
+      raceTimeMs = 0;
       wasGrounded = false;
       perfectFxFrames = 0;
       perfectFxPts = [];
@@ -176,8 +187,9 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
 
     // ---- 物理步進 ----
     const STEP = 1000 / 60;
-    const applyControls = (grounded: boolean) => {
+    const applyControls = (grounded: boolean, upright: boolean) => {
       if (!throttle || overRef.current) return;
+      if (grounded && !upright) return; // 倒地不給力
       const c = bike.chassis;
       if (grounded) {
         // 著地：沿車身朝向施前進力 + 後輪轉動（不主動翻身，確保穩定前進）
@@ -197,8 +209,9 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
 
     const step = (dtMs: number) => {
       const grounded = rearContacts > 0 || frontContacts > 0;
+      const uprightNow = Math.cos(bike.chassis.angle) > RULES.uprightCosThreshold;
       airborneSteps = grounded ? 0 : airborneSteps + 1;
-      applyControls(grounded);
+      applyControls(grounded, uprightNow);
       Engine.update(engine, STEP);
 
       const c = bike.chassis;
@@ -241,10 +254,11 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
       if (groundedNow) airRotation = 0;
       wasGrounded = groundedNow;
 
-      // 摔車：輪朝上（傾倒超過 90°）持續一段時間（DEVDOC 5.4）
+      // 摔車：倒地 0.5s 立判、空中倒置 2s 判（倒地不可按壓翻回）
       if (Math.cos(c.angle) < 0) {
         crashTimer += dtMs / 1000;
-        if (crashTimer >= RULES.crashUpsideDownSec && !overRef.current) {
+        const crashTimeout = groundedNow ? 0.5 : RULES.crashUpsideDownSec;
+        if (crashTimer >= crashTimeout && !overRef.current) {
           setCrashed(true);
         }
       } else {
@@ -496,6 +510,7 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
       let dt = now - last;
       last = now;
       if (dt > 60) dt = 60; // 防止分頁切回時爆衝
+      if (!overRef.current) raceTimeMs += dt;
       acc += dt;
 
       let grounded = false;
@@ -542,6 +557,7 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
           airborne: !grounded,
           airFlips: flips,
           throttle,
+          timer: fmtTime(raceTimeMs),
         });
       }
     };
@@ -572,6 +588,7 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
         {hud.airborne && hud.airFlips > 0 && (
           <div className="score-air">空中 {hud.airFlips} 圈</div>
         )}
+        <div className="score-timer">{hud.timer}</div>
       </div>
 
       {/* 角落小資訊 */}
@@ -598,6 +615,7 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
         <div className="overlay">
           <div className="overlay-title">{finished ? "完賽！" : "摔車"}</div>
           <div className="overlay-score">{hud.points} 分</div>
+          <div className="overlay-time">{hud.timer}</div>
           <button className="overlay-btn" onClick={requestReset}>
             再玩一次 (R)
           </button>

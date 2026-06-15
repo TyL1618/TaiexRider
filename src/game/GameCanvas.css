@@ -41,6 +41,15 @@
   text-shadow: 0 0 10px rgba(45, 226, 230, 0.6);
 }
 
+.score-timer {
+  margin-top: 0.3rem;
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  color: var(--neon-amber);
+  opacity: 0.75;
+}
+
 /* 角落小資訊 */
 .hud-corner {
   position: absolute;
@@ -174,6 +183,14 @@
   font-size: 1.4rem;
   color: var(--neon-amber);
   text-shadow: 0 0 12px rgba(255, 179, 0, 0.5);
+}
+
+.overlay-time {
+  font-size: 1rem;
+  letter-spacing: 0.15em;
+  color: var(--neon-amber);
+  opacity: 0.7;
+  margin-top: -0.4rem;
 }
 
 .overlay-btn {

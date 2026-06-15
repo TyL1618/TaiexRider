@@ -9,13 +9,14 @@ export interface TrackData {
   label: string; // 顯示名（代號 / TAIEX）
   name: string; // 中文名
   kind: string; // 'stock' | 'taiex'
+  mode: "intraday" | "monthly"; // 昨日盤線 | 近月日線
   desc: string; // 性格描述
   prices: number[];
 }
 
 export const TRACKS: TrackData[] = [
-  { ...taiex, name: "加權指數", desc: "大盤盤中・平緩巡航" },
-  { ...s2330, name: "台積電", desc: "權值龍頭・中等起伏" },
-  { ...s0050, name: "元大台灣50", desc: "ETF・中等起伏" },
-  { ...s2454, name: "聯發科", desc: "投機飆股・狂野跳台" },
+  { ...taiex, name: "加權指數", mode: "intraday", desc: "昨日盤中・平緩巡航" },
+  { ...s2330, name: "台積電", mode: "monthly", desc: "近月日線・中等起伏" },
+  { ...s0050, name: "元大台灣50", mode: "monthly", desc: "近月日線・中等起伏" },
+  { ...s2454, name: "聯發科", mode: "monthly", desc: "近月日線・狂野跳台" },
 ];
