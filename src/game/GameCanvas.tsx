@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Engine, Events, Composite, Body, type IEventCollision } from "matter-js";
 import "./GameCanvas.css";
-import { pricesToTrack, buildTerrainBodies, terrainYAt, type Track } from "./terrain";
+import { pricesToTrack, buildTerrainBodies, slopeAt, terrainYAt, type Track } from "./terrain";
 import { createBike, resetBike, type Bike } from "./bike";
 import { BIKE, CAMERA, COLOR, DRIVE, RULES } from "./constants";
 
@@ -172,6 +172,7 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
     let airRotation = 0;
     let airTime = 0; // 連續騰空時間（雙輪皆離地）
     let airborneSteps = 0; // 連續離地 step 數（後翻寬限用）
+    let groundedStreak = 0; // 連續著地 step 數（離地 boost 的 gate，擋微彈疊乘）
     let crashTimer = 0;
     let points = 0;
     let bonusPoints = 0; // 特技分（後翻＋完美落地），行進分另算疊加
@@ -200,6 +201,7 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
       airRotation = 0;
       airTime = 0;
       airborneSteps = 0;
+      groundedStreak = 0;
       crashTimer = 0;
       points = 0;
       bonusPoints = 0;
@@ -217,25 +219,18 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
 
     // ---- 物理步進 ----
     const STEP = 1000 / 60;
-    // 前後輪所踩地形連線(弦)的傾角 → 前輪上陡坡時整台車跟著轉上去（不用鼻頭水平爬）
-    const chordSlope = (): number => {
-      const xr = bike.rearWheel.position.x;
-      const xf = bike.frontWheel.position.x;
-      const yr = terrainYAt(track, xr);
-      const yf = terrainYAt(track, xf);
-      return Math.atan2(yf - yr, xf - xr);
-    };
-
     // 定速引擎（Rider 風格街機手感）：
-    //  著地按住 → 沿「兩輪取坡」方向鎖速（只改切線分量、保留垂直分量→過坡頂自然飛出去）
-    //  著地恆時 → 車身角速度朝弦坡比例修正（平滑貼地，不翹頭、落地不翻）
+    //  著地按住 → 沿「前輪所在坡段」方向鎖速（只改切線分量、保留垂直分量→過坡頂自然飛出去）
+    //    用前輪領坡（不是弦/車身中心）→ 前輪一貼上坡牆，驅動沿牆面往上＝銳角 V 谷/陡牆都爬得上去
+    //  著地恆時 → 車身角速度朝該坡段比例修正（平滑貼地，不翹頭、落地不翻）
     //  離地：按住＝後空翻、放開＝車頭緩緩往前壓（準備落地）
     const applyControls = (grounded: boolean, _upright: boolean) => {
       if (overRef.current) return;
       const c = bike.chassis;
 
       if (grounded) {
-        const slope = chordSlope();
+        // 前輪領坡：取前輪所在坡段傾角，當作驅動方向 & 對齊目標
+        const slope = slopeAt(track, bike.frontWheel.position.x);
         const dirX = Math.cos(slope);
         const dirY = Math.sin(slope);
         if (throttle) {
@@ -325,11 +320,20 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
         airRotation = 0;
         airTime = 0;
       } else if (!groundedNow && wasGrounded) {
-        // 離地瞬間：① 速度 ×launchBoost（解耦：地面慢、飛行距離保持）
-        //           ② 歸零殘留角速度（消除爬坡貼坡帶上來的「莫名往後翻」）
-        Body.setVelocity(c, { x: c.velocity.x * DRIVE.launchBoost, y: c.velocity.y * DRIVE.launchBoost });
+        // 離地瞬間：
+        //  ① 拉到目標離地速 (≤target，永不超過→不疊乘爆衝)，且要在地面待夠才給（擋轉折點微彈）
+        //  ② 歸零殘留角速度（消除爬坡貼坡帶上來的「莫名往後翻」）
+        if (groundedStreak >= DRIVE.minGroundedStepsForBoost) {
+          const sp = Math.hypot(c.velocity.x, c.velocity.y);
+          const target = DRIVE.cruiseSpeed * DRIVE.launchBoost;
+          if (sp > 0.001 && sp < target) {
+            const k = target / sp;
+            Body.setVelocity(c, { x: c.velocity.x * k, y: c.velocity.y * k });
+          }
+        }
         Body.setAngularVelocity(c, 0);
       }
+      groundedStreak = groundedNow ? groundedStreak + 1 : 0;
       if (groundedNow) airRotation = 0;
       wasGrounded = groundedNow;
 
@@ -338,11 +342,13 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
       const distScore = Math.min(1000, Math.round((traveled / (track.finishX - track.startX)) * 1000));
       points = bonusPoints + distScore;
 
-      // 卡住判定：按油門但幾乎不動（V 谷卡死 / 翻車壓地），或車身著地但速度為零
-      const isStuck = Math.abs(c.velocity.x) < 0.5 && (throttle || chassisContacts > 0);
-      if (isStuck && !overRef.current) {
+      // 死亡判定（不管有無按油門）：兩輪都沒碰地板 && 整體幾乎不動 && 持續 2 秒
+      // → 收掉「卡 V 尖點兩輪懸空不動」「翻車貼地不動」等死局；飛行中有移動→不誤判
+      const bothWheelsOff = rearContacts === 0 && frontContacts === 0;
+      const notMoving = Math.hypot(c.velocity.x, c.velocity.y) < 0.5;
+      if (bothWheelsOff && notMoving && !overRef.current) {
         crashTimer += dtMs / 1000;
-        if (crashTimer >= 2.0) {
+        if (crashTimer >= RULES.crashUpsideDownSec) {
           setCrashed(true);
         }
       } else {
