@@ -220,32 +220,37 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
     // ---- 物理步進 ----
     const STEP = 1000 / 60;
     // 定速引擎（Rider 風格街機手感）：
-    //  著地按住 → 沿「前輪所在坡段」方向鎖速（只改切線分量、保留垂直分量→過坡頂自然飛出去）
-    //    用前輪領坡（不是弦/車身中心）→ 前輪一貼上坡牆，驅動沿牆面往上＝銳角 V 谷/陡牆都爬得上去
-    //  著地恆時 → 車身角速度朝該坡段比例修正（平滑貼地，不翹頭、落地不翻）
+    //  著地按住 → 只維持「速度大小=cruiseSpeed」，方向交給物理：
+    //    平/上/下坡輪子貼地滾→方向自然跟地形(等速)；凸坡頂地面掉開→帶動量自然飛出去(往右上就飛)；
+    //    凹谷地面頂住→不亂飛、順順爬出。快停了(起步/撞牆)才沿前輪坡向「推一把」避免卡死。
+    //  著地恆時 → 車身角速度朝前輪坡段平滑修正（貼坡、不翹頭）
     //  離地：按住＝後空翻、放開＝車頭緩緩往前壓（準備落地）
     const applyControls = (grounded: boolean, _upright: boolean) => {
       if (overRef.current) return;
       const c = bike.chassis;
 
       if (grounded) {
-        // 前輪領坡：取前輪所在坡段傾角，當作驅動方向 & 對齊目標
-        const slope = slopeAt(track, bike.frontWheel.position.x);
-        const dirX = Math.cos(slope);
-        const dirY = Math.sin(slope);
         if (throttle) {
-          const nx = -dirY;
-          const ny = dirX;
-          const along = c.velocity.x * dirX + c.velocity.y * dirY;
-          const perp = c.velocity.x * nx + c.velocity.y * ny;
-          const newAlong = along + (DRIVE.cruiseSpeed - along) * DRIVE.groundLockEase;
-          // 車身：保留法線(垂直)分量→過凸點不被抹掉，能自然彈飛
-          Body.setVelocity(c, { x: newAlong * dirX + perp * nx, y: newAlong * dirY + perp * ny });
-          // 輪子：只給沿坡切線分量（不保留垂直）→ 緊貼坡面、不被垂直分量掀起
-          Body.setVelocity(bike.rearWheel, { x: newAlong * dirX, y: newAlong * dirY });
-          Body.setVelocity(bike.frontWheel, { x: newAlong * dirX, y: newAlong * dirY });
+          const v = c.velocity;
+          const sp = Math.hypot(v.x, v.y);
+          if (sp > 1) {
+            // 維持等速：方向不動(跟地形/凸點起跳)，只把速度大小 ease 到 cruiseSpeed
+            const k = 1 + (DRIVE.cruiseSpeed / sp - 1) * DRIVE.groundLockEase;
+            Body.setVelocity(c, { x: v.x * k, y: v.y * k });
+            Body.setVelocity(bike.rearWheel, { x: v.x * k, y: v.y * k });
+            Body.setVelocity(bike.frontWheel, { x: v.x * k, y: v.y * k });
+          } else {
+            // 快停了→沿前輪坡向推一把（起步、撞牆、卡 V 谷時不卡死）
+            const slope = slopeAt(track, bike.frontWheel.position.x);
+            const vx = Math.cos(slope) * DRIVE.cruiseSpeed;
+            const vy = Math.sin(slope) * DRIVE.cruiseSpeed;
+            Body.setVelocity(c, { x: vx, y: vy });
+            Body.setVelocity(bike.rearWheel, { x: vx, y: vy });
+            Body.setVelocity(bike.frontWheel, { x: vx, y: vy });
+          }
         }
-        // 對齊弦坡：以比例修正車身角速度（gain），並夾在 groundedAvMax 內
+        // 對齊前輪坡段：以比例修正車身角速度（gain），並夾在 groundedAvMax 內
+        const slope = slopeAt(track, bike.frontWheel.position.x);
         const da = angleDelta(c.angle, slope);
         let av = da * DRIVE.groundAlignGain;
         if (Math.abs(av) > DRIVE.groundedAvMax) av = Math.sign(av) * DRIVE.groundedAvMax;
