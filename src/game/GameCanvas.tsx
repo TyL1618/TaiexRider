@@ -194,7 +194,7 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
       if (grounded) {
         // 著地：沿車身朝向施前進力 + 後輪轉動（不主動翻身，確保穩定前進）
         if (c.velocity.x < DRIVE.maxSpeed) {
-          const uphillBoost = (c.angle < -0.12 && c.velocity.x < 2.5) ? DRIVE.uphillBoost : 1;
+          const uphillBoost = (c.angle < -0.12 && c.velocity.x < DRIVE.uphillMaxSpeed) ? DRIVE.uphillBoost : 1;
           const f = c.mass * DRIVE.accel * uphillBoost;
           c.force.x += Math.cos(c.angle) * f;
           c.force.y += Math.sin(c.angle) * f;
