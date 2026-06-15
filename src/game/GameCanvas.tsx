@@ -3,7 +3,7 @@ import { Engine, Events, Composite, Body, type IEventCollision } from "matter-js
 import "./GameCanvas.css";
 import { pricesToTrack, buildTerrainBodies, type Track } from "./terrain";
 import { createBike, resetBike, type Bike } from "./bike";
-import { CAMERA, COLOR, DRIVE, RULES } from "./constants";
+import { BIKE, CAMERA, COLOR, DRIVE, RULES } from "./constants";
 
 interface GameCanvasProps {
   prices: number[];
@@ -83,7 +83,8 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
     Composite.add(world, buildTerrainBodies(track));
 
     const spawnX = track.startX;
-    const spawnY = track.vertices[0].y - 55; // 緊貼起點平台上方，落下即就位
+    // 輪底剛好貼地：車身中心 = 地面 - 輪軸偏移 - 輪半徑（直接落在路面，不從空中掉）
+    const spawnY = track.vertices[0].y - BIKE.wheelDropY - BIKE.wheelRadius - 1;
     const bike: Bike = createBike(world, spawnX, spawnY);
 
     // ---- 插值用：記錄上一物理步的位置/角度，渲染時平滑消除步進鋸齒 ----
