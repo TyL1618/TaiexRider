@@ -155,6 +155,11 @@ interface TrackData {
 
 頂點陣列餵給 Matter.js 的多段靜態矩形地形（`Bodies.rectangle` 拼接）。
 
+**地形碰撞體實作（`buildTerrainBodies`，v0.3.7 定案）：**
+- 每段一個旋轉矩形，厚度 26px，兩端各 +3px（`len = segLen + 6`）確保接縫重疊
+- 頂點填縫圓已移除（曾用 `Bodies.circle(r=13)` 填縫，但在凸角轉折點造成彈射「隱形牆」）
+- 正確做法：矩形端點的角點計算已證明落在地形頂點 ±1px，重疊 6px 足以填縫不需要圓體
+
 ---
 
 ## 5. 遊戲機制設計

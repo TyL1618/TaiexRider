@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.3.6";
+export const APP_VERSION = "0.3.7";
 
 export interface ChangelogEntry {
   date: string;
@@ -10,6 +10,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     date: "2026-06-16 (凌晨)",
     notes: [
       "結算畫面：點擊中段可瞬間切換 賽道全覽 / 走勢圖（不再疊圖）",
+      "修正轉折點隱形牆：移除頂點填縫圓，改用矩形兩端各 +3px 重疊",
       "死亡特效：翻車瞬間粒子爆炸（琥珀/青/白三色）＋螢幕白閃＋鏡頭震動，動畫 1.5 秒",
       "修正山峰頂點刺穿誤判死亡（正立狀態不觸發 crashZone）",
       "死亡動畫期間鏡頭凍住，不提前縮放至全覽",

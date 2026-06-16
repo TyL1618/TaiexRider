@@ -143,7 +143,7 @@ export function buildTerrainBodies(track: Track, thickness = 26): Body[] {
     const dx = b.x - a.x;
     const dy = b.y - a.y;
     const segLen = Math.hypot(dx, dy) || 1;
-    const len = segLen + 2; // +2 避免端點微縫
+    const len = segLen + 6; // +6 兩端各 3px 重疊，消除接縫不需頂點圓
     const angle = Math.atan2(dy, dx);
     const downNx = -dy / segLen;
     const downNy = dx / segLen;
@@ -161,19 +161,7 @@ export function buildTerrainBodies(track: Track, thickness = 26): Body[] {
     );
   }
 
-  // 每個頂點補一個圓，填滿相鄰矩形間的三角縫隙
-  // 圓心在頂點正下方 r px，頂端恰好與地形頂面齊平，無凸出台階
-  for (const v of vertices) {
-    bodies.push(
-      Bodies.circle(v.x, v.y + r, r, {
-        isStatic: true,
-        friction: 1,
-        frictionStatic: 1,
-        label: "terrain",
-        render: { visible: false },
-      }),
-    );
-  }
+  // 頂點圓已移除：矩形兩端各 +3px 重疊已填縫，頂點圓反而造成凸角彈射（隱形牆）
 
   return bodies;
 }
