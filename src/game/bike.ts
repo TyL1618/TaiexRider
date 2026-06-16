@@ -31,13 +31,14 @@ export function createBike(world: World, x: number, y: number): Bike {
   } = BIKE;
 
   const chassis = Bodies.rectangle(x, y, chassisW, chassisH, {
-    collisionFilter: { ...filter, mask: 0 }, // chassis 不與地形碰撞（只有輪子著地），防止車身陷入接縫
+    collisionFilter: filter, // 與地形碰撞（防止掉進接縫）；friction=0 保證只滑不卡
     density: chassisDensity,
     frictionAir: chassisFrictionAir,
-    friction: 0.4,
+    friction: 0,
+    frictionStatic: 0,
     restitution,
     label: "chassis",
-    chamfer: { radius: 2 },
+    chamfer: { radius: 8 }, // 大圓角：在坡段接縫順滑滑過，不被稜角卡住
   });
 
   const makeWheel = (ox: number, label: string, density: number) =>

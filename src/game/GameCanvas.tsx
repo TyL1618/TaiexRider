@@ -86,7 +86,7 @@ export default function GameCanvas({ prices, label, name, onExit }: GameCanvasPr
 
     // ---- 建立世界 ----
     const engine = Engine.create();
-    engine.gravity.y = 0.7; // 低重力 → 空中時間更長，翻轉窗口更寬（Ketch Rider 風格）
+    engine.gravity.y = 0.3; // 低重力 → 空中時間更長，翻轉窗口更寬（Ketch Rider 風格）
     const world = engine.world;
 
     const track: Track = pricesToTrack(prices);
@@ -173,8 +173,7 @@ export default function GameCanvas({ prices, label, name, onExit }: GameCanvasPr
     let airRotation = 0;
     let airTime = 0; // 連續騰空時間（雙輪皆離地）
     let airborneSteps = 0; // 連續離地 step 數（後翻寬限用）
-    let groundedStreak = 0; // 連續著地 step 數（離地 boost 的 gate，擋微彈疊乘）
-    let crashTimer = 0;
+let crashTimer = 0;
     let points = 0;
     let bonusPoints = 0; // 特技分（後翻＋完美落地），行進分另算疊加
     let wasGrounded = false;
@@ -205,7 +204,6 @@ export default function GameCanvas({ prices, label, name, onExit }: GameCanvasPr
       airRotation = 0;
       airTime = 0;
       airborneSteps = 0;
-      groundedStreak = 0;
       crashTimer = 0;
       points = 0;
       bonusPoints = 0;
@@ -335,21 +333,9 @@ export default function GameCanvas({ prices, label, name, onExit }: GameCanvasPr
         airRotation = 0;
         airTime = 0;
       } else if (!groundedNow && wasGrounded) {
-        // 離地瞬間：
-        //  ① boost：只有「有按油門 + 朝前(vx>0) + 在地面待夠」才給，拉到目標速且永不超過
-        //     → 沒按/往後/轉折點微彈一律不加速，杜絕自己亂飛/往後甩
-        //  ② 歸零殘留角速度（消除爬坡貼坡帶上來的「莫名往後翻」）
-        if (throttle && c.velocity.x > 0 && groundedStreak >= DRIVE.minGroundedStepsForBoost) {
-          const sp = Math.hypot(c.velocity.x, c.velocity.y);
-          const target = DRIVE.cruiseSpeed * DRIVE.launchBoost;
-          if (sp > 0.001 && sp < target) {
-            const k = target / sp;
-            Body.setVelocity(c, { x: c.velocity.x * k, y: c.velocity.y * k });
-          }
-        }
+        // 離地瞬間：歸零殘留角速度（消除爬坡貼坡帶上來的「莫名往後翻」）
         Body.setAngularVelocity(c, 0);
       }
-      groundedStreak = groundedNow ? groundedStreak + 1 : 0;
       if (groundedNow) airRotation = 0;
       wasGrounded = groundedNow;
 
@@ -673,11 +659,24 @@ export default function GameCanvas({ prices, label, name, onExit }: GameCanvasPr
       ctx.fillStyle = grad;
       ctx.fill();
 
-      // 霓虹折線（漲=紅/跌=綠/平=青）
+      // 開盤基準線
+      const refPrice = prices[0];
+      const refY = toY2(refPrice);
+      ctx.beginPath();
+      ctx.moveTo(padX, refY);
+      ctx.lineTo(padX + mapW, refY);
+      ctx.strokeStyle = "rgba(180,180,180,0.35)";
+      ctx.lineWidth = 1;
+      ctx.setLineDash([4, 4]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // 霓虹折線：相對開盤價 → 高於開盤=紅(漲)/低於開盤=綠(跌)/持平=青
       for (let i = 0; i < prices.length - 1; i++) {
+        const mid = (prices[i] + prices[i + 1]) / 2;
         const col =
-          prices[i + 1] > prices[i] ? COLOR.trackUp
-          : prices[i + 1] < prices[i] ? COLOR.trackDown
+          mid > refPrice ? COLOR.trackUp
+          : mid < refPrice ? COLOR.trackDown
           : COLOR.track;
         const glow =
           col === COLOR.trackUp ? COLOR.trackUpGlow

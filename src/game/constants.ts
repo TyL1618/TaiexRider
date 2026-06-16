@@ -46,9 +46,7 @@ export const DRIVE = {
   // 用兩輪取坡而非車身中心 → 前輪一上陡坡整台車跟著轉上去（不會用鼻頭水平爬）。
   cruiseSpeed: 5.76, // 沿坡面鎖定速度 (px/step)，7.2×0.8（使用者要求減速20%）
   groundLockEase: 0.7, // 速度趨近 cruiseSpeed 的平滑度 (0~1)，越大越快收斂（0.7≈3步內達速，減少折點burst感）
-  launchBoost: 2.09, // 離地目標速倍率 → 目標離地速 = cruiseSpeed×此值 ≈12（飛行距離/高度與調速前相同）
-  minGroundedStepsForBoost: 5, // 離地前要在地面連續待夠幾 step 才給 boost（擋轉折點微彈疊乘爆衝）
-  groundAlignGain: 0.3, // 著地時車身角速度朝「坡面切線」修正的比例（平滑貼地，治本翹頭/落地翻車）
+groundAlignGain: 0.3, // 著地時車身角速度朝「坡面切線」修正的比例（平滑貼地，治本翹頭/落地翻車）
   groundedAvMax: 0.15, // 著地角速度上限（貼坡速度；新驅動不再硬設方向→目標可達，不會狂轉翻過頭）
   airSpinAccel: 0.024, // 空中「按住」後空翻每 step 逼近量
   airSpinMax: 0.192, // 後空翻最大角速度
