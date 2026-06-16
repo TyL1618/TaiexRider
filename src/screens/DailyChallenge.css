@@ -93,6 +93,18 @@
 .rk-time { flex: 1; text-align: right; }
 .rk-user { flex: 1.4; text-align: right; }
 
+.rank-list { display: flex; flex-direction: column; }
+.rank-row {
+  display: flex;
+  align-items: center;
+  padding: 0.55rem 0.9rem;
+  font-size: 0.9rem;
+  color: var(--text);
+  border-bottom: 1px solid rgba(45, 226, 230, 0.08);
+}
+.rank-row.top .rk-pos,
+.rank-row.top .rk-score { color: var(--neon-amber); font-weight: 700; }
+
 .rank-empty {
   margin-top: 2rem;
   text-align: center;

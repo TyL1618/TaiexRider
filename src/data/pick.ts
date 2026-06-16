@@ -17,6 +17,11 @@ export function dailyTrack(d = new Date()): TrackData {
   return MONTHLY[dayNumber(d) % MONTHLY.length];
 }
 
+// 排行榜分組用的當日 key（本地時區 YYYY-MM-DD，對齊 dailyTrack 的日期種子）
+export function dailyKey(d = new Date()): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 // 隨機：從股票池抽一張
 export function randomTrack(): TrackData {
   return STOCK_POOL[Math.floor(Math.random() * STOCK_POOL.length)];

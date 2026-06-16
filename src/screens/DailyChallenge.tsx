@@ -1,8 +1,14 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import Sparkline from "../components/Sparkline";
-import { dailyTrack } from "../data/pick";
+import { dailyTrack, dailyKey } from "../data/pick";
+import { fetchDailyTop, isLeaderboardConfigured, type ScoreRow } from "../lib/leaderboard";
 import type { TrackData } from "../data/tracks";
 import "./DailyChallenge.css";
+
+const fmtMs = (ms: number) => {
+  const s = ms / 1000;
+  return `${Math.floor(s / 60)}:${(s % 60).toFixed(1).padStart(4, "0")}`;
+};
 
 export default function DailyChallenge({
   onPlay,
@@ -14,6 +20,8 @@ export default function DailyChallenge({
   const track = dailyTrack();
   const today = new Date();
   const dateStr = `${today.getFullYear()}/${String(today.getMonth() + 1).padStart(2, "0")}/${String(today.getDate()).padStart(2, "0")}`;
+  const [rows, setRows] = useState<ScoreRow[]>([]);
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     window.history.pushState({ taiexDaily: true }, "");
@@ -21,6 +29,20 @@ export default function DailyChallenge({
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
   }, [onBack]);
+
+  // 讀今日排行榜（未設定後端時 fetchDailyTop 回 []，走佔位畫面）
+  useEffect(() => {
+    let alive = true;
+    fetchDailyTop(dailyKey()).then((r) => {
+      if (alive) {
+        setRows(r);
+        setLoaded(true);
+      }
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   return (
     <div className="daily-screen">
@@ -52,13 +74,31 @@ export default function DailyChallenge({
           <span className="rk-time">時間</span>
           <span className="rk-user">玩家</span>
         </div>
-        <div className="rank-empty">
-          <div className="rank-empty-icon">🔒</div>
-          排行榜將於後端上線後開放（Phase 4）<br />
-          <span className="rank-empty-sub">
-            屆時依「通關分數」排名，分數相同比「通關時間」（越短越前），顯示前 100 名
-          </span>
-        </div>
+        {!isLeaderboardConfigured ? (
+          <div className="rank-empty">
+            <div className="rank-empty-icon">🔒</div>
+            排行榜將於後端上線後開放（Phase 4）<br />
+            <span className="rank-empty-sub">
+              屆時依「通關分數」排名，分數相同比「通關時間」（越短越前），顯示前 100 名
+            </span>
+          </div>
+        ) : loaded && rows.length === 0 ? (
+          <div className="rank-empty">
+            <div className="rank-empty-icon">🏁</div>
+            今日尚無成績，搶頭香！
+          </div>
+        ) : (
+          <div className="rank-list">
+            {rows.map((r, i) => (
+              <div className={`rank-row ${i < 3 ? "top" : ""}`} key={i}>
+                <span className="rk-pos">{i + 1}</span>
+                <span className="rk-score">{r.score}</span>
+                <span className="rk-time">{fmtMs(r.time_ms)}</span>
+                <span className="rk-user">{r.player_name}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

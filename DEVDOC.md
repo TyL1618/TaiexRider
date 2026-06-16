@@ -303,3 +303,40 @@ taiexrider/
 - [ ] `MI_5MINS_INDEX` 實際回傳欄位格式與解析度（5 分鐘 vs 5 秒）（Phase 2 實測確認）
 - [ ] 個股賽道資料長度：固定近 3 個月，還是讓玩家選 1/3 個月（待定）
 - [ ] 經典賽道收錄哪些歷史事件（2020.3 崩盤、2022 熊市、其他？）
+
+---
+
+## 11. Phase 4 後端設計（排行榜 MVP）
+
+> 目標：**每日排名賽**的成績上傳 + 排行榜讀取（前 100，分數→時間排序）。後端＝Supabase（免費方案 + cron-job.org 保活，見 memory）。
+
+### 11.1 已鎖定的決策
+- **身分（MVP）**：匿名**裝置 UUID**（localStorage）+ 可編輯**暱稱**。**不做 Google 登入**（零摩擦、立刻能有排行榜；登入綁定延後）。
+- **每日地圖**：沿用 client 端**日期種子** `dailyTrack()`（全台同一天同圖，免後端）。後端只用 `challenge_date` 分組成績；**權威下發地圖延後**（防作弊強化時再做）。
+- **前端走 REST（不裝 SDK）**：用 `fetch` + anon key 打 PostgREST，零 bundle 成本（沿用保活時驗證過的 REST 模式）。
+- **提交走 RPC**：`submit_daily_score()`（security definer，upsert-if-better），anon 只能 `execute` 該 function + `select` 資料表，**不開放直接 insert/update**（稍微收斂偽造）。
+
+### 11.2 資料表 / RPC（見 `supabase/schema.sql`，明日貼上跑）
+- 表 `daily_scores`：`challenge_date date`、`player_id text`、`player_name text`、`score int`、`time_ms int`、`flips int`、`perfect int`、`created_at`。`unique(challenge_date, player_id)` → 每人每日一筆（取最佳）。
+- 排名：`order by score desc, time_ms asc`，`limit 100`。
+- 索引：`(challenge_date, score desc, time_ms asc)`。
+- RPC `submit_daily_score(p_date,p_id,p_name,p_score,p_time,p_flips,p_perfect)`：upsert，只有「分數更高、或同分但時間更短」才覆蓋。
+- RLS：`anon` 可 `select daily_scores`；`anon` 可 `execute submit_daily_score`；不給直接寫表。
+
+### 11.3 前端模組（今天已建，inert until .env）
+- `src/lib/leaderboard.ts`：`isLeaderboardConfigured`、`fetchDailyTop(dateKey)`、`submitDailyScore(dateKey, id, name, stats)`。未設定 env 時回 `[]`/`false`，不影響現有行為。
+- `src/lib/playerId.ts`：`getPlayerId()`（localStorage UUID）、`getPlayerName()/setPlayerName()`。
+- `src/data/pick.ts` `dailyKey()`：`YYYY-MM-DD` 當日 key（對齊 `dailyTrack` 的日期種子）。
+- `DailyChallenge`：已串 `fetchDailyTop` → 有成績就列出、未設定/無成績走佔位。
+
+### 11.4 防作弊（MVP 接受弱，記錄強化路徑）
+- 純前端送分可偽造，MVP 接受（透過 RPC 稍微收斂直接寫表）。
+- 強化（後期）：Google 登入綁 `auth.uid` + RLS、後端合理性檢查（分數上限/時間下限）、種子回放驗算、後端權威下發每日地圖。
+
+### 11.5 明日執行清單（純執行、省 token）
+1. 主帳號**開新免費 org**（taiexrider 專用）→ 建 project（region `ap-northeast-1`）。
+2. SQL Editor 貼 `supabase/schema.sql` 跑（含表 / RPC / RLS / keep_alive）。
+3. Settings→API 複製 **Project URL + anon key** → 填 `.env`（`.env.example` 為範本，**.env 不進 git**）。
+4. **接提交**：`GameCanvas` 加 `onGameOver?(stats)` callback（完賽/摔車各觸發一次，帶 `{score,timeMs,flips,perfect,finished}`）；`App` 在「每日排名賽啟動的 run」收到 → `submitDailyScore(dailyKey(), getPlayerId(), getPlayerName(), stats)`；`DailyChallenge` 加暱稱輸入 UI。
+5. cron-job.org 加這個專案保活（打 `daily_scores` 或 `keep_alive`）。
+6. 真機測：跑每日賽 → 成績出現在排行榜（分數→時間排序）。
