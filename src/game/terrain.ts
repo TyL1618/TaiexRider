@@ -17,7 +17,7 @@ export interface Track {
 
 // 價格陣列 → 賽道頂點（DEVDOC 第 4 節）
 export function pricesToTrack(prices: number[]): Track {
-  const { segmentWidth, heightRange, heightMin, heightMax, refPct, baselineY, startFlat, endFlat, maxSlopeDeg } =
+  const { segmentWidth, heightRange, heightMin, heightMax, refPct, baselineY, startFlat, endFlat, maxSlopeDeg, flatBottomW } =
     TRACK;
 
   // 1. 正規化高度（依波動度動態縮放：越狂野的股票地形越高）
@@ -59,19 +59,42 @@ export function pricesToTrack(prices: number[]): Track {
   }
 
   // 每段顏色：比較 padded 相鄰兩值方向（漲=紅/跌=綠/平=青）
-  const colors: string[] = [];
+  const rawColors: string[] = [];
   for (let i = 0; i < padded.length - 1; i++) {
-    if (padded[i + 1] > padded[i]) colors.push(COLOR.trackUp);
-    else if (padded[i + 1] < padded[i]) colors.push(COLOR.trackDown);
-    else colors.push(COLOR.track);
+    if (padded[i + 1] > padded[i]) rawColors.push(COLOR.trackUp);
+    else if (padded[i + 1] < padded[i]) rawColors.push(COLOR.trackDown);
+    else rawColors.push(COLOR.track);
   }
 
-  const ys = vertices.map((v) => v.y);
+  // 後處理：V 谷夾角 < 90°（h1×h2 > segW²）時插入一小段平底，讓車有地方轉向再爬坡
+  const threshold = segmentWidth * segmentWidth;
+  const finalVerts: Vec2[] = [];
+  const finalColors: string[] = [];
+  let xOff = 0;
+  for (let i = 0; i < vertices.length; i++) {
+    finalVerts.push({ x: vertices[i].x + xOff, y: vertices[i].y });
+    const isValley =
+      i > 0 &&
+      i < vertices.length - 1 &&
+      vertices[i].y > vertices[i - 1].y &&  // came down (y 向下為正)
+      vertices[i].y > vertices[i + 1].y;    // going up
+    const h1 = isValley ? vertices[i].y - vertices[i - 1].y : 0;
+    const h2 = isValley ? vertices[i].y - vertices[i + 1].y : 0;
+    if (isValley && h1 * h2 > threshold) {
+      // 插入平底段：同高度、往右延伸 flatBottomW
+      xOff += flatBottomW;
+      finalVerts.push({ x: vertices[i].x + xOff, y: vertices[i].y });
+      finalColors.push(COLOR.track); // 平底段顏色 = 平盤青
+    }
+    if (i < rawColors.length) finalColors.push(rawColors[i]);
+  }
+
+  const ys = finalVerts.map((v) => v.y);
   return {
-    vertices,
-    colors,
+    vertices: finalVerts,
+    colors: finalColors,
     startX: (startFlat * segmentWidth) / 2,
-    finishX: vertices[vertices.length - 1].x,
+    finishX: finalVerts[finalVerts.length - 1].x,
     minY: Math.min(...ys),
     maxY: Math.max(...ys),
   };

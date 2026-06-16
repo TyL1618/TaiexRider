@@ -14,6 +14,7 @@ export const TRACK = {
   endFlat: 3, // 終點平台補幾個平坦點
   // 斜率限制：相鄰兩點高度差上限 = tan(maxSlopeDeg) * segmentWidth
   maxSlopeDeg: 75,
+  flatBottomW: 80,  // V 谷夾角 < 90° 時插入的平底寬度 (px)，約一個車身長
 } as const;
 
 // 車輛＝摩托車（chassis = 車架物理體；drawBike 貼 public/bike.png，缺檔則畫向量備援）
@@ -49,8 +50,8 @@ export const DRIVE = {
   minGroundedStepsForBoost: 5, // 離地前要在地面連續待夠幾 step 才給 boost（擋轉折點微彈疊乘爆衝）
   groundAlignGain: 0.3, // 著地時車身角速度朝「坡面切線」修正的比例（平滑貼地，治本翹頭/落地翻車）
   groundedAvMax: 0.15, // 著地角速度上限（貼坡速度；新驅動不再硬設方向→目標可達，不會狂轉翻過頭）
-  airSpinAccel: 0.018, // 空中「按住」後空翻每 step 逼近量（×0.6，好控）
-  airSpinMax: 0.144, // 後空翻最大角速度（×0.6，降旋轉同時降飛出瞬間後甩力）
+  airSpinAccel: 0.024, // 空中「按住」後空翻每 step 逼近量（×0.8 of 0.030）
+  airSpinMax: 0.192, // 後空翻最大角速度（×0.8 of 0.24）
   airNoseForwardAccel: 0.0006, // 空中「放開」車頭往前壓每 step 逼近量（÷10，很緩）
   airNoseForwardMax: 0.008, // 空中車頭前壓最大角速度（÷10，只極緩低頭備降）
 } as const;

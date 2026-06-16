@@ -465,26 +465,24 @@ export default function GameCanvas({ prices, label, name, onExit }: GameCanvasPr
       ctx.save();
       ctx.translate(wx(px), wy(py));
       ctx.rotate(angle);
-      // 輪胎（深色實心）
+      const sr = r * scale; // 依鏡頭縮放比例縮小輪子
       ctx.beginPath();
-      ctx.arc(0, 0, r, 0, Math.PI * 2);
+      ctx.arc(0, 0, sr, 0, Math.PI * 2);
       ctx.fillStyle = "#0a0f18";
       ctx.fill();
-      // 霓虹輪框（雙描邊取代 shadowBlur）
       ctx.strokeStyle = COLOR.bikeGlow;
-      ctx.lineWidth = 7;
+      ctx.lineWidth = 7 * scale;
       ctx.globalAlpha = 0.4;
       ctx.stroke();
       ctx.strokeStyle = COLOR.wheel;
-      ctx.lineWidth = 2.5;
+      ctx.lineWidth = 2.5 * scale;
       ctx.globalAlpha = 1;
       ctx.stroke();
-      // 輪轂 + 輪輻（顯示轉動）
       ctx.beginPath();
-      ctx.arc(0, 0, r * 0.34, 0, Math.PI * 2);
+      ctx.arc(0, 0, sr * 0.34, 0, Math.PI * 2);
       ctx.moveTo(0, 0);
-      ctx.lineTo(r, 0);
-      ctx.lineWidth = 1.4;
+      ctx.lineTo(sr, 0);
+      ctx.lineWidth = 1.4 * scale;
       ctx.stroke();
       ctx.restore();
     };
@@ -501,10 +499,18 @@ export default function GameCanvas({ prices, label, name, onExit }: GameCanvasPr
       if (bikeImgReady) {
         const w = BIKE.spriteW;
         const h = w * (bikeImg.naturalHeight / bikeImg.naturalWidth);
+        const sw = w * scale; // 隨鏡頭縮放（overview 時縮小，不遮賽道）
+        const sh = h * scale;
         ctx.save();
         ctx.translate(wx(cx), wy(cy));
         ctx.rotate(cAngle);
-        ctx.drawImage(bikeImg, -w / 2 + BIKE.spriteOffsetX, -h / 2 + BIKE.spriteOffsetY, w, h);
+        ctx.drawImage(
+          bikeImg,
+          (-w / 2 + BIKE.spriteOffsetX) * scale,
+          (-h / 2 + BIKE.spriteOffsetY) * scale,
+          sw,
+          sh,
+        );
         ctx.restore();
         return;
       }
@@ -512,7 +518,7 @@ export default function GameCanvas({ prices, label, name, onExit }: GameCanvasPr
       ctx.save();
       ctx.translate(wx(cx), wy(cy));
       ctx.rotate(cAngle);
-      ctx.scale(0.52, 0.52);
+      ctx.scale(0.52 * scale, 0.52 * scale);
 
       ctx.shadowBlur = 0;
       ctx.lineJoin = "round";
@@ -623,6 +629,65 @@ export default function GameCanvas({ prices, label, name, onExit }: GameCanvasPr
       ctx.restore();
     };
 
+    // 結算用股價迷你圖：直接用原始 prices[] 在螢幕中段畫折線，比例與物理世界無關
+    const drawMinimap = () => {
+      if (prices.length < 2) return;
+      const padX = 28;
+      const topY = H * 0.33;
+      const botY = H * 0.70;
+      const mapW = W - padX * 2;
+      const mapH = botY - topY;
+      const vpad = mapH * 0.08; // 上下各 8% 留白，線不貼邊
+      const minP = Math.min(...prices);
+      const maxP = Math.max(...prices);
+      const span = maxP - minP || 1;
+      const toX = (i: number) => padX + (i / (prices.length - 1)) * mapW;
+      const toY2 = (p: number) => botY - vpad - ((p - minP) / span) * (mapH - 2 * vpad);
+
+      ctx.save();
+      ctx.lineJoin = "round";
+      ctx.lineCap = "round";
+
+      // 漸層填色
+      ctx.beginPath();
+      ctx.moveTo(toX(0), toY2(prices[0]));
+      for (let i = 1; i < prices.length; i++) ctx.lineTo(toX(i), toY2(prices[i]));
+      ctx.lineTo(toX(prices.length - 1), botY);
+      ctx.lineTo(toX(0), botY);
+      ctx.closePath();
+      const grad = ctx.createLinearGradient(0, topY, 0, botY);
+      grad.addColorStop(0, "rgba(45,226,230,0.07)");
+      grad.addColorStop(1, "rgba(45,226,230,0)");
+      ctx.fillStyle = grad;
+      ctx.fill();
+
+      // 霓虹折線（漲=紅/跌=綠/平=青）
+      for (let i = 0; i < prices.length - 1; i++) {
+        const col =
+          prices[i + 1] > prices[i] ? COLOR.trackUp
+          : prices[i + 1] < prices[i] ? COLOR.trackDown
+          : COLOR.track;
+        const glow =
+          col === COLOR.trackUp ? COLOR.trackUpGlow
+          : col === COLOR.trackDown ? COLOR.trackDownGlow
+          : COLOR.trackGlow;
+        const x1 = toX(i), y1 = toY2(prices[i]);
+        const x2 = toX(i + 1), y2 = toY2(prices[i + 1]);
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.strokeStyle = glow;
+        ctx.lineWidth = 7;
+        ctx.globalAlpha = 0.3;
+        ctx.stroke();
+        ctx.strokeStyle = col;
+        ctx.lineWidth = 2.5;
+        ctx.globalAlpha = 1;
+        ctx.stroke();
+      }
+      ctx.restore();
+    };
+
     const render = (alpha: number) => {
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, W, H);
@@ -631,6 +696,7 @@ export default function GameCanvas({ prices, label, name, onExit }: GameCanvasPr
       drawFlag(track.finishX, track.vertices[track.vertices.length - 1].y, COLOR.finish, "FIN");
       drawBike(alpha);
       drawPerfectFx();
+      if (overRef.current) drawMinimap();
     };
 
     // ---- 主迴圈（固定步進累加器）----
@@ -734,9 +800,10 @@ export default function GameCanvas({ prices, label, name, onExit }: GameCanvasPr
         </div>
       )}
 
-      {/* 角落小資訊 */}
+      {/* 角落小資訊（垂直排列：名稱 / 距離）*/}
       <div className="hud-corner">
-        {label} {name}　距離 {hud.distance}m
+        <div>{label} {name}</div>
+        <div>距離 {hud.distance}m</div>
       </div>
 
       {/* 左上：設定 */}
