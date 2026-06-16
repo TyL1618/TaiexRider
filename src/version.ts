@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.3.1";
+export const APP_VERSION = "0.3.2";
 
 export interface ChangelogEntry {
   date: string;
@@ -7,10 +7,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    date: "2026-06-16 (深夜)",
+    notes: [
+      "根治翻車自動翻正：翻倒貼地時每 step 鎖定旋轉，輪子摩擦不再讓車翻正",
+      "根治地形穿落：改用矩形＋頂點填縫圓，消除接縫三角縫隙且無薄弱端點",
+      "死亡條件簡化：翻倒貼地立即進 1 秒倒計時，不再需要速度門檻",
+    ],
+  },
+  {
     date: "2026-06-16 (晚)",
     notes: [
       "修正空中一秒即死 bug（死亡判定拆為翻倒貼地／空中卡死兩條件）",
-      "地形改三角梯形拼接，相鄰接縫零縫隙，根治穿落問題",
     ],
   },
   {

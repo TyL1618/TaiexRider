@@ -122,43 +122,49 @@ export function terrainYAt(track: Track, x: number): number {
   return a.y + (b.y - a.y) * t;
 }
 
-// 賽道頂點 → 靜態碰撞體（每段切成兩個三角形，相鄰段共用精確頂點 → 接縫零縫隙）
-export function buildTerrainBodies(track: Track): Body[] {
+// 賽道頂點 → 靜態碰撞體（旋轉矩形 + 頂點填縫圓）
+// 矩形沿法線偏移半厚 → 頂面貼線；各頂點加圓形（r=thickness/2）→ 數學上填滿任何角度的接縫，不製造台階
+export function buildTerrainBodies(track: Track, thickness = 26): Body[] {
   const bodies: Body[] = [];
   const { vertices } = track;
-  const yBottom = track.maxY + 600; // 遠低於可視區
+  const r = thickness / 2;
 
-  const opts = {
-    isStatic: true,
-    friction: 1,
-    frictionStatic: 1,
-    label: "terrain",
-    render: { visible: false },
-  };
-
+  // 每段一個旋轉矩形
   for (let i = 0; i < vertices.length - 1; i++) {
     const a = vertices[i];
     const b = vertices[i + 1];
-
-    // 三角①：a ─ b ─ (b.x, yBottom)
-    // 右邊緣與下一段三角②左邊緣完全重合 → 零縫隙
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const segLen = Math.hypot(dx, dy) || 1;
+    const len = segLen + 2; // +2 避免端點微縫
+    const angle = Math.atan2(dy, dx);
+    const downNx = -dy / segLen;
+    const downNy = dx / segLen;
+    const cx = (a.x + b.x) / 2 + downNx * r;
+    const cy = (a.y + b.y) / 2 + downNy * r;
     bodies.push(
-      Bodies.fromVertices(
-        (a.x + b.x * 2) / 3,
-        (a.y + b.y + yBottom) / 3,
-        [[{ x: a.x, y: a.y }, { x: b.x, y: b.y }, { x: b.x, y: yBottom }]],
-        opts,
-      ),
+      Bodies.rectangle(cx, cy, len, thickness, {
+        isStatic: true,
+        angle,
+        friction: 1,
+        frictionStatic: 1,
+        label: "terrain",
+        render: { visible: false },
+      }),
     );
+  }
 
-    // 三角②：a ─ (b.x, yBottom) ─ (a.x, yBottom)
+  // 每個頂點補一個圓，填滿相鄰矩形間的三角縫隙
+  // 圓心在頂點正下方 r px，頂端恰好與地形頂面齊平，無凸出台階
+  for (const v of vertices) {
     bodies.push(
-      Bodies.fromVertices(
-        (a.x * 2 + b.x) / 3,
-        (a.y + yBottom * 2) / 3,
-        [[{ x: a.x, y: a.y }, { x: b.x, y: yBottom }, { x: a.x, y: yBottom }]],
-        opts,
-      ),
+      Bodies.circle(v.x, v.y + r, r, {
+        isStatic: true,
+        friction: 1,
+        frictionStatic: 1,
+        label: "terrain",
+        render: { visible: false },
+      }),
     );
   }
 

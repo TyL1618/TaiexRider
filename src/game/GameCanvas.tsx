@@ -349,8 +349,12 @@ let crashTimer = 0;
       const speed = Math.hypot(c.velocity.x, c.velocity.y);
       const upsideDown = Math.cos(c.angle) < -0.5; // 車身超過 120° 翻轉
       const hasGroundContact = chassisContacts > 0 || rearContacts > 0 || frontContacts > 0;
-      // 翻倒且貼地：chassis 接觸讓接觸力制動，速度門檻高 5.0
-      const crashedOnGround = upsideDown && hasGroundContact && speed < 5.0;
+      // 翻倒貼地時鎖死旋轉，防止輪子摩擦扭矩自動翻正（「不倒翁」bug）
+      if (upsideDown && hasGroundContact) {
+        Body.setAngularVelocity(c, 0);
+      }
+      // 翻倒貼地：不需速度門檻，旋轉已鎖不會翻正，1 秒後判死
+      const crashedOnGround = upsideDown && hasGroundContact;
       // 空中完全卡住：飛行中 speed ≈ 6.9，只有真死局（卡谷等）才 < 0.5
       const stuckMidAir = bothWheelsOff && speed < 0.5;
       const goneWrong = crashedOnGround || stuckMidAir;
