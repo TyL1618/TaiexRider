@@ -60,12 +60,15 @@ export default function GameCanvas({ prices, label, name, onExit }: GameCanvasPr
   const [crashed, setCrashed] = useState(false);
   const [finished, setFinished] = useState(false);
   const [dying, setDying] = useState(false);
+  const [showChart, setShowChart] = useState(false); // 結算時切換 走勢圖/賽道
   const [toast, setToast] = useState<{ text: string; id: number } | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   // 讓事件處理可讀到最新的結束狀態
   const overRef = useRef(false);
   const dyingRef = useRef(false); // 死亡動畫進行中（在 useEffect 閉包內設定）
+  const showChartRef = useRef(false); // 走勢圖模式（canvas 閉包即時讀取）
   overRef.current = crashed || finished || dyingRef.current;
+  showChartRef.current = showChart;
 
   // 外部觸發重置（R 鍵 / 按鈕）
   const resetSignal = useRef(0);
@@ -243,12 +246,14 @@ let crashTimer = 0;
       deathShakeAmp = 0;
       deathElapsed = 0;
       dyingRef.current = false;
+      showChartRef.current = false;
       scale = 1;
       targetScale = 1;
       overviewComputed = false;
       setCrashed(false);
       setFinished(false);
       setDying(false);
+      setShowChart(false);
       setToast(null);
     };
 
@@ -754,32 +759,38 @@ let crashTimer = 0;
     const render = (alpha: number) => {
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, W, H);
-      drawTrack();
-      drawFlag(track.vertices[0].x, track.vertices[0].y, COLOR.start, "START");
-      drawFlag(track.finishX, track.vertices[track.vertices.length - 1].y, COLOR.finish, "FIN");
-      drawBike(alpha);
-      drawPerfectFx();
-      // 死亡特效：粒子爆炸（A）+ 白色閃光（B）
-      if (dyingRef.current) {
-        ctx.save();
-        for (const p of deathParticles) {
-          if (p.life <= 0) continue;
-          ctx.globalAlpha = Math.max(0, p.life);
-          ctx.fillStyle = p.color;
-          ctx.beginPath();
-          ctx.arc(wx(p.x), wy(p.y), Math.max(1, p.size * scale), 0, Math.PI * 2);
-          ctx.fill();
-        }
-        ctx.restore();
-        if (deathFlashAlpha > 0.01) {
+
+      if (overRef.current && showChartRef.current) {
+        // 走勢圖模式：純折線圖，賽道不渲染
+        drawMinimap();
+      } else {
+        // 賽道模式（遊戲中 + 結算賽道視角 + 死亡動畫）
+        drawTrack();
+        drawFlag(track.vertices[0].x, track.vertices[0].y, COLOR.start, "START");
+        drawFlag(track.finishX, track.vertices[track.vertices.length - 1].y, COLOR.finish, "FIN");
+        drawBike(alpha);
+        drawPerfectFx();
+        // 死亡特效：粒子爆炸（A）+ 白色閃光（B）
+        if (dyingRef.current) {
           ctx.save();
-          ctx.globalAlpha = deathFlashAlpha;
-          ctx.fillStyle = "#ffffff";
-          ctx.fillRect(0, 0, W, H);
+          for (const p of deathParticles) {
+            if (p.life <= 0) continue;
+            ctx.globalAlpha = Math.max(0, p.life);
+            ctx.fillStyle = p.color;
+            ctx.beginPath();
+            ctx.arc(wx(p.x), wy(p.y), Math.max(1, p.size * scale), 0, Math.PI * 2);
+            ctx.fill();
+          }
           ctx.restore();
+          if (deathFlashAlpha > 0.01) {
+            ctx.save();
+            ctx.globalAlpha = deathFlashAlpha;
+            ctx.fillStyle = "#ffffff";
+            ctx.fillRect(0, 0, W, H);
+            ctx.restore();
+          }
         }
       }
-      if (overRef.current) drawMinimap();
     };
 
     // ---- 主迴圈（固定步進累加器）----
@@ -955,6 +966,15 @@ let crashTimer = 0;
             <div className="overlay-track-name">{label} {name}</div>
             <div className="overlay-score">{hud.points} 分</div>
             <div className="overlay-time">{hud.timer}</div>
+          </div>
+          {/* 中段透明點擊區：切換賽道 / 走勢圖 */}
+          <div
+            className="chart-toggle-area"
+            onClick={() => setShowChart((s) => !s)}
+          >
+            <span className="chart-toggle-hint">
+              {showChart ? "← 賽道" : "走勢圖 →"}
+            </span>
           </div>
           <div className="overlay-bottom">
             <button className="overlay-btn" onClick={requestReset}>

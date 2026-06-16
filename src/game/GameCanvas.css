@@ -287,3 +287,32 @@
 .overlay-btn:active {
   transform: scale(0.97);
 }
+
+/* ---- 結算中段：點擊切換賽道 / 走勢圖 ---- */
+.chart-toggle-area {
+  flex: 1;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  width: 100%;
+  padding-bottom: 0.75rem;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.chart-toggle-hint {
+  padding: 0.3rem 0.9rem;
+  font-size: 0.68rem;
+  letter-spacing: 0.14em;
+  color: rgba(45, 226, 230, 0.5);
+  border: 1px solid rgba(45, 226, 230, 0.18);
+  border-radius: 20px;
+  user-select: none;
+  pointer-events: none;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.chart-toggle-area:active .chart-toggle-hint {
+  color: var(--neon-cyan);
+  border-color: var(--neon-cyan);
+}
