@@ -45,7 +45,7 @@ export const DRIVE = {
   //   任何坡都爬得上、上下坡平地同速；過坡頂保留垂直速度＝自然飛出去。
   // 用兩輪取坡而非車身中心 → 前輪一上陡坡整台車跟著轉上去（不會用鼻頭水平爬）。
   cruiseSpeed: 7.2, // 沿坡面鎖定速度 (px/step)，地面用（前版 12 ×0.6，慢好控）
-  groundLockEase: 0.35, // 速度趨近 cruiseSpeed 的平滑度 (0~1)，避免落地瞬間硬切
+  groundLockEase: 0.7, // 速度趨近 cruiseSpeed 的平滑度 (0~1)，越大越快收斂（0.7≈3步內達速，減少折點burst感）
   launchBoost: 1.67, // 離地目標速度倍率 → 目標離地速 = cruiseSpeed×此值 ≈12（解耦：地面慢、飛得遠）
   minGroundedStepsForBoost: 5, // 離地前要在地面連續待夠幾 step 才給 boost（擋轉折點微彈疊乘爆衝）
   groundAlignGain: 0.3, // 著地時車身角速度朝「坡面切線」修正的比例（平滑貼地，治本翹頭/落地翻車）

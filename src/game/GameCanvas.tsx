@@ -86,7 +86,7 @@ export default function GameCanvas({ prices, label, name, onExit }: GameCanvasPr
 
     // ---- 建立世界 ----
     const engine = Engine.create();
-    engine.gravity.y = 1;
+    engine.gravity.y = 0.5; // 低重力 → 空中時間更長，翻轉窗口更寬（Ketch Rider 風格）
     const world = engine.world;
 
     const track: Track = pricesToTrack(prices);
@@ -233,14 +233,25 @@ export default function GameCanvas({ prices, label, name, onExit }: GameCanvasPr
       const c = bike.chassis;
 
       if (grounded) {
-        if (throttle) {
-          // 坡面切線鎖速：後輪→前輪連線方向恆朝前(tx>0)，陡坡平地同速
-          const dx = bike.frontWheel.position.x - bike.rearWheel.position.x;
-          const dy = bike.frontWheel.position.y - bike.rearWheel.position.y;
-          const len = Math.hypot(dx, dy);
-          if (len > 0.001) {
-            const tx = dx / len;
-            const ty = dy / len;
+        // 後輪→前輪連線 = 坡面切線（tx 恆正 = 永遠朝前）
+        const dx = bike.frontWheel.position.x - bike.rearWheel.position.x;
+        const dy = bike.frontWheel.position.y - bike.rearWheel.position.y;
+        const len = Math.hypot(dx, dy);
+        if (len > 0.001) {
+          const tx = dx / len;
+          const ty = dy / len;
+          // ① 法線速度歸零（吸地消彈跳）
+          //    坡面外法線 = (ty, -tx)（y 向下座標系：flat→(0,-1)=朝上 ✓）
+          //    只移除「離坡」分量(vn>0)；「入坡」分量留給物理碰撞處理，不干涉落地
+          const nx = ty, ny = -tx;
+          let vn = c.velocity.x * nx + c.velocity.y * ny;
+          if (vn > 0) Body.setVelocity(c, { x: c.velocity.x - vn * nx, y: c.velocity.y - vn * ny });
+          vn = bike.rearWheel.velocity.x * nx + bike.rearWheel.velocity.y * ny;
+          if (vn > 0) Body.setVelocity(bike.rearWheel, { x: bike.rearWheel.velocity.x - vn * nx, y: bike.rearWheel.velocity.y - vn * ny });
+          vn = bike.frontWheel.velocity.x * nx + bike.frontWheel.velocity.y * ny;
+          if (vn > 0) Body.setVelocity(bike.frontWheel, { x: bike.frontWheel.velocity.x - vn * nx, y: bike.frontWheel.velocity.y - vn * ny });
+          // ② 油門：切線鎖速到 cruiseSpeed
+          if (throttle) {
             const vt = c.velocity.x * tx + c.velocity.y * ty;
             const delta = (DRIVE.cruiseSpeed - vt) * DRIVE.groundLockEase;
             Body.setVelocity(c, { x: c.velocity.x + delta * tx, y: c.velocity.y + delta * ty });
@@ -248,7 +259,7 @@ export default function GameCanvas({ prices, label, name, onExit }: GameCanvasPr
             Body.setVelocity(bike.frontWheel, { x: bike.frontWheel.velocity.x + delta * tx, y: bike.frontWheel.velocity.y + delta * ty });
           }
         }
-        // 對齊前輪坡段：以比例修正車身角速度（gain），並夾在 groundedAvMax 內
+        // ③ 對齊前輪坡段：以比例修正車身角速度（gain），並夾在 groundedAvMax 內
         const slope = slopeAt(track, bike.frontWheel.position.x);
         const da = angleDelta(c.angle, slope);
         let av = da * DRIVE.groundAlignGain;
