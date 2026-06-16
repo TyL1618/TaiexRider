@@ -20,6 +20,8 @@ interface Hud {
   airFlips: number;
   throttle: boolean;
   timer: string;
+  totalFlips: number;
+  perfectLandings: number;
 }
 
 const fmtTime = (ms: number): string => {
@@ -56,6 +58,8 @@ export default function GameCanvas({ prices, label, name, onExit }: GameCanvasPr
     airFlips: 0,
     throttle: false,
     timer: "0:00.0",
+    totalFlips: 0,
+    perfectLandings: 0,
   });
   const [crashed, setCrashed] = useState(false);
   const [finished, setFinished] = useState(false);
@@ -63,12 +67,16 @@ export default function GameCanvas({ prices, label, name, onExit }: GameCanvasPr
   const [showChart, setShowChart] = useState(false); // 結算時切換 走勢圖/賽道
   const [toast, setToast] = useState<{ text: string; id: number } | null>(null);
   const [showSettings, setShowSettings] = useState(false);
+  const [paused, setPaused] = useState(false); // 暫停（discussion 第 13 點）
+  const [confirmExit, setConfirmExit] = useState(false); // 返回主選單確認
   // 讓事件處理可讀到最新的結束狀態
   const overRef = useRef(false);
   const dyingRef = useRef(false); // 死亡動畫進行中（在 useEffect 閉包內設定）
   const showChartRef = useRef(false); // 走勢圖模式（canvas 閉包即時讀取）
+  const pausedRef = useRef(false); // 暫停（主迴圈閉包即時讀取）
   overRef.current = crashed || finished || dyingRef.current;
   showChartRef.current = showChart;
+  pausedRef.current = paused || confirmExit || showSettings; // 任一彈窗開啟也凍住遊戲
 
   // 外部觸發重置（R 鍵 / 按鈕）
   const resetSignal = useRef(0);
@@ -181,6 +189,9 @@ export default function GameCanvas({ prices, label, name, onExit }: GameCanvasPr
 let crashTimer = 0;
     let points = 0;
     let bonusPoints = 0; // 特技分（後翻＋完美落地），行進分另算疊加
+    let maxDistScore = 0; // 歷史最大行進分 → 分數只增不減（discussion 第 5 點）
+    let totalFlips = 0; // 全程累計後空翻圈數（結算顯示，discussion 第 9 點）
+    let perfectLandings = 0; // 全程完美落地次數
     let wasGrounded = false;
     let hudTick = 0;
     let raceTimeMs = 0;
@@ -237,6 +248,9 @@ let crashTimer = 0;
       crashTimer = 0;
       points = 0;
       bonusPoints = 0;
+      maxDistScore = 0;
+      totalFlips = 0;
+      perfectLandings = 0;
       raceTimeMs = 0;
       wasGrounded = false;
       perfectFxFrames = 0;
@@ -350,6 +364,7 @@ let crashTimer = 0;
         if (upright && flips > 0) {
           const gained = flipScore(flips);
           bonusPoints += gained;
+          totalFlips += flips;
           showToast(`${flips} 圈 +${gained}`);
         }
         // 完美落地：用車身中心下方坡面角，比兩輪插值更穩（不受前後輪跨 segment 影響）
@@ -361,6 +376,7 @@ let crashTimer = 0;
         const perfectBonus = perfectFlips * 100;
         if (realAir && Math.abs(airRotation) > Math.PI * 1.7 && levelOk) {
           bonusPoints += perfectBonus;
+          perfectLandings++;
           showToast(`完美落地 ${perfectFlips}圈 +${perfectBonus}`);
           perfectFxFrames = 30;
           perfectFxPts = [
@@ -377,18 +393,21 @@ let crashTimer = 0;
       if (groundedNow) airRotation = 0;
       wasGrounded = groundedNow;
 
-      // 行進分：到終點剛好 1000，即時疊加在特技分上
+      // 行進分：到終點剛好 1000，即時疊加在特技分上。
+      // 只增不減（discussion 第 5 點）：車身向後滑不扣回已達到的行進分。
       const traveled = Math.max(0, c.position.x - track.startX);
       const distScore = Math.min(1000, Math.round((traveled / (track.finishX - track.startX)) * 1000));
-      points = bonusPoints + distScore;
+      if (distScore > maxDistScore) maxDistScore = distScore;
+      points = bonusPoints + maxDistScore;
 
       // 死亡判定
       const bothWheelsOff = rearContacts === 0 && frontContacts === 0;
       const speed = Math.hypot(c.velocity.x, c.velocity.y);
       // 車頂碰地：把局部 crashZone 座標轉世界，任一點低於地形 → 死
-      // 前提：車身非正立（upright=false），避免山峰頂點從輪底穿上來誤判
+      // 前提：車身真的「翻過 90°」(cos < crashTipCos)，爬陡坡前傾(<90°)不誤判（discussion 第 1 點）
+      const tippedOver = Math.cos(c.angle) < RULES.crashTipCos;
       const ca = Math.cos(c.angle), sa = Math.sin(c.angle);
-      const topHit = !upright && BIKE.crashZone.some(({ x: lx, y: ly }) => {
+      const topHit = tippedOver && BIKE.crashZone.some(({ x: lx, y: ly }) => {
         const wx = ca * lx - sa * ly + c.position.x;
         const wy = sa * lx + ca * ly + c.position.y;
         return wy > terrainYAt(track, wx);
@@ -457,18 +476,31 @@ let crashTimer = 0;
     const drawTrack = () => {
       const v = track.vertices;
       ctx.save();
-      // 線下漸層填色
-      ctx.beginPath();
-      ctx.moveTo(wx(v[0].x), wy(v[0].y));
-      for (let i = 1; i < v.length; i++) ctx.lineTo(wx(v[i].x), wy(v[i].y));
-      ctx.lineTo(wx(v[v.length - 1].x), H);
-      ctx.lineTo(wx(v[0].x), H);
-      ctx.closePath();
-      const grad = ctx.createLinearGradient(0, 0, 0, H);
-      grad.addColorStop(0, COLOR.fillTop);
-      grad.addColorStop(1, COLOR.fillBottom);
-      ctx.fillStyle = grad;
-      ctx.fill();
+      // 視覺 A：每段填滿成 K 棒柱（漲紅/跌綠/平青），上緣 = 折線、往下填到畫面底。
+      // 與物理梯形碰撞體同形，所見即所撞。
+      for (let i = 0; i < v.length - 1; i++) {
+        const col = track.colors[i];
+        const x1 = wx(v[i].x), y1 = wy(v[i].y);
+        const x2 = wx(v[i + 1].x), y2 = wy(v[i + 1].y);
+        const top = Math.min(y1, y2);
+        const fillTop = col === COLOR.trackUp ? COLOR.fillUpTop
+          : col === COLOR.trackDown ? COLOR.fillDownTop
+          : COLOR.fillFlatTop;
+        const fillBot = col === COLOR.trackUp ? COLOR.fillUpBot
+          : col === COLOR.trackDown ? COLOR.fillDownBot
+          : COLOR.fillFlatBot;
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.lineTo(x2, H);
+        ctx.lineTo(x1, H);
+        ctx.closePath();
+        const grad = ctx.createLinearGradient(0, top, 0, H);
+        grad.addColorStop(0, fillTop);
+        grad.addColorStop(1, fillBot);
+        ctx.fillStyle = grad;
+        ctx.fill();
+      }
       // 霓虹折線（漲=紅/跌=綠，連續同色段合為一條 path 減少 draw call）
       ctx.lineJoin = "round";
       ctx.lineCap = "round";
@@ -807,6 +839,12 @@ let crashTimer = 0;
         last = now;
         acc = 0;
       }
+      // 暫停：不步進物理、不累計時間，僅維持畫面（last=now 防止恢復時 dt 暴衝）
+      if (pausedRef.current && !overRef.current) {
+        last = now;
+        render(Math.min(acc / STEP, 1));
+        return;
+      }
       let dt = now - last;
       last = now;
       if (dt > 60) dt = 60; // 防止分頁切回時爆衝
@@ -884,6 +922,8 @@ let crashTimer = 0;
           airFlips: flips,
           throttle,
           timer: fmtTime(raceTimeMs),
+          totalFlips,
+          perfectLandings,
         });
       }
     };
@@ -903,6 +943,21 @@ let crashTimer = 0;
       Engine.clear(engine);
     };
   }, [prices]);
+
+  // 攔截裝置返回鍵（Android/TWA 的實體返回 → popstate）：遊戲中按返回 → 跳確認，不直接離開
+  useEffect(() => {
+    window.history.pushState({ taiexGame: true }, "");
+    const onPop = () => {
+      if (overRef.current) {
+        onExit(); // 已結算畫面：返回直接回主選單
+        return;
+      }
+      setConfirmExit(true);
+      window.history.pushState({ taiexGame: true }, ""); // 重新攔住，停在遊戲
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, [onExit]);
 
   return (
     <div className="game-root">
@@ -929,10 +984,37 @@ let crashTimer = 0;
           <button className="icon-btn settings-btn" onClick={() => setShowSettings(true)} aria-label="設定">
             ⚙
           </button>
-          <button className="exit-btn" onClick={onExit}>
+          <button className="exit-btn" onClick={() => setConfirmExit(true)}>
             返回主選單
           </button>
+          <button className="pause-btn" onClick={() => setPaused((p) => !p)}>
+            {paused ? "▶ 繼續" : "❚❚ 暫停"}
+          </button>
         </>
+      )}
+
+      {/* 暫停遮罩（點任意處繼續）*/}
+      {paused && !crashed && !finished && !dying && !confirmExit && !showSettings && (
+        <div className="overlay" onClick={() => setPaused(false)}>
+          <div className="overlay-title">已暫停</div>
+          <div className="settings-row dim">點擊任意處繼續</div>
+        </div>
+      )}
+
+      {/* 返回主選單確認（遊玩中按返回 / 裝置返回鍵）*/}
+      {confirmExit && (
+        <div className="overlay" onClick={() => setConfirmExit(false)}>
+          <div className="settings-panel" onClick={(e) => e.stopPropagation()}>
+            <div className="overlay-title">離開賽道？</div>
+            <div className="settings-row dim">目前成績不會保存</div>
+            <button className="overlay-btn" onClick={onExit}>
+              確定離開
+            </button>
+            <button className="overlay-btn ghost" onClick={() => setConfirmExit(false)}>
+              繼續遊玩
+            </button>
+          </div>
+        </div>
       )}
 
       {/* 得分提示（後空翻 / 完美落地）*/}
@@ -966,6 +1048,9 @@ let crashTimer = 0;
             <div className="overlay-track-name">{label} {name}</div>
             <div className="overlay-score">{hud.points} 分</div>
             <div className="overlay-time">{hud.timer}</div>
+            <div className="overlay-stats">
+              翻轉 {hud.totalFlips} 圈 ・ 完美落地 {hud.perfectLandings} 次
+            </div>
           </div>
           {/* 中段透明點擊區：切換賽道 / 走勢圖 */}
           <div

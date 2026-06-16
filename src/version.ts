@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.3.7";
+export const APP_VERSION = "0.4.0";
 
 export interface ChangelogEntry {
   date: string;
@@ -6,6 +6,19 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    date: "2026-06-16 (v0.4.0)",
+    notes: [
+      "地形改「實心填滿」：賽道下方填成 K 棒柱（漲紅/跌綠/平青），根治隱形牆與卡轉折",
+      "線段顏色改依實際坡向上色（上升紅/下降綠），不再因夾平而與視覺不符",
+      "死亡判定門檻放寬：只有車身翻過 90° 才會判死，爬陡坡前傾不再被戳死",
+      "分數只增不減：車身向後滑不再扣回已達成的行進分",
+      "完賽結算新增：翻轉總圈數 ・ 完美落地次數",
+      "新增暫停 / 繼續按鈕；遊玩中按返回主選單會先跳確認",
+      "裝置返回鍵：遊戲中→確認離開賽道；首頁→確認離開 App",
+      "首頁右上版本號改為設定鈕（音量待實作＋版本＋更新日誌）；左上新增排行榜（敬請期待）",
+    ],
+  },
   {
     date: "2026-06-16 (凌晨)",
     notes: [

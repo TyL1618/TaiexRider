@@ -153,12 +153,16 @@ interface TrackData {
 }
 ```
 
-頂點陣列餵給 Matter.js 的多段靜態矩形地形（`Bodies.rectangle` 拼接）。
+頂點陣列餵給 Matter.js 的靜態地形碰撞體。
 
-**地形碰撞體實作（`buildTerrainBodies`，v0.3.7 定案）：**
-- 每段一個旋轉矩形，厚度 26px，兩端各 +3px（`len = segLen + 6`）確保接縫重疊
-- 頂點填縫圓已移除（曾用 `Bodies.circle(r=13)` 填縫，但在凸角轉折點造成彈射「隱形牆」）
-- 正確做法：矩形端點的角點計算已證明落在地形頂點 ±1px，重疊 6px 足以填縫不需要圓體
+**地形碰撞體實作（`buildTerrainBodies`，v0.4.0 定案 — 實心填滿梯形）：**
+- 每段一個 `Bodies.fromVertices` **凸梯形**：上緣 = 折線（兩頂點）、兩側垂直、下緣拉到 `maxY + 800`（賽道下方整片填實）。
+- 傳入 `Vertices.centre(verts)` 當 position → fromVertices 不平移頂點，世界座標 = 原始 verts（已用 node 實測吻合，單一凸 part，無需 poly-decomp）。
+- **為何根治隱形牆/卡轉折**：相鄰梯形共用一條垂直邊（在共同頂點 x 處往下），頂面 = 折線本身、零縫、零凸角。舊「旋轉矩形沿法線偏移」會讓轉折點兩段法線不同 → 上緣角翹到折線上方 = 隱形牆；填滿後完全消除。
+- **填滿又繞過 fromVertices 穿透**：早期整條 `fromVertices` 失敗是因薄片（<1px 三角頂點）被高速隧穿；梯形又肥又深，無薄片。
+- **視覺 A（K 棒柱）**：渲染與碰撞同形——每段填紅(漲)/綠(跌)/青(平)柱，頂部實往下淡出。物理與渲染解耦，若要回到「只留頂線」霓虹風（B）或漸層（C），改 `drawTrack` 即可，碰撞不受影響。
+- **歷史**：v0.3.7 以前為「旋轉矩形厚 26px + 兩端 +3px 重疊」（曾加頂點填縫圓 `Bodies.circle(r=13)`，因凸角彈射移除）；v0.4.0 全面改填滿梯形。
+- **備援**：若 chassis 圓體仍偶卡谷底，可加 collisionFilter mask 讓 chassis 不碰地、只輪子碰（Hill Climb 標準做法），本次未啟用。
 
 ---
 

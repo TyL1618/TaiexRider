@@ -1,4 +1,4 @@
-import { Bodies, type Body } from "matter-js";
+import { Bodies, Vertices, type Body } from "matter-js";
 import { COLOR, TRACK } from "./constants";
 
 export interface Vec2 {
@@ -58,18 +58,9 @@ export function pricesToTrack(prices: number[]): Track {
     prevY = y;
   }
 
-  // 每段顏色：比較 padded 相鄰兩值方向（漲=紅/跌=綠/平=青）
-  const rawColors: string[] = [];
-  for (let i = 0; i < padded.length - 1; i++) {
-    if (padded[i + 1] > padded[i]) rawColors.push(COLOR.trackUp);
-    else if (padded[i + 1] < padded[i]) rawColors.push(COLOR.trackDown);
-    else rawColors.push(COLOR.track);
-  }
-
   // 後處理：V 谷夾角 < 90°（h1×h2 > segW²）時插入一小段平底，讓車有地方轉向再爬坡
   const threshold = segmentWidth * segmentWidth;
   const finalVerts: Vec2[] = [];
-  const finalColors: string[] = [];
   let xOff = 0;
   for (let i = 0; i < vertices.length; i++) {
     finalVerts.push({ x: vertices[i].x + xOff, y: vertices[i].y });
@@ -84,9 +75,18 @@ export function pricesToTrack(prices: number[]): Track {
       // 插入平底段：同高度、往右延伸 flatBottomW
       xOff += flatBottomW;
       finalVerts.push({ x: vertices[i].x + xOff, y: vertices[i].y });
-      finalColors.push(COLOR.track); // 平底段顏色 = 平盤青
     }
-    if (i < rawColors.length) finalColors.push(rawColors[i]);
+  }
+
+  // 每段顏色：依「最終頂點 y 方向」判斷（discussion 第 3 點）。
+  // 不再用原始 price 漲跌——夾平/平底插入後視覺坡向可能與原始方向不符，
+  // 一律以實際畫出來的折線方向上色（上升=紅/下降=綠/持平=青），顏色與視覺一致。
+  const finalColors: string[] = [];
+  for (let i = 0; i < finalVerts.length - 1; i++) {
+    const dy = finalVerts[i + 1].y - finalVerts[i].y; // y 向下為正
+    if (dy < -0.5) finalColors.push(COLOR.trackUp);    // 往上 = 漲 = 紅
+    else if (dy > 0.5) finalColors.push(COLOR.trackDown); // 往下 = 跌 = 綠
+    else finalColors.push(COLOR.track);                // 持平 = 青
   }
 
   const ys = finalVerts.map((v) => v.y);
@@ -129,30 +129,31 @@ export function terrainYAt(track: Track, x: number): number {
   return a.y + (b.y - a.y) * t;
 }
 
-// 賽道頂點 → 靜態碰撞體（旋轉矩形 + 頂點填縫圓）
-// 矩形沿法線偏移半厚 → 頂面貼線；各頂點加圓形（r=thickness/2）→ 數學上填滿任何角度的接縫，不製造台階
-export function buildTerrainBodies(track: Track, thickness = 26): Body[] {
+// 賽道頂點 → 靜態碰撞體：每段一個「實心梯形」（凸四邊形）
+// 上緣 = 折線本身、兩側垂直、下緣拉到 baseY（賽道下方全部填滿）。
+// 相鄰梯形共用一條垂直邊 → 零縫、零凸角、頂面 = 折線本身 → 結構性根治
+// 隱形牆 / 卡轉折（discussion 第 2/4/12 點）。取代舊「旋轉矩形沿法線偏移」
+// 造成的頂點翹角；也繞過 fromVertices 整條地形薄片穿透問題（梯形又肥又深）。
+export function buildTerrainBodies(track: Track): Body[] {
   const bodies: Body[] = [];
-  const { vertices } = track;
-  const r = thickness / 2;
+  const { vertices, maxY } = track;
+  const baseY = maxY + 800; // 填滿深度：遠低於最低點，車永遠到不了下緣
 
-  // 每段一個旋轉矩形
   for (let i = 0; i < vertices.length - 1; i++) {
     const a = vertices[i];
     const b = vertices[i + 1];
-    const dx = b.x - a.x;
-    const dy = b.y - a.y;
-    const segLen = Math.hypot(dx, dy) || 1;
-    const len = segLen + 6; // +6 兩端各 3px 重疊，消除接縫不需頂點圓
-    const angle = Math.atan2(dy, dx);
-    const downNx = -dy / segLen;
-    const downNy = dx / segLen;
-    const cx = (a.x + b.x) / 2 + downNx * r;
-    const cy = (a.y + b.y) / 2 + downNy * r;
+    // 凸四邊形（y 向下，順時針）：左上 → 右上 → 右下 → 左下
+    const verts = [
+      { x: a.x, y: a.y },
+      { x: b.x, y: b.y },
+      { x: b.x, y: baseY },
+      { x: a.x, y: baseY },
+    ];
+    // 傳入真實形心 → fromVertices 不平移頂點，世界座標 = verts 原值
+    const centre = Vertices.centre(verts);
     bodies.push(
-      Bodies.rectangle(cx, cy, len, thickness, {
+      Bodies.fromVertices(centre.x, centre.y, [verts], {
         isStatic: true,
-        angle,
         friction: 1,
         frictionStatic: 1,
         label: "terrain",
@@ -160,8 +161,6 @@ export function buildTerrainBodies(track: Track, thickness = 26): Body[] {
       }),
     );
   }
-
-  // 頂點圓已移除：矩形兩端各 +3px 重疊已填縫，頂點圓反而造成凸角彈射（隱形牆）
 
   return bodies;
 }

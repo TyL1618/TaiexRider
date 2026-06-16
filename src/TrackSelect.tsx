@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { TRACKS, trackDifficulty, difficultyStars, type TrackData } from "./data/tracks";
 import { APP_VERSION, CHANGELOG } from "./version";
 import "./TrackSelect.css";
@@ -20,6 +20,28 @@ export default function TrackSelect({ onPick }: { onPick: (t: TrackData) => void
   const [sortBy, setSortBy] = useState<SortBy>("popular");
   const [query, setQuery] = useState("");
   const [showLog, setShowLog] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [showRank, setShowRank] = useState(false); // 排行榜佔位（discussion 第 14 點）
+  const [confirmLeave, setConfirmLeave] = useState(false); // 裝置返回鍵離開確認（第 13 點）
+  const leavingRef = useRef(false);
+
+  // 攔截裝置返回鍵（Android/TWA）：首頁按返回 → 先問是否離開 App
+  useEffect(() => {
+    window.history.pushState({ taiexHome: true }, "");
+    const onPop = () => {
+      if (leavingRef.current) return; // 已確認離開 → 放行
+      setConfirmLeave(true);
+      window.history.pushState({ taiexHome: true }, ""); // 重新攔住
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
+
+  const doLeave = () => {
+    leavingRef.current = true;
+    setConfirmLeave(false);
+    window.history.go(-2); // 退出兩層 trap → 真正離開 App
+  };
 
   const list = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -45,8 +67,11 @@ export default function TrackSelect({ onPick }: { onPick: (t: TrackData) => void
 
   return (
     <div className="select-screen">
-      <button className="log-btn" onClick={() => setShowLog(true)} aria-label="更新日誌">
-        ℹ v{APP_VERSION}
+      <button className="corner-btn rank-btn" onClick={() => setShowRank(true)} aria-label="排行榜">
+        🏆 排行榜
+      </button>
+      <button className="corner-btn settings-corner-btn" onClick={() => setShowSettings(true)} aria-label="設定">
+        ⚙
       </button>
 
       <h1 className="select-title">TAIEX&shy;RIDER</h1>
@@ -111,6 +136,53 @@ export default function TrackSelect({ onPick }: { onPick: (t: TrackData) => void
       </div>
 
       <p className="select-foot">純娛樂・非投資建議</p>
+
+      {/* 設定面板：音量(待實作) + 版本 + 更新日誌入口 */}
+      {showSettings && (
+        <div className="log-overlay" onClick={() => setShowSettings(false)}>
+          <div className="settings-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="log-title">設定</div>
+            <div className="settings-item">音量（待實作）</div>
+            <div className="settings-item dim">版本 v{APP_VERSION}</div>
+            <button
+              className="settings-link"
+              onClick={() => {
+                setShowSettings(false);
+                setShowLog(true);
+              }}
+            >
+              更新日誌 ›
+            </button>
+            <button className="log-close" onClick={() => setShowSettings(false)}>關閉</button>
+          </div>
+        </div>
+      )}
+
+      {/* 排行榜佔位：後端 / 每日挑戰上線後接 */}
+      {showRank && (
+        <div className="log-overlay" onClick={() => setShowRank(false)}>
+          <div className="settings-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="log-title">排行榜</div>
+            <div className="settings-item dim">敬請期待</div>
+            <div className="settings-item dim" style={{ fontSize: "0.72rem", lineHeight: 1.6 }}>
+              每日挑戰關卡上線後，<br />這裡會顯示當日成績排名
+            </div>
+            <button className="log-close" onClick={() => setShowRank(false)}>關閉</button>
+          </div>
+        </div>
+      )}
+
+      {/* 離開 App 確認（裝置返回鍵）*/}
+      {confirmLeave && (
+        <div className="log-overlay" onClick={() => setConfirmLeave(false)}>
+          <div className="settings-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="log-title">離開遊戲？</div>
+            <div className="settings-item dim">確定要離開 TAIEX RIDER 嗎？</div>
+            <button className="log-close" onClick={doLeave}>確定離開</button>
+            <button className="settings-link" onClick={() => setConfirmLeave(false)}>留下繼續玩</button>
+          </div>
+        </div>
+      )}
 
       {showLog && (
         <div className="log-overlay" onClick={() => setShowLog(false)}>

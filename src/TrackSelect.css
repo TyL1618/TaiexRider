@@ -209,11 +209,10 @@
   color: var(--text-dim);
 }
 
-/* ---- 更新日誌入口按鈕（右上角）---- */
-.log-btn {
+/* ---- 角落按鈕（排行榜左上 / 設定右上）---- */
+.corner-btn {
   position: fixed;
   top: 0.9rem;
-  right: 1rem;
   padding: 0.35rem 0.75rem;
   font-size: 0.72rem;
   letter-spacing: 0.08em;
@@ -222,11 +221,62 @@
   border: 1px solid rgba(45, 226, 230, 0.25);
   border-radius: 7px;
   cursor: pointer;
+  z-index: 50;
 }
 
-.log-btn:hover {
+.corner-btn:hover {
   color: var(--neon-cyan);
   border-color: var(--neon-cyan);
+}
+
+.rank-btn {
+  left: 1rem;
+}
+
+.settings-corner-btn {
+  right: 1rem;
+  font-size: 1rem;
+  padding: 0.25rem 0.6rem;
+}
+
+/* ---- 設定 / 排行榜 / 離開確認 modal（沿用 log-overlay 遮罩）---- */
+.settings-modal {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.9rem;
+  width: min(88vw, 360px);
+  padding: 1.8rem 2rem;
+  background: rgba(10, 15, 24, 0.96);
+  border: 1px solid var(--neon-cyan);
+  border-radius: 14px;
+  box-shadow: 0 0 28px rgba(45, 226, 230, 0.2);
+  text-align: center;
+}
+
+.settings-item {
+  font-size: 0.95rem;
+  letter-spacing: 0.08em;
+  color: var(--text);
+}
+
+.settings-item.dim {
+  font-size: 0.82rem;
+  color: var(--text-dim);
+}
+
+.settings-link {
+  font-size: 0.82rem;
+  letter-spacing: 0.08em;
+  color: var(--neon-cyan);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0.2rem;
+}
+
+.settings-link:hover {
+  text-shadow: 0 0 10px rgba(45, 226, 230, 0.6);
 }
 
 /* ---- 更新日誌 modal ---- */
