@@ -86,7 +86,7 @@ export default function GameCanvas({ prices, label, name, onExit }: GameCanvasPr
 
     // ---- 建立世界 ----
     const engine = Engine.create();
-    engine.gravity.y = 0.5; // 低重力 → 空中時間更長，翻轉窗口更寬（Ketch Rider 風格）
+    engine.gravity.y = 0.7; // 低重力 → 空中時間更長，翻轉窗口更寬（Ketch Rider 風格）
     const world = engine.world;
 
     const track: Track = pricesToTrack(prices);
@@ -265,13 +265,14 @@ export default function GameCanvas({ prices, label, name, onExit }: GameCanvasPr
         let av = da * DRIVE.groundAlignGain;
         if (Math.abs(av) > DRIVE.groundedAvMax) av = Math.sign(av) * DRIVE.groundedAvMax;
         Body.setAngularVelocity(c, av);
-      } else if (throttle && Math.cos(c.angle) > 0) {
-        // 空中按住 + 未翻過頭 → 後空翻（負向＝車頭往上後翻）
+      } else if (throttle) {
+        // 空中按住 → 後空翻（任意角度均可持續旋轉；移除 cos 條件，修「倒置區間停轉」bug）
         const nv = Math.max(-DRIVE.airSpinMax, c.angularVelocity - DRIVE.airSpinAccel);
         Body.setAngularVelocity(c, nv);
-      } else if (!throttle) {
-        // 空中放開 → 車頭緩緩往前壓（正向＝nose-down），設上限不自己翻整圈
-        const nv = Math.min(DRIVE.airNoseForwardMax, c.angularVelocity + DRIVE.airNoseForwardAccel);
+      } else {
+        // 空中放開 → 立刻清除後翻慣性（max(0,av) 拔掉負向角速度），再微微前壓備降
+        const damped = Math.max(0, c.angularVelocity);
+        const nv = Math.min(DRIVE.airNoseForwardMax, damped + DRIVE.airNoseForwardAccel);
         Body.setAngularVelocity(c, nv);
       }
     };
