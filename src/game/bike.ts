@@ -29,9 +29,12 @@ export function createBike(world: World, x: number, y: number): Bike {
     restitution,
   } = BIKE;
 
-  // 圓形 chassis：接觸力永遠過圓心 → 不產生旋轉力矩 → 不在坡段接縫被頂翻/抖動
+  // 圓形 chassis + mask:0（只有輪子碰地形，車身完全不碰地）：
+  //   ① 圓形：接觸力永遠過圓心 → 不產生旋轉力矩
+  //   ② mask:0：車身不參與地形碰撞 → 不會在 K 棒接縫頂點被夾住（root fix，Hill Climb 標準做法）
+  //   填滿梯形地形無縫隙，故車身不碰地不會穿落；輪子靠軸約束撐住車身。
   const chassis = Bodies.circle(x, y, chassisRadius, {
-    collisionFilter: filter,
+    collisionFilter: { group, mask: 0 },
     density: chassisDensity,
     frictionAir: chassisFrictionAir,
     friction: 0,

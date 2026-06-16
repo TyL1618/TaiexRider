@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.4.1";
+export const APP_VERSION = "0.4.2";
 
 export interface ChangelogEntry {
   date: string;
@@ -6,6 +6,12 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    date: "2026-06-16 (v0.4.2)",
+    notes: [
+      "徹底根治卡 K 棒縫隙：車身碰撞體改為不碰地形，只由雙輪碰地（Hill Climb 標準做法）",
+    ],
+  },
   {
     date: "2026-06-16 (v0.4.1)",
     notes: [
