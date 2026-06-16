@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.4.2";
+export const APP_VERSION = "0.4.3";
 
 export interface ChangelogEntry {
   date: string;
@@ -6,6 +6,12 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    date: "2026-06-16 (v0.4.3)",
+    notes: [
+      "賽道庫擴充：新增 10 支（長榮/陽明/萬海航運三雄、台達電、日月光、中信金/富邦金、台塑、瑞昱、00878 高股息 ETF），共 24 支 × 日/月盤",
+    ],
+  },
   {
     date: "2026-06-16 (v0.4.2)",
     notes: [

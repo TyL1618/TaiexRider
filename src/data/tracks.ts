@@ -1,4 +1,4 @@
-// 可選賽道清單（Phase 2：14 支股票 × 日盤/月盤 = 28 條賽道）
+// 可選賽道清單（Phase 2：24 支股票 × 日盤/月盤 = 48 條賽道）
 // 資料來源：
 //   日盤 (intraday) = Yahoo Finance 5分K，~54點，前次交易日
 //   月盤 (monthly)  = TWSE STOCK_DAY 日收盤，近3個月 ~51點（TAIEX 用 Yahoo Finance ^TWII）
@@ -32,6 +32,26 @@ import s2357_i from "./sample-2357-intraday.json";
 import s2357_m from "./sample-2357-monthly.json";
 import s2912_i from "./sample-2912-intraday.json";
 import s2912_m from "./sample-2912-monthly.json";
+import s2603_i from "./sample-2603-intraday.json";
+import s2603_m from "./sample-2603-monthly.json";
+import s2308_i from "./sample-2308-intraday.json";
+import s2308_m from "./sample-2308-monthly.json";
+import s2891_i from "./sample-2891-intraday.json";
+import s2891_m from "./sample-2891-monthly.json";
+import s2881_i from "./sample-2881-intraday.json";
+import s2881_m from "./sample-2881-monthly.json";
+import s1301_i from "./sample-1301-intraday.json";
+import s1301_m from "./sample-1301-monthly.json";
+import s2609_i from "./sample-2609-intraday.json";
+import s2609_m from "./sample-2609-monthly.json";
+import s3711_i from "./sample-3711-intraday.json";
+import s3711_m from "./sample-3711-monthly.json";
+import s2379_i from "./sample-2379-intraday.json";
+import s2379_m from "./sample-2379-monthly.json";
+import s00878_i from "./sample-00878-intraday.json";
+import s00878_m from "./sample-00878-monthly.json";
+import s2615_i from "./sample-2615-intraday.json";
+import s2615_m from "./sample-2615-monthly.json";
 
 export interface TrackData {
   label: string;         // 股號 / TAIEX
@@ -61,6 +81,16 @@ export const TRACKS: TrackData[] = [
   { label: "2002",  name: "中國鋼鐵",   kind: "stock", mode: "monthly",  desc: "近月日線・景氣循環",   prices: s2002_m.prices },
   { label: "2357",  name: "華碩電腦",   kind: "stock", mode: "monthly",  desc: "近月日線・科技消費",   prices: s2357_m.prices },
   { label: "2912",  name: "統一超商",   kind: "stock", mode: "monthly",  desc: "近月日線・防守穩健",   prices: s2912_m.prices },
+  { label: "2603",  name: "長榮",       kind: "stock", mode: "monthly",  desc: "近月日線・航運狂飆",   prices: s2603_m.prices },
+  { label: "2308",  name: "台達電",     kind: "stock", mode: "monthly",  desc: "近月日線・AI 電源飆漲", prices: s2308_m.prices },
+  { label: "2891",  name: "中信金",     kind: "stock", mode: "monthly",  desc: "近月日線・金控龍頭",   prices: s2891_m.prices },
+  { label: "2881",  name: "富邦金",     kind: "stock", mode: "monthly",  desc: "近月日線・金控起伏",   prices: s2881_m.prices },
+  { label: "1301",  name: "台塑",       kind: "stock", mode: "monthly",  desc: "近月日線・塑化景氣",   prices: s1301_m.prices },
+  { label: "2609",  name: "陽明",       kind: "stock", mode: "monthly",  desc: "近月日線・航運起伏",   prices: s2609_m.prices },
+  { label: "3711",  name: "日月光投控", kind: "stock", mode: "monthly",  desc: "近月日線・封測飆漲",   prices: s3711_m.prices },
+  { label: "2379",  name: "瑞昱",       kind: "stock", mode: "monthly",  desc: "近月日線・IC 設計",   prices: s2379_m.prices },
+  { label: "00878", name: "國泰永續高股息", kind: "stock", mode: "monthly", desc: "近月日線・高股息 ETF", prices: s00878_m.prices },
+  { label: "2615",  name: "萬海",       kind: "stock", mode: "monthly",  desc: "近月日線・航運",       prices: s2615_m.prices },
 
   // ── 日盤（前次交易日 5分K，~54點）───────────────────────────────────
   { label: "TAIEX", name: "加權指數",   kind: "taiex", mode: "intraday", desc: "前次日盤・盤中指數",   prices: taiex_i.prices },
@@ -77,6 +107,16 @@ export const TRACKS: TrackData[] = [
   { label: "2002",  name: "中國鋼鐵",   kind: "stock", mode: "intraday", desc: "前次日盤・平穩",       prices: s2002_i.prices },
   { label: "2357",  name: "華碩電腦",   kind: "stock", mode: "intraday", desc: "前次日盤・中等起伏",   prices: s2357_i.prices },
   { label: "2912",  name: "統一超商",   kind: "stock", mode: "intraday", desc: "前次日盤・平穩",       prices: s2912_i.prices },
+  { label: "2603",  name: "長榮",       kind: "stock", mode: "intraday", desc: "前次日盤・航運",       prices: s2603_i.prices },
+  { label: "2308",  name: "台達電",     kind: "stock", mode: "intraday", desc: "前次日盤・AI 電源",   prices: s2308_i.prices },
+  { label: "2891",  name: "中信金",     kind: "stock", mode: "intraday", desc: "前次日盤・金控",       prices: s2891_i.prices },
+  { label: "2881",  name: "富邦金",     kind: "stock", mode: "intraday", desc: "前次日盤・金控",       prices: s2881_i.prices },
+  { label: "1301",  name: "台塑",       kind: "stock", mode: "intraday", desc: "前次日盤・塑化",       prices: s1301_i.prices },
+  { label: "2609",  name: "陽明",       kind: "stock", mode: "intraday", desc: "前次日盤・航運",       prices: s2609_i.prices },
+  { label: "3711",  name: "日月光投控", kind: "stock", mode: "intraday", desc: "前次日盤・封測",       prices: s3711_i.prices },
+  { label: "2379",  name: "瑞昱",       kind: "stock", mode: "intraday", desc: "前次日盤・IC 設計",   prices: s2379_i.prices },
+  { label: "00878", name: "國泰永續高股息", kind: "stock", mode: "intraday", desc: "前次日盤・高股息 ETF", prices: s00878_i.prices },
+  { label: "2615",  name: "萬海",       kind: "stock", mode: "intraday", desc: "前次日盤・航運",       prices: s2615_i.prices },
 ];
 
 // 困難度 = 最大單步漲跌幅（波動度），越大地形越狂野
