@@ -86,7 +86,7 @@ export default function GameCanvas({ prices, label, name, onExit }: GameCanvasPr
 
     // ---- 建立世界 ----
     const engine = Engine.create();
-    engine.gravity.y = 0.3; // 低重力 → 空中時間更長，翻轉窗口更寬（Ketch Rider 風格）
+    engine.gravity.y = 0.5; // 低重力 → 空中時間更長，翻轉窗口更寬（Ketch Rider 風格）
     const world = engine.world;
 
     const track: Track = pricesToTrack(prices);
@@ -321,7 +321,9 @@ let crashTimer = 0;
           bike.frontWheel.position.x - bike.rearWheel.position.x,
         );
         const levelOk = Math.abs(angleDelta(c.angle, landSlope)) < RULES.perfectLevelRad;
-        if (realAir && upright && flips > 0 && levelOk) {
+        // 完美落地：不用 upright（陡坡平行貼地時 cos(angle) 本來就小，用 levelOk 已排除倒著降）
+        // 用 airRotation > 1.7π 取代 flips>0，消除「97% 一圈但整數截斷為0」漏觸發
+        if (realAir && Math.abs(airRotation) > Math.PI * 1.7 && levelOk) {
           bonusPoints += RULES.perfectBonus;
           showToast(`完美落地 +${RULES.perfectBonus}`);
           perfectFxFrames = 30;
