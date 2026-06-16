@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { Engine, Events, Composite, Body, type IEventCollision } from "matter-js";
 import "./GameCanvas.css";
-import { pricesToTrack, buildTerrainBodies, slopeAt, terrainYAt, type Track } from "./terrain";
+import { pricesToTrack, buildTerrainBodies, slopeAt, type Track } from "./terrain";
 import { createBike, resetBike, type Bike } from "./bike";
 import { BIKE, CAMERA, COLOR, DRIVE, RULES } from "./constants";
+import { APP_VERSION } from "../version";
 
 interface GameCanvasProps {
   prices: number[];
@@ -36,7 +37,6 @@ function angleDelta(prev: number, next: number): number {
   return d;
 }
 
-export const APP_VERSION = "0.2.0";
 
 // 累積 flips 的遞增總分：1圈100 / 2圈250 / 3圈450 ...
 function flipScore(flips: number): number {
@@ -314,18 +314,16 @@ let crashTimer = 0;
           bonusPoints += gained;
           showToast(`${flips} 圈 +${gained}`);
         }
-        // 完美落地：先在空中做過翻滾(flips>0) + 真實跳躍 + 正立 + 車身與坡面平行
-        // 用「車身角≈坡面角」取代「同 step 雙輪觸地」→ 不受兩輪觸地那幾毫秒時間差影響
-        const landSlope = Math.atan2(
-          terrainYAt(track, bike.frontWheel.position.x) - terrainYAt(track, bike.rearWheel.position.x),
-          bike.frontWheel.position.x - bike.rearWheel.position.x,
-        );
+        // 完美落地：用車身中心下方坡面角，比兩輪插值更穩（不受前後輪跨 segment 影響）
+        const landSlope = slopeAt(track, c.position.x);
         const levelOk = Math.abs(angleDelta(c.angle, landSlope)) < RULES.perfectLevelRad;
-        // 完美落地：不用 upright（陡坡平行貼地時 cos(angle) 本來就小，用 levelOk 已排除倒著降）
-        // 用 airRotation > 1.7π 取代 flips>0，消除「97% 一圈但整數截斷為0」漏觸發
+        // 觸發：真實跳躍 + airRotation > 1.7π（85% 一圈，消除整數截斷漏觸發）+ 平行坡面
+        // 計分：依整數圈數，最少 1 圈 × 100
+        const perfectFlips = Math.max(1, flips);
+        const perfectBonus = perfectFlips * 100;
         if (realAir && Math.abs(airRotation) > Math.PI * 1.7 && levelOk) {
-          bonusPoints += RULES.perfectBonus;
-          showToast(`完美落地 +${RULES.perfectBonus}`);
+          bonusPoints += perfectBonus;
+          showToast(`完美落地 ${perfectFlips}圈 +${perfectBonus}`);
           perfectFxFrames = 30;
           perfectFxPts = [
             { x: bike.rearWheel.position.x, y: bike.rearWheel.position.y },
@@ -346,11 +344,12 @@ let crashTimer = 0;
       const distScore = Math.min(1000, Math.round((traveled / (track.finishX - track.startX)) * 1000));
       points = bonusPoints + distScore;
 
-      // 死亡判定（不管有無按油門）：兩輪都沒碰地板 && 整體幾乎不動 && 持續 2 秒
-      // → 收掉「卡 V 尖點兩輪懸空不動」「翻車貼地不動」等死局；飛行中有移動→不誤判
+      // 死亡判定：翻倒(>120°) OR 雙輪騰空卡住，速度 < 5（飛行中 cruiseSpeed ≈ 6.9 > 5，不誤判）
       const bothWheelsOff = rearContacts === 0 && frontContacts === 0;
-      const notMoving = Math.hypot(c.velocity.x, c.velocity.y) < 0.5;
-      if (bothWheelsOff && notMoving && !overRef.current) {
+      const speed = Math.hypot(c.velocity.x, c.velocity.y);
+      const upsideDown = Math.cos(c.angle) < -0.5; // 車身超過 120° 翻轉
+      const goneWrong = (upsideDown || bothWheelsOff) && speed < 5.0;
+      if (goneWrong && !overRef.current) {
         crashTimer += dtMs / 1000;
         if (crashTimer >= RULES.crashUpsideDownSec) {
           setCrashed(true);
@@ -813,21 +812,21 @@ let crashTimer = 0;
         </div>
       )}
 
-      {/* 角落小資訊（垂直排列：名稱 / 距離）*/}
-      <div className="hud-corner">
-        <div>{label} {name}</div>
-        <div>距離 {hud.distance}m</div>
-      </div>
-
-      {/* 左上：設定 */}
-      <button className="icon-btn settings-btn" onClick={() => setShowSettings(true)} aria-label="設定">
-        ⚙
-      </button>
-
-      {/* 右上：返回主選單 */}
-      <button className="exit-btn" onClick={onExit}>
-        返回主選單
-      </button>
+      {/* 角落小資訊 + 設定鈕 + 返回鈕：結算時隱藏（overlay-result 有自己的按鈕）*/}
+      {!crashed && !finished && (
+        <>
+          <div className="hud-corner">
+            <div>{label} {name}</div>
+            <div>距離 {hud.distance}m</div>
+          </div>
+          <button className="icon-btn settings-btn" onClick={() => setShowSettings(true)} aria-label="設定">
+            ⚙
+          </button>
+          <button className="exit-btn" onClick={onExit}>
+            返回主選單
+          </button>
+        </>
+      )}
 
       {/* 得分提示（後空翻 / 完美落地）*/}
       {toast && (

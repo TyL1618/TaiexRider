@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { TRACKS, trackDifficulty, difficultyStars, type TrackData } from "./data/tracks";
+import { APP_VERSION, CHANGELOG } from "./version";
 import "./TrackSelect.css";
 
 type Mode = "monthly" | "intraday";
@@ -18,6 +19,7 @@ export default function TrackSelect({ onPick }: { onPick: (t: TrackData) => void
   const [mode, setMode] = useState<Mode>("monthly");
   const [sortBy, setSortBy] = useState<SortBy>("popular");
   const [query, setQuery] = useState("");
+  const [showLog, setShowLog] = useState(false);
 
   const list = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -43,6 +45,10 @@ export default function TrackSelect({ onPick }: { onPick: (t: TrackData) => void
 
   return (
     <div className="select-screen">
+      <button className="log-btn" onClick={() => setShowLog(true)} aria-label="更新日誌">
+        ℹ v{APP_VERSION}
+      </button>
+
       <h1 className="select-title">TAIEX&shy;RIDER</h1>
 
       <div className="mode-tabs">
@@ -105,6 +111,27 @@ export default function TrackSelect({ onPick }: { onPick: (t: TrackData) => void
       </div>
 
       <p className="select-foot">純娛樂・非投資建議</p>
+
+      {showLog && (
+        <div className="log-overlay" onClick={() => setShowLog(false)}>
+          <div className="log-panel" onClick={(e) => e.stopPropagation()}>
+            <div className="log-title">更新日誌</div>
+            <div className="log-scroll">
+              {CHANGELOG.map((entry) => (
+                <div key={entry.date} className="log-entry">
+                  <div className="log-date">{entry.date}</div>
+                  <ul className="log-notes">
+                    {entry.notes.map((n, i) => (
+                      <li key={i}>{n}</li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+            <button className="log-close" onClick={() => setShowLog(false)}>關閉</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

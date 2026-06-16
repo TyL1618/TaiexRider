@@ -14,8 +14,7 @@ export function createBike(world: World, x: number, y: number): Bike {
   const group = Body.nextGroup(true);
   const filter = { group };
   const {
-    chassisW,
-    chassisH,
+    chassisRadius,
     wheelRadius,
     wheelBaseHalf,
     wheelDropY,
@@ -30,15 +29,15 @@ export function createBike(world: World, x: number, y: number): Bike {
     restitution,
   } = BIKE;
 
-  const chassis = Bodies.rectangle(x, y, chassisW, chassisH, {
-    collisionFilter: filter, // 與地形碰撞（防止掉進接縫）；friction=0 保證只滑不卡
+  // 圓形 chassis：接觸力永遠過圓心 → 不產生旋轉力矩 → 不在坡段接縫被頂翻/抖動
+  const chassis = Bodies.circle(x, y, chassisRadius, {
+    collisionFilter: filter,
     density: chassisDensity,
     frictionAir: chassisFrictionAir,
     friction: 0,
     frictionStatic: 0,
-    restitution,
+    restitution: 0,
     label: "chassis",
-    chamfer: { radius: 8 }, // 大圓角：在坡段接縫順滑滑過，不被稜角卡住
   });
 
   const makeWheel = (ox: number, label: string, density: number) =>
