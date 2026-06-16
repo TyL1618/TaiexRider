@@ -44,16 +44,17 @@ export const DRIVE = {
   // 著地按住 → 沿「前後輪所踩地形連線(弦)」方向鎖速（只改切線分量、保留垂直分量）：
   //   任何坡都爬得上、上下坡平地同速；過坡頂保留垂直速度＝自然飛出去。
   // 用兩輪取坡而非車身中心 → 前輪一上陡坡整台車跟著轉上去（不會用鼻頭水平爬）。
-  cruiseSpeed: 7.2, // 沿坡面鎖定速度 (px/step)，地面用（前版 12 ×0.6，慢好控）
+  cruiseSpeed: 5.76, // 沿坡面鎖定速度 (px/step)，7.2×0.8（使用者要求減速20%）
   groundLockEase: 0.7, // 速度趨近 cruiseSpeed 的平滑度 (0~1)，越大越快收斂（0.7≈3步內達速，減少折點burst感）
-  launchBoost: 1.67, // 離地目標速度倍率 → 目標離地速 = cruiseSpeed×此值 ≈12（解耦：地面慢、飛得遠）
+  launchBoost: 2.09, // 離地目標速倍率 → 目標離地速 = cruiseSpeed×此值 ≈12（飛行距離/高度與調速前相同）
   minGroundedStepsForBoost: 5, // 離地前要在地面連續待夠幾 step 才給 boost（擋轉折點微彈疊乘爆衝）
   groundAlignGain: 0.3, // 著地時車身角速度朝「坡面切線」修正的比例（平滑貼地，治本翹頭/落地翻車）
   groundedAvMax: 0.15, // 著地角速度上限（貼坡速度；新驅動不再硬設方向→目標可達，不會狂轉翻過頭）
-  airSpinAccel: 0.024, // 空中「按住」後空翻每 step 逼近量（×0.8 of 0.030）
-  airSpinMax: 0.192, // 後空翻最大角速度（×0.8 of 0.24）
-  airNoseForwardAccel: 0.0006, // 空中「放開」車頭往前壓每 step 逼近量（÷10，很緩）
-  airNoseForwardMax: 0.008, // 空中車頭前壓最大角速度（÷10，只極緩低頭備降）
+  airSpinAccel: 0.024, // 空中「按住」後空翻每 step 逼近量
+  airSpinMax: 0.192, // 後空翻最大角速度
+  airSpinBrakeAccel: 0.06, // 空中「放開」後翻制動力（每 step 朝0推進量，≈4步從最大速停下）
+  airNoseForwardAccel: 0.0006, // 空中「放開」車頭往前壓每 step 逼近量（很緩，備降）
+  airNoseForwardMax: 0.008, // 空中車頭前壓最大角速度
 } as const;
 
 export const RULES = {

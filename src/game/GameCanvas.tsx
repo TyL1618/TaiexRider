@@ -270,10 +270,10 @@ export default function GameCanvas({ prices, label, name, onExit }: GameCanvasPr
         const nv = Math.max(-DRIVE.airSpinMax, c.angularVelocity - DRIVE.airSpinAccel);
         Body.setAngularVelocity(c, nv);
       } else {
-        // 空中放開 → 立刻清除後翻慣性（max(0,av) 拔掉負向角速度），再微微前壓備降
-        const damped = Math.max(0, c.angularVelocity);
-        const nv = Math.min(DRIVE.airNoseForwardMax, damped + DRIVE.airNoseForwardAccel);
-        Body.setAngularVelocity(c, nv);
+        // 空中放開：線性制動（airSpinBrakeAccel/step 朝 0 推，≈4步停），不瞬間歸零保留手感
+        let av = c.angularVelocity;
+        if (av < 0) av = Math.min(0, av + DRIVE.airSpinBrakeAccel);
+        Body.setAngularVelocity(c, Math.min(DRIVE.airNoseForwardMax, av + DRIVE.airNoseForwardAccel));
       }
     };
 

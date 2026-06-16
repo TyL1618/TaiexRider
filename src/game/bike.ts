@@ -31,7 +31,7 @@ export function createBike(world: World, x: number, y: number): Bike {
   } = BIKE;
 
   const chassis = Bodies.rectangle(x, y, chassisW, chassisH, {
-    collisionFilter: filter,
+    collisionFilter: { ...filter, mask: 0 }, // chassis 不與地形碰撞（只有輪子著地），防止車身陷入接縫
     density: chassisDensity,
     frictionAir: chassisFrictionAir,
     friction: 0.4,
