@@ -155,8 +155,9 @@ interface TrackData {
 
 頂點陣列餵給 Matter.js 的靜態地形碰撞體。
 
-**地形碰撞體實作（`buildTerrainBodies`，v0.4.0 定案 — 實心填滿梯形）：**
-- 每段一個 `Bodies.fromVertices` **凸梯形**：上緣 = 折線（兩頂點）、兩側垂直、下緣拉到 `maxY + 800`（賽道下方整片填實）。
+**地形碰撞體實作（`buildTerrainBodies`，v0.4.1 定案 — 實心填滿梯形 + 底部外擴）：**
+- 每段一個 `Bodies.fromVertices` **凸梯形**：上緣 = 折線（兩頂點，精確不動）、下緣拉到 `maxY + 800`、**下緣兩角各往外擴 `overlap = segmentWidth`**（上窄下寬）。
+- **底部外擴的用意（v0.4.1 修 bug）**：相鄰梯形在接縫「正下方」重疊成實心聯集，消除外露的**垂直內部邊**——這正是「從高處落下偶爾卡在兩根 K 棒縫隙」的元兇（Matter.js internal-edge 卡頓）。已用 node 實測：峰/谷兩種頂點，union 頂面與折線誤差皆為 0（外擴不會讓任何梯形凸出鄰段上方），故手感／視覺完全不變。
 - 傳入 `Vertices.centre(verts)` 當 position → fromVertices 不平移頂點，世界座標 = 原始 verts（已用 node 實測吻合，單一凸 part，無需 poly-decomp）。
 - **為何根治隱形牆/卡轉折**：相鄰梯形共用一條垂直邊（在共同頂點 x 處往下），頂面 = 折線本身、零縫、零凸角。舊「旋轉矩形沿法線偏移」會讓轉折點兩段法線不同 → 上緣角翹到折線上方 = 隱形牆；填滿後完全消除。
 - **填滿又繞過 fromVertices 穿透**：早期整條 `fromVertices` 失敗是因薄片（<1px 三角頂點）被高速隧穿；梯形又肥又深，無薄片。

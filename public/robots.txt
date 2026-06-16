@@ -1,0 +1,4 @@
+# TaiexRider — 不希望網頁版被搜尋引擎索引（discussion #7）
+# 主要入口為 Google Play 的 TWA App；網頁版僅為技術載體，不主動宣傳、不索引。
+User-agent: *
+Disallow: /

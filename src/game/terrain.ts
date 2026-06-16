@@ -138,16 +138,20 @@ export function buildTerrainBodies(track: Track): Body[] {
   const bodies: Body[] = [];
   const { vertices, maxY } = track;
   const baseY = maxY + 800; // 填滿深度：遠低於最低點，車永遠到不了下緣
+  // 底部往兩側外擴 → 相鄰梯形在接縫「正下方」重疊成實心聯集，
+  // 消除外露的垂直內部邊（Matter.js internal-edge 卡頓：從高處落下卡在 K 棒縫隙）。
+  // 頂緣兩頂點維持精確不動 → 頂面=折線完全不變、零凸角，手感不受影響。
+  const overlap = TRACK.segmentWidth;
 
   for (let i = 0; i < vertices.length - 1; i++) {
     const a = vertices[i];
     const b = vertices[i + 1];
-    // 凸四邊形（y 向下，順時針）：左上 → 右上 → 右下 → 左下
+    // 凸梯形（y 向下，順時針），上窄下寬：左上 → 右上 → 右下(外擴) → 左下(外擴)
     const verts = [
       { x: a.x, y: a.y },
       { x: b.x, y: b.y },
-      { x: b.x, y: baseY },
-      { x: a.x, y: baseY },
+      { x: b.x + overlap, y: baseY },
+      { x: a.x - overlap, y: baseY },
     ];
     // 傳入真實形心 → fromVertices 不平移頂點，世界座標 = verts 原值
     const centre = Vertices.centre(verts);

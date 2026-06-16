@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.4.0";
+export const APP_VERSION = "0.4.1";
 
 export interface ChangelogEntry {
   date: string;
@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    date: "2026-06-16 (v0.4.1)",
+    notes: [
+      "修正從高處落下偶爾卡在 K 棒接縫的 bug（梯形底部外擴重疊，消除內部垂直邊）",
+      "首頁排版：標題下移，不再與排行榜／設定鈕重疊",
+      "遊戲內暫停鈕下移，不再與返回主選單鈕重疊",
+    ],
+  },
   {
     date: "2026-06-16 (v0.4.0)",
     notes: [

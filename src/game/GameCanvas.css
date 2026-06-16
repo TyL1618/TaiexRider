@@ -141,7 +141,7 @@
 /* 暫停 / 繼續（返回主選單按鈕下方）*/
 .pause-btn {
   position: absolute;
-  top: 2.6rem;
+  top: 3.4rem;
   right: 1rem;
   padding: 0.4rem 0.8rem;
   font-size: 0.75rem;
