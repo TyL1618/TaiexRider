@@ -344,11 +344,16 @@ let crashTimer = 0;
       const distScore = Math.min(1000, Math.round((traveled / (track.finishX - track.startX)) * 1000));
       points = bonusPoints + distScore;
 
-      // 死亡判定：翻倒(>120°) OR 雙輪騰空卡住，速度 < 5（飛行中 cruiseSpeed ≈ 6.9 > 5，不誤判）
+      // 死亡判定（兩種死法獨立判斷）
       const bothWheelsOff = rearContacts === 0 && frontContacts === 0;
       const speed = Math.hypot(c.velocity.x, c.velocity.y);
       const upsideDown = Math.cos(c.angle) < -0.5; // 車身超過 120° 翻轉
-      const goneWrong = (upsideDown || bothWheelsOff) && speed < 5.0;
+      const hasGroundContact = chassisContacts > 0 || rearContacts > 0 || frontContacts > 0;
+      // 翻倒且貼地：chassis 接觸讓接觸力制動，速度門檻高 5.0
+      const crashedOnGround = upsideDown && hasGroundContact && speed < 5.0;
+      // 空中完全卡住：飛行中 speed ≈ 6.9，只有真死局（卡谷等）才 < 0.5
+      const stuckMidAir = bothWheelsOff && speed < 0.5;
+      const goneWrong = crashedOnGround || stuckMidAir;
       if (goneWrong && !overRef.current) {
         crashTimer += dtMs / 1000;
         if (crashTimer >= RULES.crashUpsideDownSec) {

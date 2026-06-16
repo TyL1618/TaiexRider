@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.3.0";
+export const APP_VERSION = "0.3.1";
 
 export interface ChangelogEntry {
   date: string;
@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    date: "2026-06-16 (晚)",
+    notes: [
+      "修正空中一秒即死 bug（死亡判定拆為翻倒貼地／空中卡死兩條件）",
+      "地形改三角梯形拼接，相鄰接縫零縫隙，根治穿落問題",
+    ],
+  },
   {
     date: "2026-06-16",
     notes: [

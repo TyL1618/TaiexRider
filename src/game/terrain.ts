@@ -122,34 +122,45 @@ export function terrainYAt(track: Track, x: number): number {
   return a.y + (b.y - a.y) * t;
 }
 
-// 賽道頂點 → 一串靜態碰撞體（每段一個旋轉矩形，略為重疊避免接縫卡頓）
-export function buildTerrainBodies(track: Track, thickness = 26): Body[] {
+// 賽道頂點 → 靜態碰撞體（每段切成兩個三角形，相鄰段共用精確頂點 → 接縫零縫隙）
+export function buildTerrainBodies(track: Track): Body[] {
   const bodies: Body[] = [];
   const { vertices } = track;
+  const yBottom = track.maxY + 600; // 遠低於可視區
+
+  const opts = {
+    isStatic: true,
+    friction: 1,
+    frictionStatic: 1,
+    label: "terrain",
+    render: { visible: false },
+  };
+
   for (let i = 0; i < vertices.length - 1; i++) {
     const a = vertices[i];
     const b = vertices[i + 1];
-    const dx = b.x - a.x;
-    const dy = b.y - a.y;
-    const segLen = Math.hypot(dx, dy) || 1;
-    const len = segLen + 2; // +2 略為重疊
-    const angle = Math.atan2(dy, dx);
-    // 沿「線段法線往下」偏移半厚度 → 矩形頂面精準貼在線上（各斜率皆然）。
-    // 之前用世界 Y 偏移：斜段頂面會橫移/下沉，接縫出現落差小台階→小前輪卡山峰。
-    const downNx = -dy / segLen;
-    const downNy = dx / segLen;
-    const cx = (a.x + b.x) / 2 + downNx * (thickness / 2);
-    const cy = (a.y + b.y) / 2 + downNy * (thickness / 2);
+
+    // 三角①：a ─ b ─ (b.x, yBottom)
+    // 右邊緣與下一段三角②左邊緣完全重合 → 零縫隙
     bodies.push(
-      Bodies.rectangle(cx, cy, len, thickness, {
-        isStatic: true,
-        angle,
-        friction: 1,
-        frictionStatic: 1,
-        label: "terrain",
-        render: { visible: false },
-      }),
+      Bodies.fromVertices(
+        (a.x + b.x * 2) / 3,
+        (a.y + b.y + yBottom) / 3,
+        [[{ x: a.x, y: a.y }, { x: b.x, y: b.y }, { x: b.x, y: yBottom }]],
+        opts,
+      ),
+    );
+
+    // 三角②：a ─ (b.x, yBottom) ─ (a.x, yBottom)
+    bodies.push(
+      Bodies.fromVertices(
+        (a.x * 2 + b.x) / 3,
+        (a.y + yBottom * 2) / 3,
+        [[{ x: a.x, y: a.y }, { x: b.x, y: yBottom }, { x: a.x, y: yBottom }]],
+        opts,
+      ),
     );
   }
+
   return bodies;
 }
