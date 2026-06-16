@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.3.3";
+export const APP_VERSION = "0.3.4";
 
 export interface ChangelogEntry {
   date: string;
@@ -6,6 +6,12 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    date: "2026-06-16 (凌晨)",
+    notes: [
+      "死亡特效：翻車瞬間粒子爆炸（琥珀/青/白三色）＋螢幕白閃＋鏡頭震動",
+    ],
+  },
   {
     date: "2026-06-16 (深夜)",
     notes: [

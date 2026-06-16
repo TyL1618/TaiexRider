@@ -59,11 +59,13 @@ export default function GameCanvas({ prices, label, name, onExit }: GameCanvasPr
   });
   const [crashed, setCrashed] = useState(false);
   const [finished, setFinished] = useState(false);
+  const [dying, setDying] = useState(false);
   const [toast, setToast] = useState<{ text: string; id: number } | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   // 讓事件處理可讀到最新的結束狀態
   const overRef = useRef(false);
-  overRef.current = crashed || finished;
+  const dyingRef = useRef(false); // 死亡動畫進行中（在 useEffect 閉包內設定）
+  overRef.current = crashed || finished || dyingRef.current;
 
   // 外部觸發重置（R 鍵 / 按鈕）
   const resetSignal = useRef(0);
@@ -185,6 +187,31 @@ let crashTimer = 0;
     let toastId = 0;
     const showToast = (text: string) => setToast({ text, id: ++toastId });
 
+    // ---- 死亡動畫狀態 ----
+    type DeathParticle = { x: number; y: number; vx: number; vy: number; life: number; color: string; size: number };
+    let deathParticles: DeathParticle[] = [];
+    let deathFlashAlpha = 0;
+    let deathShakeAmp = 0;
+    let deathElapsed = 0;
+    const DEATH_DUR = 0.8;
+
+    const spawnDeathParticles = (ox: number, oy: number) => {
+      deathParticles = [];
+      const cols = [COLOR.bike, COLOR.bike, COLOR.start, "#ffffff"]; // 偏琥珀
+      for (let i = 0; i < 28; i++) {
+        const a = Math.random() * Math.PI * 2;
+        const spd = 3 + Math.random() * 9;
+        deathParticles.push({
+          x: ox, y: oy,
+          vx: Math.cos(a) * spd,
+          vy: Math.sin(a) * spd - 5, // 微微朝上爆出
+          life: 1,
+          color: cols[Math.floor(Math.random() * cols.length)],
+          size: 2 + Math.random() * 4,
+        });
+      }
+    };
+
     const doReset = () => {
       Body.setStatic(bike.chassis, false);
       Body.setStatic(bike.rearWheel, false);
@@ -211,11 +238,17 @@ let crashTimer = 0;
       wasGrounded = false;
       perfectFxFrames = 0;
       perfectFxPts = [];
+      deathParticles = [];
+      deathFlashAlpha = 0;
+      deathShakeAmp = 0;
+      deathElapsed = 0;
+      dyingRef.current = false;
       scale = 1;
       targetScale = 1;
       overviewComputed = false;
       setCrashed(false);
       setFinished(false);
+      setDying(false);
       setToast(null);
     };
 
@@ -360,7 +393,16 @@ let crashTimer = 0;
       if (goneWrong && !overRef.current) {
         crashTimer += dtMs / 1000;
         if (crashTimer >= RULES.crashUpsideDownSec) {
-          setCrashed(true);
+          Body.setStatic(bike.chassis, true);
+          Body.setStatic(bike.rearWheel, true);
+          Body.setStatic(bike.frontWheel, true);
+          spawnDeathParticles(bike.chassis.position.x, bike.chassis.position.y);
+          deathFlashAlpha = 1.0;
+          deathShakeAmp = 8;
+          deathElapsed = 0;
+          overRef.current = true; // 立即阻止物理，不等下次 React 重渲染
+          dyingRef.current = true;
+          setDying(true);
         }
       } else {
         crashTimer = 0;
@@ -716,6 +758,26 @@ let crashTimer = 0;
       drawFlag(track.finishX, track.vertices[track.vertices.length - 1].y, COLOR.finish, "FIN");
       drawBike(alpha);
       drawPerfectFx();
+      // 死亡特效：粒子爆炸（A）+ 白色閃光（B）
+      if (dyingRef.current) {
+        ctx.save();
+        for (const p of deathParticles) {
+          if (p.life <= 0) continue;
+          ctx.globalAlpha = Math.max(0, p.life);
+          ctx.fillStyle = p.color;
+          ctx.beginPath();
+          ctx.arc(wx(p.x), wy(p.y), Math.max(1, p.size * scale), 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.restore();
+        if (deathFlashAlpha > 0.01) {
+          ctx.save();
+          ctx.globalAlpha = deathFlashAlpha;
+          ctx.fillStyle = "#ffffff";
+          ctx.fillRect(0, 0, W, H);
+          ctx.restore();
+        }
+      }
       if (overRef.current) drawMinimap();
     };
 
@@ -767,8 +829,32 @@ let crashTimer = 0;
         camY += (ty - camY) * CAMERA.ease;
       }
 
+      // 死亡動畫更新
+      if (dyingRef.current) {
+        const dtSec = Math.min(dt, 60) / 1000;
+        deathElapsed += dtSec;
+        for (const p of deathParticles) {
+          if (p.life <= 0) continue;
+          p.x += p.vx;
+          p.y += p.vy;
+          p.vy += 0.35; // 粒子重力
+          p.life -= dtSec / DEATH_DUR;
+        }
+        deathFlashAlpha *= 0.72; // 白閃約 3 幀淡出
+        deathShakeAmp *= 0.82;   // 震動逐漸衰減
+        if (deathElapsed >= DEATH_DUR) {
+          dyingRef.current = false;
+          setDying(false);
+          setCrashed(true);
+        }
+      }
+      // 鏡頭震動（暫時偏移，渲染後還原，不汙染 camX/camY 平滑狀態）
+      const shakeDx = dyingRef.current && deathShakeAmp > 0.5 ? (Math.random() * 2 - 1) * deathShakeAmp : 0;
+      const shakeDy = dyingRef.current && deathShakeAmp > 0.5 ? (Math.random() * 2 - 1) * deathShakeAmp : 0;
+      camX += shakeDx; camY += shakeDy;
       const alpha = Math.min(acc / STEP, 1);
       render(alpha);
+      camX -= shakeDx; camY -= shakeDy;
       if (perfectFxFrames > 0) perfectFxFrames--;
 
       // HUD（節流更新，避免每幀 setState）
@@ -809,8 +895,8 @@ let crashTimer = 0;
     <div className="game-root">
       <canvas ref={canvasRef} className="game-canvas" />
 
-      {/* 分數：螢幕正中央偏上（結算時隱藏，避免與 overlay 重疊）*/}
-      {!crashed && !finished && (
+      {/* 分數：螢幕正中央偏上（結算/死亡動畫時隱藏）*/}
+      {!crashed && !finished && !dying && (
         <div className="score-center">
           <div className="score-num">{hud.points}</div>
           {hud.airborne && hud.airFlips > 0 && (
@@ -820,8 +906,8 @@ let crashTimer = 0;
         </div>
       )}
 
-      {/* 角落小資訊 + 設定鈕 + 返回鈕：結算時隱藏（overlay-result 有自己的按鈕）*/}
-      {!crashed && !finished && (
+      {/* 角落小資訊 + 設定鈕 + 返回鈕：結算/死亡動畫時隱藏*/}
+      {!crashed && !finished && !dying && (
         <>
           <div className="hud-corner">
             <div>{label} {name}</div>
