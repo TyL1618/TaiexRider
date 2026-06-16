@@ -48,7 +48,7 @@ body {
    ============================================================ */
 .corner-btn {
   position: fixed;
-  top: 0.9rem;
+  top: calc(0.9rem + env(safe-area-inset-top, 0px));
   padding: 0.35rem 0.75rem;
   font-size: 0.72rem;
   letter-spacing: 0.08em;
@@ -65,7 +65,7 @@ body {
 /* 返回鈕（子畫面左上） */
 .back-btn {
   position: fixed;
-  top: 0.9rem;
+  top: calc(0.9rem + env(safe-area-inset-top, 0px));
   left: 1rem;
   padding: 0.4rem 0.85rem;
   font-size: 0.8rem;

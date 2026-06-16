@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.5.0";
+export const APP_VERSION = "0.5.1";
 
 export interface ChangelogEntry {
   date: string;
@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    date: "2026-06-17 (v0.5.1)",
+    notes: [
+      "全螢幕：PWA/TWA manifest 改 fullscreen（安裝後沉浸式隱藏系統列）",
+      "安全區 padding：底部 Android 三鍵列不再蓋到拉霸鈕等 UI（未全螢幕時也安全）",
+      "拉霸轉速：等速段由 3 秒改 2 秒（2s 等速 + 2s 減速 + 停 1s）",
+    ],
+  },
   {
     date: "2026-06-17 (v0.5.0)",
     notes: [

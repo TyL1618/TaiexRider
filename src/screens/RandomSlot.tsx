@@ -9,7 +9,7 @@ const VISIBLE = 7;        // 視窗顯示格數（垂直空間多）
 const VIEWPORT_H = ITEM_H * VISIBLE;
 const CENTER_OFFSET = (VIEWPORT_H - ITEM_H) / 2;
 const REPEAT = 8;         // 滾輪重複池次數（夠長才轉得久）
-const T1 = 3, T2 = 2;     // 等速 3s + 減速 2s
+const T1 = 2, T2 = 2;     // 等速 2s + 減速 2s（停住後再 hold 1s 出結果）
 
 // 滾輪長串：把股票池重複多次
 const REEL: TrackData[] = Array.from({ length: REPEAT }, () => STOCK_POOL).flat();
@@ -48,7 +48,7 @@ export default function RandomSlot({
     const chosen = Math.floor(Math.random() * STOCK_POOL.length);
     const targetIndex = (REPEAT - 2) * STOCK_POOL.length + chosen; // 落在尾段、下方留足視窗
     const D = targetIndex * ITEM_H - CENTER_OFFSET;
-    const v = D / (T1 + T2 / 2); // 等速段速度（= D/4），減速段平均 v/2
+    const v = D / (T1 + T2 / 2); // 等速段速度；減速段平均 v/2，恰好停在 D
     const start = performance.now();
 
     const tick = (now: number) => {

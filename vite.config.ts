@@ -15,7 +15,7 @@ export default defineConfig({
         description: "把台股走勢變成霓虹機車賽道的單指小遊戲",
         theme_color: "#05080f",
         background_color: "#05080f",
-        display: "standalone",
+        display: "fullscreen",
         orientation: "portrait",
         icons: [
           {
