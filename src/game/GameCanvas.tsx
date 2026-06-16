@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Engine, Events, Composite, Body, type IEventCollision } from "matter-js";
 import "./GameCanvas.css";
-import { pricesToTrack, buildTerrainBodies, slopeAt, type Track } from "./terrain";
+import { pricesToTrack, buildTerrainBodies, slopeAt, terrainYAt, type Track } from "./terrain";
 import { createBike, resetBike, type Bike } from "./bike";
 import { BIKE, CAMERA, COLOR, DRIVE, RULES } from "./constants";
 import { APP_VERSION } from "../version";
@@ -344,20 +344,19 @@ let crashTimer = 0;
       const distScore = Math.min(1000, Math.round((traveled / (track.finishX - track.startX)) * 1000));
       points = bonusPoints + distScore;
 
-      // 死亡判定（兩種死法獨立判斷）
+      // 死亡判定
       const bothWheelsOff = rearContacts === 0 && frontContacts === 0;
       const speed = Math.hypot(c.velocity.x, c.velocity.y);
-      const upsideDown = Math.cos(c.angle) < -0.5; // 車身超過 120° 翻轉
-      const hasGroundContact = chassisContacts > 0 || rearContacts > 0 || frontContacts > 0;
-      // 翻倒貼地時鎖死旋轉，防止輪子摩擦扭矩自動翻正（「不倒翁」bug）
-      if (upsideDown && hasGroundContact) {
-        Body.setAngularVelocity(c, 0);
-      }
-      // 翻倒貼地：不需速度門檻，旋轉已鎖不會翻正，1 秒後判死
-      const crashedOnGround = upsideDown && hasGroundContact;
+      // 車頂碰地：把局部 crashZone 座標轉世界，任一點低於地形 → 死
+      const ca = Math.cos(c.angle), sa = Math.sin(c.angle);
+      const topHit = BIKE.crashZone.some(({ x: lx, y: ly }) => {
+        const wx = ca * lx - sa * ly + c.position.x;
+        const wy = sa * lx + ca * ly + c.position.y;
+        return wy > terrainYAt(track, wx);
+      });
       // 空中完全卡住：飛行中 speed ≈ 6.9，只有真死局（卡谷等）才 < 0.5
       const stuckMidAir = bothWheelsOff && speed < 0.5;
-      const goneWrong = crashedOnGround || stuckMidAir;
+      const goneWrong = topHit || stuckMidAir;
       if (goneWrong && !overRef.current) {
         crashTimer += dtMs / 1000;
         if (crashTimer >= RULES.crashUpsideDownSec) {

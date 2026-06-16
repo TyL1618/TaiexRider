@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.3.2";
+export const APP_VERSION = "0.3.3";
 
 export interface ChangelogEntry {
   date: string;
@@ -9,9 +9,9 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     date: "2026-06-16 (深夜)",
     notes: [
-      "根治翻車自動翻正：翻倒貼地時每 step 鎖定旋轉，輪子摩擦不再讓車翻正",
-      "根治地形穿落：改用矩形＋頂點填縫圓，消除接縫三角縫隙且無薄弱端點",
-      "死亡條件簡化：翻倒貼地立即進 1 秒倒計時，不再需要速度門檻",
+      "死亡邏輯改為「車頂碰地即死」：5 個局部座標點（前擾流→風鏡→油箱→座椅），任一點低於地形即判死",
+      "不延伸到尾殼，避免陡坡朝上時屁股誤觸前一段地形",
+      "同時修正 slopeAt / terrainYAt 在 V 谷後索引錯誤的既有 bug（改二分搜尋）",
     ],
   },
   {

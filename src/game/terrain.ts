@@ -100,25 +100,32 @@ export function pricesToTrack(prices: number[]): Track {
   };
 }
 
+// 二分搜尋找到 x 所在的 segment index（V 谷插入後 x 不均勻，不能用 floor(x/segW)）
+function segIdx(v: Vec2[], x: number): number {
+  let lo = 0, hi = v.length - 2;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (v[mid + 1].x < x) lo = mid + 1;
+    else hi = mid;
+  }
+  return lo;
+}
+
 // 取得賽道在世界 x 處的坡面傾角 (rad)，供著地時把車身對齊坡面切線
 export function slopeAt(track: Track, x: number): number {
   const v = track.vertices;
-  let i = Math.floor(x / TRACK.segmentWidth);
-  if (i < 0) i = 0;
-  if (i > v.length - 2) i = v.length - 2;
+  const i = segIdx(v, x);
   return Math.atan2(v[i + 1].y - v[i].y, v[i + 1].x - v[i].x);
 }
 
-// 取得賽道在世界 x 處的地形高度 y（線性內插），供「前後輪取坡」用
+// 取得賽道在世界 x 處的地形高度 y（線性內插），供車頂碰撞點查詢用
 export function terrainYAt(track: Track, x: number): number {
   const v = track.vertices;
-  const seg = TRACK.segmentWidth;
-  let i = Math.floor(x / seg);
-  if (i < 0) i = 0;
-  if (i > v.length - 2) i = v.length - 2;
-  const a = v[i];
-  const b = v[i + 1];
-  const t = Math.max(0, Math.min(1, (x - a.x) / (b.x - a.x)));
+  const i = segIdx(v, x);
+  const a = v[i], b = v[i + 1];
+  const dx = b.x - a.x;
+  if (dx === 0) return a.y;
+  const t = Math.max(0, Math.min(1, (x - a.x) / dx));
   return a.y + (b.y - a.y) * t;
 }
 
