@@ -193,18 +193,18 @@ let crashTimer = 0;
     let deathFlashAlpha = 0;
     let deathShakeAmp = 0;
     let deathElapsed = 0;
-    const DEATH_DUR = 0.8;
+    const DEATH_DUR = 1.5;
 
     const spawnDeathParticles = (ox: number, oy: number) => {
       deathParticles = [];
       const cols = [COLOR.bike, COLOR.bike, COLOR.start, "#ffffff"]; // 偏琥珀
       for (let i = 0; i < 28; i++) {
         const a = Math.random() * Math.PI * 2;
-        const spd = 3 + Math.random() * 9;
+        const spd = 1.5 + Math.random() * 4; // 速度放慢，1.5s 內不飛出螢幕
         deathParticles.push({
           x: ox, y: oy,
           vx: Math.cos(a) * spd,
-          vy: Math.sin(a) * spd - 5, // 微微朝上爆出
+          vy: Math.sin(a) * spd - 2.5, // 微微朝上爆出
           life: 1,
           color: cols[Math.floor(Math.random() * cols.length)],
           size: 2 + Math.random() * 4,
@@ -381,8 +381,9 @@ let crashTimer = 0;
       const bothWheelsOff = rearContacts === 0 && frontContacts === 0;
       const speed = Math.hypot(c.velocity.x, c.velocity.y);
       // 車頂碰地：把局部 crashZone 座標轉世界，任一點低於地形 → 死
+      // 前提：車身非正立（upright=false），避免山峰頂點從輪底穿上來誤判
       const ca = Math.cos(c.angle), sa = Math.sin(c.angle);
-      const topHit = BIKE.crashZone.some(({ x: lx, y: ly }) => {
+      const topHit = !upright && BIKE.crashZone.some(({ x: lx, y: ly }) => {
         const wx = ca * lx - sa * ly + c.position.x;
         const wy = sa * lx + ca * ly + c.position.y;
         return wy > terrainYAt(track, wx);
@@ -808,9 +809,9 @@ let crashTimer = 0;
         acc -= STEP;
       }
 
-      // 鏡頭跟隨 / 終點全覽
+      // 鏡頭跟隨 / 終點全覽（dying 時鏡頭凍住，等動畫結束再開始縮放）
       const c = bike.chassis;
-      if (overRef.current) {
+      if (overRef.current && !dyingRef.current) {
         if (!overviewComputed) {
           const trackW = track.finishX;
           const trackH = track.maxY - track.minY + 60; // +60 for flags
@@ -822,12 +823,13 @@ let crashTimer = 0;
         scale += (targetScale - scale) * 0.04;
         camX += (overviewCamX - camX) * 0.04;
         camY += (overviewCamY - camY) * 0.04;
-      } else {
+      } else if (!overRef.current) {
         const tx = c.position.x - W * CAMERA.offsetXRatio;
         const ty = c.position.y - H * CAMERA.offsetYRatio;
         camX += (Math.max(0, tx) - camX) * CAMERA.ease;
         camY += (ty - camY) * CAMERA.ease;
       }
+      // else: dying=true → 鏡頭靜止，保持爆炸現場在畫面中
 
       // 死亡動畫更新
       if (dyingRef.current) {
@@ -837,7 +839,7 @@ let crashTimer = 0;
           if (p.life <= 0) continue;
           p.x += p.vx;
           p.y += p.vy;
-          p.vy += 0.35; // 粒子重力
+          p.vy += 0.1; // 粒子重力（慢，讓 1.5s 內不落出畫面）
           p.life -= dtSec / DEATH_DUR;
         }
         deathFlashAlpha *= 0.72; // 白閃約 3 幀淡出

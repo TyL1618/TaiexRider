@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.3.4";
+export const APP_VERSION = "0.3.5";
 
 export interface ChangelogEntry {
   date: string;
@@ -9,7 +9,9 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     date: "2026-06-16 (凌晨)",
     notes: [
-      "死亡特效：翻車瞬間粒子爆炸（琥珀/青/白三色）＋螢幕白閃＋鏡頭震動",
+      "死亡特效：翻車瞬間粒子爆炸（琥珀/青/白三色）＋螢幕白閃＋鏡頭震動，動畫 1.5 秒",
+      "修正山峰頂點刺穿誤判死亡（正立狀態不觸發 crashZone）",
+      "死亡動畫期間鏡頭凍住，不提前縮放至全覽",
     ],
   },
   {
