@@ -100,23 +100,60 @@ create policy "anyone can read" on daily_tracks for select using (true);
 
 ## 4. 賽道生成演算法
 
-輸入：一個數字陣列 `prices[]`（可能是大盤指數的時間序列，或個股的每日收盤序列）。
+> ✅ **Phase 2 已實作**，實際程式在 `src/game/terrain.ts` 的 `pricesToTrack(prices)`。
 
-1. **正規化高度**：找出 `min`、`max`，將每個值映射到固定的高度範圍（例如 0~400px），公式：
-   `y = baselineY - (price - min) / (max - min) * heightRange`
-   （Canvas y 軸向下為正，所以要取負）
+輸入：一個數字陣列 `prices[]`（個股月線日收盤 ~51~63 點，或日盤 5分K ~54 點）。
 
-2. **設定水平間距**：每個資料點對應一個固定的 `segmentWidth`（例如 80~150px）。資料點越多，賽道越長。
-   - 個股月線（~20 個資料點）→ 較短、較平緩的賽道
-   - 大盤當日走勢（~60~100+ 個資料點）→ 較長、細節較多的賽道
+### 4.1 高度正規化（依波動度自動縮放）
 
-3. **斜率限制 / 補點**：計算相鄰兩點的斜率角度，若超過物理可承受的角度（例如 > 50°），有兩種處理方式：
-   - 在中間插入內插點，把陡峭變化拆成漸進的坡
-   - 或刻意保留陡峭段，做成「近乎垂直的牆」當作高難度段落（StonkRider 本身也有這種設計，當作關卡亮點）
+```
+REF_PCT = 0.03   // 3% 為「普通波動」基準
+maxStepPct = max(|prices[i]/prices[i-1] - 1|)  // 此賽道的最大單步漲跌幅
 
-4. **起點/終點處理**：賽道頭尾各加一段平坦區，作為出發/結束緩衝區。
+scaledHeight = clamp(
+  heightRange * (maxStepPct / REF_PCT),   // 以基準縮放
+  heightMin,                               // 下限：最平穩賽道也有最小高差
+  heightMax                                // 上限：最狂野賽道不超過此高度
+)
 
-5. **輸出**：`{x, y}[]` 頂點陣列 → 餵給 Matter.js，用 `Bodies.fromVertices` 或多段 static rectangle 拼成地形碰撞體。
+y[i] = baselineY - (price[i] - min) / (max - min) * scaledHeight
+```
+
+**現行參數**（`src/game/constants.ts` → `TRACK`）：
+
+| 參數 | 值 | 說明 |
+|---|---|---|
+| `segmentWidth` | 120 px | 每個資料點的水平間距 |
+| `heightRange` | 340 px | 對應 3% 波動的基準高度 |
+| `heightMin` | 250 px | 最平穩賽道的最小高差 |
+| `heightMax` | 1000 px | 最狂野賽道的高度上限 |
+| `baselineY` | 560 px | 最低點對應的世界座標 y |
+| `maxSlopeDeg` | 75° | 相鄰段最大斜率（tan(75°)×120≈448px/段） |
+| `startFlat` | 4 段 | 起點平台長度 |
+| `endFlat` | 3 段 | 終點平台長度 |
+
+### 4.2 斜率限制
+
+相鄰兩點高度差超過 `tan(maxSlopeDeg) × segmentWidth` 時，**等比例壓縮**整條賽道的 `scaledHeight`（不截斷、不補點），使最陡處恰好等於上限。這保留了價格波動的「形狀」，只是等比例縮小幅度。
+
+### 4.3 霓虹著色
+
+- **漲（前一點→後一點 price 上升）** → 紅色 `#ff2244`
+- **跌** → 綠色 `#00ff88`（台股慣例：跌=綠）
+- **平/起終點** → cyan `#2de2e6`
+
+### 4.4 輸出格式
+
+```typescript
+interface TrackData {
+  vertices: { x: number; y: number }[];  // 地形頂點
+  colors: string[];                       // 每段顏色
+  startX: number;                         // 起點 x
+  finishX: number;                        // 終點 x
+}
+```
+
+頂點陣列餵給 Matter.js 的多段靜態矩形地形（`Bodies.rectangle` 拼接）。
 
 ---
 

@@ -8,6 +8,7 @@ import { BIKE, CAMERA, COLOR, DRIVE, RULES } from "./constants";
 interface GameCanvasProps {
   prices: number[];
   label: string;
+  name: string;
   onExit: () => void;
 }
 
@@ -46,7 +47,7 @@ function flipScore(flips: number): number {
   return total;
 }
 
-export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
+export default function GameCanvas({ prices, label, name, onExit }: GameCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [hud, setHud] = useState<Hud>({
     distance: 0,
@@ -186,6 +187,9 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
     const showToast = (text: string) => setToast({ text, id: ++toastId });
 
     const doReset = () => {
+      Body.setStatic(bike.chassis, false);
+      Body.setStatic(bike.rearWheel, false);
+      Body.setStatic(bike.frontWheel, false);
       resetBike(bike);
       prevChassisPos = { x: bike.chassis.position.x, y: bike.chassis.position.y };
       prevChassisAngle = bike.chassis.angle;
@@ -220,9 +224,8 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
     // ---- 物理步進 ----
     const STEP = 1000 / 60;
     // 定速引擎（Rider 風格街機手感）：
-    //  著地按住 → 強制「水平速度永遠朝前(+x)」ease 到 cruiseSpeed，垂直分量交給物理：
-    //    水平鎖朝前 → 絕不倒退（賽道恆 +x 為前進方向）；起步/被重力往後滑也立刻轉正。
-    //    垂直自由 → 上坡靠地面頂著爬、過凸坡頂保留往上動量→自然飛出去(往右上就飛)、凹谷貼地不亂飛。
+    //  著地按住 → 鎖「後輪→前輪連線方向（坡面切線，永遠朝前）」的速度分量到 cruiseSpeed：
+    //    任何坡面同速（陡坡不再蝸牛），tx 永遠 > 0 → 不倒退，凸坡頂有向上動量 → 自然飛出去。
     //  著地恆時 → 車身角速度朝前輪坡段平滑修正（貼坡、不翹頭）
     //  離地：按住＝後空翻、放開＝車頭緩緩往前壓（準備落地）
     const applyControls = (grounded: boolean, _upright: boolean) => {
@@ -231,11 +234,19 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
 
       if (grounded) {
         if (throttle) {
-          // 水平 ease 到 +cruiseSpeed（永遠朝前），垂直 (y) 不碰→交給物理(爬坡/起跳/貼地)
-          const newVx = c.velocity.x + (DRIVE.cruiseSpeed - c.velocity.x) * DRIVE.groundLockEase;
-          Body.setVelocity(c, { x: newVx, y: c.velocity.y });
-          Body.setVelocity(bike.rearWheel, { x: newVx, y: bike.rearWheel.velocity.y });
-          Body.setVelocity(bike.frontWheel, { x: newVx, y: bike.frontWheel.velocity.y });
+          // 坡面切線鎖速：後輪→前輪連線方向恆朝前(tx>0)，陡坡平地同速
+          const dx = bike.frontWheel.position.x - bike.rearWheel.position.x;
+          const dy = bike.frontWheel.position.y - bike.rearWheel.position.y;
+          const len = Math.hypot(dx, dy);
+          if (len > 0.001) {
+            const tx = dx / len;
+            const ty = dy / len;
+            const vt = c.velocity.x * tx + c.velocity.y * ty;
+            const delta = (DRIVE.cruiseSpeed - vt) * DRIVE.groundLockEase;
+            Body.setVelocity(c, { x: c.velocity.x + delta * tx, y: c.velocity.y + delta * ty });
+            Body.setVelocity(bike.rearWheel, { x: bike.rearWheel.velocity.x + delta * tx, y: bike.rearWheel.velocity.y + delta * ty });
+            Body.setVelocity(bike.frontWheel, { x: bike.frontWheel.velocity.x + delta * tx, y: bike.frontWheel.velocity.y + delta * ty });
+          }
         }
         // 對齊前輪坡段：以比例修正車身角速度（gain），並夾在 groundedAvMax 內
         const slope = slopeAt(track, bike.frontWheel.position.x);
@@ -348,8 +359,11 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
         crashTimer = 0;
       }
 
-      // 完賽
+      // 完賽：凍住車身讓縮放全覽時車不掉下去
       if (c.position.x >= track.finishX && !overRef.current) {
+        Body.setStatic(bike.chassis, true);
+        Body.setStatic(bike.rearWheel, true);
+        Body.setStatic(bike.frontWheel, true);
         setFinished(true);
       }
       return { grounded: groundedNow, upright };
@@ -709,18 +723,20 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
     <div className="game-root">
       <canvas ref={canvasRef} className="game-canvas" />
 
-      {/* 分數：螢幕正中央偏上 */}
-      <div className="score-center">
-        <div className="score-num">{hud.points}</div>
-        {hud.airborne && hud.airFlips > 0 && (
-          <div className="score-air">空中 {hud.airFlips} 圈</div>
-        )}
-        <div className="score-timer">{hud.timer}</div>
-      </div>
+      {/* 分數：螢幕正中央偏上（結算時隱藏，避免與 overlay 重疊）*/}
+      {!crashed && !finished && (
+        <div className="score-center">
+          <div className="score-num">{hud.points}</div>
+          {hud.airborne && hud.airFlips > 0 && (
+            <div className="score-air">空中 {hud.airFlips} 圈</div>
+          )}
+          <div className="score-timer">{hud.timer}</div>
+        </div>
+      )}
 
       {/* 角落小資訊 */}
       <div className="hud-corner">
-        {label}　距離 {hud.distance}m
+        {label} {name}　距離 {hud.distance}m
       </div>
 
       {/* 左上：設定 */}
@@ -740,9 +756,9 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
         </div>
       )}
 
-      <div className={`throttle-dot ${hud.throttle ? "on" : ""}`} />
+      {!crashed && !finished && <div className={`throttle-dot ${hud.throttle ? "on" : ""}`} />}
 
-      <div className="ctrl-hint">按住畫面 = 前進 ・ 空中按住 = 後空翻</div>
+      {!crashed && !finished && <div className="ctrl-hint">按住畫面 = 前進 ・ 空中按住 = 後空翻</div>}
 
       {showSettings && (
         <div className="overlay" onClick={() => setShowSettings(false)}>
@@ -761,6 +777,7 @@ export default function GameCanvas({ prices, label, onExit }: GameCanvasProps) {
         <div className="overlay-result">
           <div className="overlay-top">
             <div className="overlay-title">{finished ? "完賽！" : "摔車"}</div>
+            <div className="overlay-track-name">{label} {name}</div>
             <div className="overlay-score">{hud.points} 分</div>
             <div className="overlay-time">{hud.timer}</div>
           </div>

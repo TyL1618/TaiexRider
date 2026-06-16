@@ -229,7 +229,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: space-between;
-  padding: 11% 0 9%;
+  padding: 18% 0 16%;
   /* 不變暗、不模糊：完賽要看得到原本股市折線圖 */
 }
 
@@ -239,6 +239,14 @@
   flex-direction: column;
   align-items: center;
   gap: 0.6rem;
+}
+
+.overlay-track-name {
+  font-size: 1rem;
+  letter-spacing: 0.12em;
+  color: var(--neon-cyan);
+  opacity: 0.75;
+  margin-top: -0.2rem;
 }
 
 .overlay-title {

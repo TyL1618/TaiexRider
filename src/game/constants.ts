@@ -49,8 +49,8 @@ export const DRIVE = {
   minGroundedStepsForBoost: 5, // 離地前要在地面連續待夠幾 step 才給 boost（擋轉折點微彈疊乘爆衝）
   groundAlignGain: 0.3, // 著地時車身角速度朝「坡面切線」修正的比例（平滑貼地，治本翹頭/落地翻車）
   groundedAvMax: 0.15, // 著地角速度上限（貼坡速度；新驅動不再硬設方向→目標可達，不會狂轉翻過頭）
-  airSpinAccel: 0.030, // 空中「按住」後空翻每 step 逼近量（短滯空也轉得動）
-  airSpinMax: 0.24, // 後空翻最大角速度（配合地形變陡＝滯空變長→可轉兩圈）
+  airSpinAccel: 0.018, // 空中「按住」後空翻每 step 逼近量（×0.6，好控）
+  airSpinMax: 0.144, // 後空翻最大角速度（×0.6，降旋轉同時降飛出瞬間後甩力）
   airNoseForwardAccel: 0.0006, // 空中「放開」車頭往前壓每 step 逼近量（÷10，很緩）
   airNoseForwardMax: 0.008, // 空中車頭前壓最大角速度（÷10，只極緩低頭備降）
 } as const;

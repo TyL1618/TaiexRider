@@ -13,6 +13,7 @@ export default function App() {
       key={track.label}
       prices={track.prices}
       label={track.label}
+      name={track.name}
       onExit={() => setTrack(null)}
     />
   );
