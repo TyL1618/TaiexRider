@@ -1,0 +1,104 @@
+.daily-screen {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 3.4rem 1.25rem 1rem;
+  box-sizing: border-box;
+  overflow-y: auto;
+}
+
+.daily-head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  max-width: 420px;
+}
+
+.daily-tag {
+  font-size: 0.82rem;
+  letter-spacing: 0.1em;
+  color: var(--neon-amber);
+  text-shadow: 0 0 10px rgba(255, 179, 0, 0.4);
+}
+
+.daily-chart {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  padding: 0.6rem 0;
+  border: 1px solid rgba(45, 226, 230, 0.18);
+  border-radius: 12px;
+  background: rgba(45, 226, 230, 0.03);
+  margin-top: 0.3rem;
+}
+
+.daily-info { display: flex; align-items: baseline; gap: 0.6rem; margin-top: 0.6rem; }
+.daily-label {
+  font-size: 1.8rem;
+  font-weight: 800;
+  color: var(--neon-cyan);
+  text-shadow: 0 0 12px rgba(45, 226, 230, 0.5);
+}
+.daily-name { font-size: 1.05rem; color: var(--text); }
+.daily-period { font-size: 0.74rem; letter-spacing: 0.08em; color: var(--text-dim); }
+
+.daily-challenge-btn {
+  margin-top: 1rem;
+  padding: 0.85rem 2.4rem;
+  font-size: 1.15rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  color: #05080f;
+  background: var(--neon-amber);
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  box-shadow: 0 0 22px rgba(255, 179, 0, 0.5);
+}
+.daily-challenge-btn:active { transform: scale(0.97); }
+
+/* ---- 排行榜 ---- */
+.rank-section {
+  width: 100%;
+  max-width: 420px;
+  margin-top: 1.8rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.rank-section-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--neon-cyan);
+  text-align: left;
+}
+
+.rank-header {
+  display: flex;
+  align-items: center;
+  padding: 0.5rem 0.9rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+  border-bottom: 1px solid rgba(45, 226, 230, 0.18);
+}
+.rk-pos { width: 2.5rem; text-align: left; }
+.rk-score { flex: 1; text-align: right; }
+.rk-time { flex: 1; text-align: right; }
+.rk-user { flex: 1.4; text-align: right; }
+
+.rank-empty {
+  margin-top: 2rem;
+  text-align: center;
+  font-size: 0.85rem;
+  line-height: 1.7;
+  color: var(--text-dim);
+}
+.rank-empty-icon { font-size: 1.8rem; margin-bottom: 0.5rem; }
+.rank-empty-sub { font-size: 0.72rem; color: rgba(92, 107, 122, 0.8); }

@@ -6,20 +6,18 @@
   align-items: center;
   gap: 0;
   text-align: center;
-  padding: 3.8rem 1.25rem 1rem;
+  padding: 3.4rem 1.25rem 1rem;
   overflow-y: auto;
   box-sizing: border-box;
 }
 
 .select-title {
-  font-size: clamp(2.2rem, 10vw, 3.5rem);
+  font-size: 1.6rem;
   font-weight: 800;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.1em;
   color: var(--neon-cyan);
-  text-shadow:
-    0 0 8px var(--neon-cyan),
-    0 0 28px rgba(45, 226, 230, 0.5);
-  margin-bottom: 1.5rem;
+  text-shadow: 0 0 8px var(--neon-cyan), 0 0 22px rgba(45, 226, 230, 0.4);
+  margin-bottom: 1.2rem;
 }
 
 /* ---- 模式切換 tabs ---- */
@@ -56,9 +54,7 @@
   box-shadow: 0 0 16px rgba(45, 226, 230, 0.25);
 }
 
-.mode-tab:active {
-  transform: scale(0.97);
-}
+.mode-tab:active { transform: scale(0.97); }
 
 .mode-tab-desc {
   font-size: 0.68rem;
@@ -89,20 +85,10 @@
   outline: none;
 }
 
-.search-box::placeholder {
-  color: var(--text-dim);
-}
+.search-box::placeholder { color: var(--text-dim); }
+.search-box:focus { border-color: var(--neon-cyan); box-shadow: 0 0 12px rgba(45, 226, 230, 0.2); }
 
-.search-box:focus {
-  border-color: var(--neon-cyan);
-  box-shadow: 0 0 12px rgba(45, 226, 230, 0.2);
-}
-
-.sort-group {
-  display: flex;
-  gap: 0.4rem;
-  width: 100%;
-}
+.sort-group { display: flex; gap: 0.4rem; width: 100%; }
 
 .sort-btn {
   flex: 1;
@@ -117,29 +103,12 @@
   transition: all 0.15s;
 }
 
-.sort-btn.active {
-  color: var(--neon-cyan);
-  border-color: var(--neon-cyan);
-  background: rgba(45, 226, 230, 0.08);
-}
+.sort-btn.active { color: var(--neon-cyan); border-color: var(--neon-cyan); background: rgba(45, 226, 230, 0.08); }
 
-.empty-hint {
-  font-size: 0.95rem;
-  color: var(--text);
-  line-height: 1.8;
-}
+.empty-hint { font-size: 0.95rem; color: var(--text); line-height: 1.8; }
+.empty-sub { font-size: 0.72rem; color: var(--text-dim); }
 
-.empty-sub {
-  font-size: 0.72rem;
-  color: var(--text-dim);
-}
-
-.track-diff {
-  margin-left: auto;
-  font-size: 0.85rem;
-  color: var(--neon-amber);
-  letter-spacing: 0.05em;
-}
+.track-diff { margin-left: auto; font-size: 0.85rem; color: var(--neon-amber); letter-spacing: 0.05em; }
 
 /* ---- 賽道卡片列表（直立全寬）---- */
 .track-list {
@@ -148,6 +117,7 @@
   gap: 0.75rem;
   width: 100%;
   max-width: 480px;
+  padding-bottom: 1.5rem;
 }
 
 .track-card {
@@ -162,26 +132,13 @@
   border-radius: 12px;
   cursor: pointer;
   text-align: left;
-  transition:
-    transform 0.1s,
-    box-shadow 0.15s,
-    border-color 0.15s;
+  transition: transform 0.1s, box-shadow 0.15s, border-color 0.15s;
 }
 
-.track-card:hover {
-  border-color: var(--neon-cyan);
-  box-shadow: 0 0 20px rgba(45, 226, 230, 0.3);
-}
+.track-card:hover { border-color: var(--neon-cyan); box-shadow: 0 0 20px rgba(45, 226, 230, 0.3); }
+.track-card:active { transform: scale(0.98); }
 
-.track-card:active {
-  transform: scale(0.98);
-}
-
-.track-card-row {
-  display: flex;
-  align-items: baseline;
-  gap: 0.6rem;
-}
+.track-card-row { display: flex; align-items: baseline; gap: 0.6rem; }
 
 .track-label {
   font-size: 1.4rem;
@@ -190,171 +147,5 @@
   text-shadow: 0 0 10px rgba(45, 226, 230, 0.5);
 }
 
-.track-name {
-  font-size: 0.95rem;
-  color: var(--text);
-}
-
-.track-desc {
-  font-size: 0.75rem;
-  color: var(--text-dim);
-  letter-spacing: 0.05em;
-}
-
-.select-foot {
-  margin-top: auto;
-  padding-top: 1.5rem;
-  font-size: 0.7rem;
-  letter-spacing: 0.25em;
-  color: var(--text-dim);
-}
-
-/* ---- 角落按鈕（排行榜左上 / 設定右上）---- */
-.corner-btn {
-  position: fixed;
-  top: 0.9rem;
-  padding: 0.35rem 0.75rem;
-  font-size: 0.72rem;
-  letter-spacing: 0.08em;
-  color: var(--text-dim);
-  background: rgba(5, 8, 15, 0.6);
-  border: 1px solid rgba(45, 226, 230, 0.25);
-  border-radius: 7px;
-  cursor: pointer;
-  z-index: 50;
-}
-
-.corner-btn:hover {
-  color: var(--neon-cyan);
-  border-color: var(--neon-cyan);
-}
-
-.rank-btn {
-  left: 1rem;
-}
-
-.settings-corner-btn {
-  right: 1rem;
-  font-size: 1rem;
-  padding: 0.25rem 0.6rem;
-}
-
-/* ---- 設定 / 排行榜 / 離開確認 modal（沿用 log-overlay 遮罩）---- */
-.settings-modal {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.9rem;
-  width: min(88vw, 360px);
-  padding: 1.8rem 2rem;
-  background: rgba(10, 15, 24, 0.96);
-  border: 1px solid var(--neon-cyan);
-  border-radius: 14px;
-  box-shadow: 0 0 28px rgba(45, 226, 230, 0.2);
-  text-align: center;
-}
-
-.settings-item {
-  font-size: 0.95rem;
-  letter-spacing: 0.08em;
-  color: var(--text);
-}
-
-.settings-item.dim {
-  font-size: 0.82rem;
-  color: var(--text-dim);
-}
-
-.settings-link {
-  font-size: 0.82rem;
-  letter-spacing: 0.08em;
-  color: var(--neon-cyan);
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  padding: 0.2rem;
-}
-
-.settings-link:hover {
-  text-shadow: 0 0 10px rgba(45, 226, 230, 0.6);
-}
-
-/* ---- 更新日誌 modal ---- */
-.log-overlay {
-  position: fixed;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(5, 8, 15, 0.82);
-  backdrop-filter: blur(4px);
-  z-index: 100;
-}
-
-.log-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  width: min(92vw, 420px);
-  max-height: 75vh;
-  padding: 1.6rem 1.8rem;
-  background: rgba(10, 15, 24, 0.96);
-  border: 1px solid var(--neon-cyan);
-  border-radius: 14px;
-  box-shadow: 0 0 28px rgba(45, 226, 230, 0.2);
-}
-
-.log-title {
-  font-size: 1.2rem;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  color: var(--neon-cyan);
-  text-align: center;
-}
-
-.log-scroll {
-  flex: 1;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 1.2rem;
-}
-
-.log-entry {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-}
-
-.log-date {
-  font-size: 0.72rem;
-  letter-spacing: 0.1em;
-  color: var(--neon-amber);
-}
-
-.log-notes {
-  margin: 0;
-  padding-left: 1.1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.log-notes li {
-  font-size: 0.82rem;
-  color: var(--text);
-  line-height: 1.5;
-}
-
-.log-close {
-  align-self: center;
-  padding: 0.5rem 1.6rem;
-  font-size: 0.9rem;
-  letter-spacing: 0.08em;
-  color: #05080f;
-  background: var(--neon-cyan);
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  box-shadow: 0 0 14px rgba(45, 226, 230, 0.4);
-}
+.track-name { font-size: 0.95rem; color: var(--text); }
+.track-desc { font-size: 0.75rem; color: var(--text-dim); letter-spacing: 0.05em; }

@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.4.3";
+export const APP_VERSION = "0.5.0";
 
 export interface ChangelogEntry {
   date: string;
@@ -6,6 +6,15 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    date: "2026-06-17 (v0.5.0)",
+    notes: [
+      "Phase 3 三模式：首頁改為「每日排名賽 / 隨機賽道 / 自選賽道」三大入口",
+      "每日排名賽：依日期種子選今日地圖（全台同圖），含走勢圖預覽＋排行榜佔位（前 100 名・分數→時間排序，待 Phase 4 後端）",
+      "隨機賽道：cyberpunk 垂直拉霸機，3 秒等速＋2 秒減速，停住後浮現結果視窗（走勢圖＋名稱代號）",
+      "自選賽道：沿用原列表（近月/日盤・搜尋・排序）",
+    ],
+  },
   {
     date: "2026-06-16 (v0.4.3)",
     notes: [

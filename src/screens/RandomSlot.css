@@ -1,0 +1,145 @@
+.slot-screen {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3.4rem 1.25rem 1.5rem;
+  box-sizing: border-box;
+}
+
+.slot-title {
+  font-size: 1.6rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: var(--neon-cyan);
+  text-shadow: 0 0 8px var(--neon-cyan), 0 0 22px rgba(45, 226, 230, 0.4);
+  margin-bottom: 1.2rem;
+}
+
+.slot-machine {
+  width: 100%;
+  max-width: 340px;
+  padding: 14px;
+  border-radius: 18px;
+  background: linear-gradient(160deg, rgba(45, 226, 230, 0.12), rgba(255, 34, 68, 0.06));
+  border: 2px solid rgba(45, 226, 230, 0.4);
+  box-shadow: 0 0 30px rgba(45, 226, 230, 0.25), inset 0 0 24px rgba(0, 0, 0, 0.6);
+}
+
+.slot-viewport {
+  position: relative;
+  overflow: hidden;
+  border-radius: 12px;
+  background: #05080f;
+  border: 1px solid rgba(45, 226, 230, 0.25);
+}
+
+.slot-strip {
+  display: flex;
+  flex-direction: column;
+  will-change: transform;
+}
+
+.slot-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.1rem;
+}
+.slot-item-label {
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  color: var(--neon-cyan);
+  text-shadow: 0 0 8px rgba(45, 226, 230, 0.5);
+  line-height: 1;
+}
+.slot-item-name { font-size: 0.8rem; color: var(--text-dim); }
+
+/* 中央得獎線（兩條霓虹橫條夾住中央格） */
+.slot-winline {
+  position: absolute;
+  left: 0;
+  right: 0;
+  pointer-events: none;
+  border-top: 2px solid var(--neon-amber);
+  border-bottom: 2px solid var(--neon-amber);
+  box-shadow: 0 0 16px rgba(255, 179, 0, 0.5), inset 0 0 22px rgba(255, 179, 0, 0.12);
+}
+
+/* 上下淡出遮罩，強化滾輪景深 */
+.slot-fade {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 38%;
+  pointer-events: none;
+  z-index: 2;
+}
+.slot-fade.top { top: 0; background: linear-gradient(to bottom, #05080f, transparent); }
+.slot-fade.bottom { bottom: 0; background: linear-gradient(to top, #05080f, transparent); }
+
+.slot-spin-btn {
+  margin-top: 1.6rem;
+  padding: 0.9rem 2.4rem;
+  font-size: 1.15rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: #05080f;
+  background: var(--neon-cyan);
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  box-shadow: 0 0 22px rgba(45, 226, 230, 0.5);
+}
+.slot-spin-btn:disabled { opacity: 0.5; cursor: default; box-shadow: none; }
+.slot-spin-btn:not(:disabled):active { transform: scale(0.97); }
+
+/* ---- 結果視窗（沿用半透明 modal 風格）---- */
+.slot-result {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  width: min(90vw, 380px);
+  padding: 1.6rem 1.4rem;
+  background: rgba(10, 15, 24, 0.92);
+  border: 1px solid var(--neon-cyan);
+  border-radius: 16px;
+  box-shadow: 0 0 30px rgba(45, 226, 230, 0.3);
+  animation: slot-pop 0.35s ease-out;
+}
+@keyframes slot-pop {
+  0% { opacity: 0; transform: scale(0.85); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+.slot-result-chart {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  padding: 0.4rem 0;
+}
+.slot-result-info { display: flex; flex-direction: column; align-items: center; gap: 0.1rem; }
+.slot-result-name {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--text);
+}
+.slot-result-label {
+  font-size: 1.1rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: var(--neon-cyan);
+  text-shadow: 0 0 10px rgba(45, 226, 230, 0.5);
+}
+.slot-result-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.7rem;
+  margin-top: 0.6rem;
+}
