@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import GameCanvas from "./game/GameCanvas";
 import type { GameOverStats } from "./game/GameCanvas";
 import TrackSelect from "./TrackSelect";
@@ -6,7 +6,9 @@ import Home, { type Screen } from "./screens/Home";
 import RandomSlot from "./screens/RandomSlot";
 import DailyChallenge from "./screens/DailyChallenge";
 import type { TrackData } from "./data/tracks";
-import { submitDailyScore } from "./lib/leaderboard";
+import { submitDailyScore, fetchDailyTop } from "./lib/leaderboard";
+import { fetchHardestDailyMap } from "./lib/dailyMap";
+import { dailyKey } from "./data/pick";
 import { getPlayerId, getPlayerName } from "./lib/playerId";
 
 export default function App() {
@@ -14,6 +16,13 @@ export default function App() {
   const [track, setTrack] = useState<TrackData | null>(null);
   const [isDailyRun, setIsDailyRun] = useState(false);
   const goHome = useCallback(() => setScreen("home"), []);
+
+  // App 啟動時預熱每日資料，進 DailyChallenge 時直接從快取拿，不需等待
+  useEffect(() => {
+    const date = dailyKey();
+    fetchHardestDailyMap(date);
+    fetchDailyTop(date);
+  }, []);
 
   const handleGameOver = useCallback((stats: GameOverStats) => {
     if (isDailyRun) {

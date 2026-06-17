@@ -29,9 +29,16 @@ function headers(): Record<string, string> {
   };
 }
 
-// 讀某日排行榜（分數高→時間短，前 N 名）
-export async function fetchDailyTop(challengeDate: string, limit = 100): Promise<ScoreRow[]> {
-  if (!isLeaderboardConfigured) return [];
+const _topCache = new Map<string, Promise<ScoreRow[]>>();
+
+// 讀某日排行榜（分數高→時間短，前 N 名）。promise 快取：同一天只打一次。
+export function fetchDailyTop(challengeDate: string, limit = 100): Promise<ScoreRow[]> {
+  if (!isLeaderboardConfigured) return Promise.resolve([]);
+  if (!_topCache.has(challengeDate)) _topCache.set(challengeDate, _fetchTop(challengeDate, limit));
+  return _topCache.get(challengeDate)!;
+}
+
+async function _fetchTop(challengeDate: string, limit: number): Promise<ScoreRow[]> {
   const q =
     `${URL}/rest/v1/daily_scores?challenge_date=eq.${challengeDate}` +
     `&order=score.desc,time_ms.asc&limit=${limit}` +
