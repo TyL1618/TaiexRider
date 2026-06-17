@@ -89,6 +89,16 @@ export async function signOut(): Promise<void> {
   await supabase.auth.signOut();
 }
 
+// 將暱稱同步到 user_profiles，讓舊成績排行榜也顯示新名稱
+export async function updateProfileName(name: string): Promise<void> {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) return;
+  await supabase.from("user_profiles").upsert(
+    { player_id: session.user.id, player_name: name },
+    { onConflict: "player_id" },
+  );
+}
+
 export async function getUser(): Promise<User | null> {
   const { data: { user } } = await supabase.auth.getUser();
   return user;

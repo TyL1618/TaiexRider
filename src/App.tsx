@@ -122,6 +122,7 @@ export default function App() {
         name={track.name}
         onExit={handleExitTrack}
         onGameOver={handleGameOver}
+        hideMinimap={track.mode === "long"}
       />
     );
   }

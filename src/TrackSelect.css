@@ -158,6 +158,45 @@
   text-align: center;
 }
 
+/* 每日長征區塊 */
+.long-track-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.4rem;
+  padding: 2rem 1rem;
+}
+
+.long-track-desc {
+  font-size: 0.85rem;
+  line-height: 1.75;
+  color: var(--text-dim);
+  letter-spacing: 0.04em;
+  max-width: 300px;
+}
+
+.long-track-btn {
+  padding: 0.85rem 2.4rem;
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: #05080f;
+  background: var(--neon-cyan);
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  box-shadow: 0 0 22px rgba(45, 226, 230, 0.5);
+  transition: opacity 0.15s;
+}
+
+.long-track-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+  box-shadow: none;
+}
+
+.long-track-btn:not(:disabled):active { transform: scale(0.97); }
+
 /* 選取中載入遮罩 */
 .select-screen.is-picking .track-list { opacity: 0.45; pointer-events: none; }
 

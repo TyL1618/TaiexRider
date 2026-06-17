@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { APP_VERSION, CHANGELOG } from "../version";
-import { signInWithGoogle, signOut, type User } from "../lib/auth";
+import { signInWithGoogle, signOut, updateProfileName, type User } from "../lib/auth";
 import { getPlayerName, setPlayerName } from "../lib/playerId";
 import "./Home.css";
 
@@ -26,6 +26,7 @@ export default function Home({ user, onNav }: { user: User | null; onNav: (s: Sc
     setPlayerName(trimmed);
     setSavedName(trimmed);
     setNickname(trimmed);
+    if (user) updateProfileName(trimmed); // 同步到 Supabase user_profiles（fire-and-forget）
   };
 
   const handleSignOut = () => {

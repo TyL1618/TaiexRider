@@ -21,6 +21,7 @@ interface GameCanvasProps {
   name: string;
   onExit: () => void;
   onGameOver?: (stats: GameOverStats) => void;
+  hideMinimap?: boolean;
 }
 
 interface Hud {
@@ -129,7 +130,7 @@ let _bikeImgReady = false;
 _bikeImg.onload = () => { _bikeImgReady = true; };
 _bikeImg.src = `${import.meta.env.BASE_URL}bike.png`;
 
-export default function GameCanvas({ prices, label, name, onExit, onGameOver }: GameCanvasProps) {
+export default function GameCanvas({ prices, label, name, onExit, onGameOver, hideMinimap = false }: GameCanvasProps) {
   const stars = difficultyStars(calcDifficulty(prices));
   const cityBuildings = generateCity(prices.length * 31 + Math.round((prices[0] || 0) * 100));
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -1202,15 +1203,19 @@ let crashTimer = 0;
               翻轉 {hud.totalFlips} 圈 ・ 完美落地 {hud.perfectLandings} 次
             </div>
           </div>
-          {/* 中段透明點擊區：切換賽道 / 走勢圖 */}
-          <div
-            className="chart-toggle-area"
-            onClick={() => setShowChart((s) => !s)}
-          >
-            <span className="chart-toggle-hint">
-              {showChart ? "← 賽道" : "走勢圖 →"}
-            </span>
-          </div>
+          {/* 中段透明點擊區：切換賽道 / 走勢圖（長征模式無單一走勢圖，隱藏切換） */}
+          {!hideMinimap ? (
+            <div
+              className="chart-toggle-area"
+              onClick={() => setShowChart((s) => !s)}
+            >
+              <span className="chart-toggle-hint">
+                {showChart ? "← 賽道" : "走勢圖 →"}
+              </span>
+            </div>
+          ) : (
+            <div className="chart-toggle-area" style={{ cursor: "default" }} />
+          )}
           <div className="overlay-bottom">
             <button className="overlay-btn" onClick={requestReset}>
               再玩一次

@@ -57,7 +57,7 @@ export interface TrackData {
   label: string;         // 股號 / TAIEX
   name: string;          // 中文名稱
   kind: string;          // 'stock' | 'taiex'
-  mode: "intraday" | "monthly";
+  mode: "intraday" | "monthly" | "long";
   desc: string;          // 簡短描述
   prices: number[];
 }

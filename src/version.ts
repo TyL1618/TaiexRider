@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.9.0";
+export const APP_VERSION = "0.9.1";
 
 export interface ChangelogEntry {
   date: string;
@@ -6,6 +6,16 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    date: "2026-06-17 (v0.9.1)",
+    notes: [
+      "改名即時同步：在設定視窗更改暱稱後，排行榜舊成績也會立刻顯示新名稱（user_profiles VIEW 覆蓋）",
+      "每日長征：自選賽道新分頁，每日 seeded 從全市場隨機挑 5 支股票串接成長路線，全台同一條",
+      "長征串接點用線性過渡平滑連結，各股先正規化為相對開盤比值再拼接",
+      "長征結算畫面不顯示走勢圖切換（路線由多股組成，無單一走勢圖）",
+      "自選賽道移除近月日線 tab（精選 24 支月線資料仍保留供隨機賽道 fallback 使用）",
+    ],
+  },
   {
     date: "2026-06-17 (v0.9.0)",
     notes: [
