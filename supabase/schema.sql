@@ -68,6 +68,28 @@ revoke insert, update, delete on public.daily_scores from anon;
 -- 允許 anon 執行提交 RPC
 grant execute on function public.submit_daily_score(date, text, text, int, int, int, int) to anon;
 
+-- ── 自動清理（DB > 400 MB 時刪 90 天前成績，由 cron-job.org 每日呼叫）────
+create or replace function public.cleanup_old_scores_if_needed()
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  db_size_mb numeric;
+begin
+  select pg_database_size(current_database()) / 1024.0 / 1024.0
+  into db_size_mb;
+
+  if db_size_mb > 400 then
+    delete from public.daily_scores
+    where challenge_date < current_date - interval '90 days';
+  end if;
+end;
+$$;
+
+grant execute on function public.cleanup_old_scores_if_needed() to anon;
+
 -- ── 保活表（cron-job.org 每日 ping，見 memory / DEVDOC）─────────
 create table if not exists public.keep_alive (id int primary key, t timestamptz default now());
 insert into public.keep_alive (id) values (1) on conflict do nothing;
