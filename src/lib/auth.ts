@@ -60,24 +60,12 @@ export function initOneTap(): void {
   }, 200);
 }
 
-// 按鈕觸發登入：先嘗試 One Tap prompt，若瀏覽器不支援則降級 redirect
+// 按鈕觸發登入：使用 redirect 流程（可靠，Supabase 自動處理 callback）
 export async function signInWithGoogle(): Promise<void> {
-  if (window.google?.accounts?.id) {
-    window.google.accounts.id.prompt((n) => {
-      if (n.isNotDisplayed() || n.isSkippedMoment()) {
-        // One Tap 無法顯示，降級到 redirect 流程
-        supabase.auth.signInWithOAuth({
-          provider: "google",
-          options: { redirectTo: window.location.origin },
-        });
-      }
-    });
-  } else {
-    await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: { redirectTo: window.location.origin },
-    });
-  }
+  await supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: { redirectTo: window.location.origin },
+  });
 }
 
 export async function signOut(): Promise<void> {

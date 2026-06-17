@@ -8,7 +8,7 @@ import DailyChallenge from "./screens/DailyChallenge";
 import type { TrackData } from "./data/tracks";
 import { submitDailyScore, fetchDailyTop } from "./lib/leaderboard";
 import { fetchHardestDailyMap } from "./lib/dailyMap";
-import { onAuthStateChange, getUser, initOneTap, type User } from "./lib/auth";
+import { onAuthStateChange, getUser, type User } from "./lib/auth";
 import { getPlayerName } from "./lib/playerId";
 import { dailyKey } from "./data/pick";
 
@@ -20,12 +20,8 @@ export default function App() {
   const goHome = useCallback(() => setScreen("home"), []);
 
   // 初始化 auth 狀態，並監聽登入 / 登出變化
-  // 未登入時自動啟動 Google One Tap（頁面上浮現選帳號卡片，不跳頁）
   useEffect(() => {
-    getUser().then((u) => {
-      setUser(u);
-      if (!u) initOneTap();
-    });
+    getUser().then(setUser);
     return onAuthStateChange(setUser);
   }, []);
 
