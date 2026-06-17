@@ -9,6 +9,13 @@
   box-sizing: border-box;
 }
 
+.slot-pool-hint {
+  font-size: 0.72rem;
+  color: var(--text-dim);
+  letter-spacing: 0.08em;
+  margin: -0.6rem 0 0.4rem;
+}
+
 .slot-title {
   font-size: 1.6rem;
   font-weight: 800;

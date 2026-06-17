@@ -149,3 +149,21 @@
 
 .track-name { font-size: 0.95rem; color: var(--text); }
 .track-desc { font-size: 0.75rem; color: var(--text-dim); letter-spacing: 0.05em; }
+
+/* 選取中載入遮罩 */
+.select-screen.is-picking .track-list { opacity: 0.45; pointer-events: none; }
+
+.picking-overlay {
+  position: fixed;
+  bottom: calc(2rem + env(safe-area-inset-bottom, 0px));
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(5, 8, 15, 0.88);
+  border: 1px solid rgba(45, 226, 230, 0.4);
+  border-radius: 20px;
+  padding: 0.5rem 1.2rem;
+  font-size: 0.85rem;
+  color: var(--neon-cyan);
+  letter-spacing: 0.08em;
+  pointer-events: none;
+}

@@ -7,7 +7,7 @@ import RandomSlot from "./screens/RandomSlot";
 import DailyChallenge from "./screens/DailyChallenge";
 import type { TrackData } from "./data/tracks";
 import { submitDailyScore, fetchDailyTop } from "./lib/leaderboard";
-import { fetchHardestDailyMap } from "./lib/dailyMap";
+import { fetchHardestDailyMap, fetchDailyMapList } from "./lib/dailyMap";
 import { onAuthStateChange, getUser, type User } from "./lib/auth";
 import { getPlayerName } from "./lib/playerId";
 import { dailyKey } from "./data/pick";
@@ -30,6 +30,7 @@ export default function App() {
     const date = dailyKey();
     fetchHardestDailyMap(date);
     fetchDailyTop(date);
+    fetchDailyMapList(date); // 預熱自選 / 隨機清單
   }, []);
 
   const handleGameOver = useCallback((stats: GameOverStats) => {

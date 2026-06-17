@@ -1,20 +1,26 @@
 import { useEffect, useRef, useState } from "react";
 import Sparkline from "../components/Sparkline";
-import { STOCK_POOL } from "../data/pick";
-import type { TrackData } from "../data/tracks";
+import { fetchDailyMapList, fetchStockDailyMap, type DailyMapMeta } from "../lib/dailyMap";
+import { STOCK_POOL, dailyKey } from "../data/pick";
+import { trackDifficulty, type TrackData } from "../data/tracks";
 import "./RandomSlot.css";
 
-const ITEM_H = 72;        // 每格高度 (px)
-const VISIBLE = 7;        // 視窗顯示格數（垂直空間多）
+const ITEM_H = 72;
+const VISIBLE = 7;
 const VIEWPORT_H = ITEM_H * VISIBLE;
 const CENTER_OFFSET = (VIEWPORT_H - ITEM_H) / 2;
-const REPEAT = 8;         // 滾輪重複池次數（夠長才轉得久）
-const T1 = 2, T2 = 2;     // 等速 2s + 減速 2s（停住後再 hold 1s 出結果）
+const REPEAT = 8;
+const VISUAL_SIZE = 30; // 每次 spin 的視覺滾輪大小（從 pool 隨機採樣）
+const T1 = 2, T2 = 2;
 
-// 滾輪長串：把股票池重複多次
-const REEL: TrackData[] = Array.from({ length: REPEAT }, () => STOCK_POOL).flat();
+type Phase = "idle" | "spinning" | "loading" | "result";
 
-type Phase = "idle" | "spinning" | "result";
+// 本地 pool fallback
+const FALLBACK_POOL: DailyMapMeta[] = STOCK_POOL.map((t) => ({
+  stock_code: t.label,
+  stock_name: t.name,
+  difficulty: trackDifficulty(t.prices),
+}));
 
 export default function RandomSlot({
   onPick,
@@ -23,11 +29,14 @@ export default function RandomSlot({
   onPick: (t: TrackData) => void;
   onBack: () => void;
 }) {
-  const [phase, setPhase] = useState<Phase>("idle");
-  const [result, setResult] = useState<TrackData | null>(null);
-  const stripRef = useRef<HTMLDivElement>(null);
-  const rafRef = useRef(0);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const [pool, setPool]         = useState<DailyMapMeta[]>([]);
+  const [poolLoaded, setLoaded] = useState(false);
+  const [phase, setPhase]       = useState<Phase>("idle");
+  const [reel, setReel]         = useState<DailyMapMeta[]>([]);
+  const [result, setResult]     = useState<TrackData | null>(null);
+  const stripRef  = useRef<HTMLDivElement>(null);
+  const rafRef    = useRef(0);
+  const timerRef  = useRef<ReturnType<typeof setTimeout>>();
 
   useEffect(() => {
     window.history.pushState({ taiexRandom: true }, "");
@@ -40,25 +49,46 @@ export default function RandomSlot({
     };
   }, [onBack]);
 
+  useEffect(() => {
+    fetchDailyMapList(dailyKey()).then((list) => {
+      setPool(list.length > 0 ? list : FALLBACK_POOL);
+      setLoaded(true);
+    });
+  }, []);
+
   const spin = () => {
-    if (phase !== "idle") return;
+    if (phase !== "idle" || !poolLoaded || pool.length === 0) return;
     setResult(null);
     setPhase("spinning");
+    if (stripRef.current) stripRef.current.style.transform = "translateY(0px)";
 
-    const chosen = Math.floor(Math.random() * STOCK_POOL.length);
-    const targetIndex = (REPEAT - 2) * STOCK_POOL.length + chosen; // 落在尾段、下方留足視窗
+    // 從全部 pool 隨機挑 winner
+    const winnerIdx = Math.floor(Math.random() * pool.length);
+    const winner = pool[winnerIdx];
+
+    // 建立視覺滾輪：VISUAL_SIZE-1 支隨機其他 + winner 放最後
+    const others = pool
+      .filter((_, i) => i !== winnerIdx)
+      .sort(() => Math.random() - 0.5)
+      .slice(0, VISUAL_SIZE - 1);
+    const visualPool = [...others, winner];
+    const newReel = Array.from({ length: REPEAT }, () => visualPool).flat();
+    setReel(newReel);
+
+    // winner 落在 (REPEAT-2) 個週期的最後一格
+    const targetIndex = (REPEAT - 2) * VISUAL_SIZE + (VISUAL_SIZE - 1);
     const D = targetIndex * ITEM_H - CENTER_OFFSET;
-    const v = D / (T1 + T2 / 2); // 等速段速度；減速段平均 v/2，恰好停在 D
+    const v = D / (T1 + T2 / 2);
     const start = performance.now();
 
     const tick = (now: number) => {
       const e = (now - start) / 1000;
       let off: number;
       if (e <= T1) {
-        off = v * e;                                   // 等速
+        off = v * e;
       } else if (e < T1 + T2) {
         const tau = e - T1;
-        off = v * T1 + v * tau - (v / (2 * T2)) * tau * tau; // 減速（線性減速，停在 D）
+        off = v * T1 + v * tau - (v / (2 * T2)) * tau * tau;
       } else {
         off = D;
       }
@@ -67,10 +97,24 @@ export default function RandomSlot({
         rafRef.current = requestAnimationFrame(tick);
       } else {
         if (stripRef.current) stripRef.current.style.transform = `translateY(${-D}px)`;
-        timerRef.current = setTimeout(() => {           // 停住 1 秒再浮現結果
-          setResult(STOCK_POOL[chosen]);
-          setPhase("result");
-        }, 1000);
+        setPhase("loading");
+        // 停住後抓 prices（通常 <200ms，幾乎無感）
+        timerRef.current = setTimeout(async () => {
+          // 本地有的直接用
+          const localTrack = STOCK_POOL.find((t) => t.label === winner.stock_code);
+          if (localTrack) {
+            setResult(localTrack);
+            setPhase("result");
+            return;
+          }
+          const row = await fetchStockDailyMap(dailyKey(), winner.stock_code);
+          if (row) {
+            setResult({ label: row.stock_code, name: row.stock_name, kind: "stock", mode: "intraday", desc: "前日盤中走勢", prices: row.prices });
+            setPhase("result");
+          } else {
+            setPhase("idle"); // fetch 失敗，靜默回到待機
+          }
+        }, 800);
       }
     };
     rafRef.current = requestAnimationFrame(tick);
@@ -79,34 +123,60 @@ export default function RandomSlot({
   const reset = () => {
     setPhase("idle");
     setResult(null);
+    setReel([]);
     if (stripRef.current) stripRef.current.style.transform = "translateY(0px)";
   };
+
+  const spinLabel = !poolLoaded
+    ? "載入市場資料…"
+    : phase === "spinning" || phase === "loading"
+    ? "轉動中…"
+    : "🎰 拉霸抽賽道";
+
+  const placeholder = Array.from({ length: VISIBLE + 2 }, (_, i) => ({
+    stock_code: "—",
+    stock_name: poolLoaded ? "準備抽籤" : "載入中",
+    difficulty: 0,
+    _key: i,
+  }));
 
   return (
     <div className="slot-screen">
       <button className="back-btn" onClick={onBack}>‹ 返回</button>
       <h1 className="slot-title">隨機賽道</h1>
+      {poolLoaded && (
+        <p className="slot-pool-hint">{pool.length} 支股票・前日盤中走勢</p>
+      )}
 
       <div className="slot-machine">
         <div className="slot-viewport" style={{ height: VIEWPORT_H }}>
           <div className="slot-strip" ref={stripRef}>
-            {REEL.map((t, i) => (
-              <div className="slot-item" key={i} style={{ height: ITEM_H }}>
-                <span className="slot-item-label">{t.label}</span>
-                <span className="slot-item-name">{t.name}</span>
-              </div>
-            ))}
+            {reel.length === 0
+              ? placeholder.map((p) => (
+                  <div className="slot-item" key={p._key} style={{ height: ITEM_H }}>
+                    <span className="slot-item-label">{p.stock_code}</span>
+                    <span className="slot-item-name">{p.stock_name}</span>
+                  </div>
+                ))
+              : reel.map((t, i) => (
+                  <div className="slot-item" key={i} style={{ height: ITEM_H }}>
+                    <span className="slot-item-label">{t.stock_code}</span>
+                    <span className="slot-item-name">{t.stock_name}</span>
+                  </div>
+                ))}
           </div>
-          {/* 中央得獎線 */}
           <div className="slot-winline" style={{ top: CENTER_OFFSET, height: ITEM_H }} />
-          {/* 上下漸層遮罩 */}
           <div className="slot-fade top" />
           <div className="slot-fade bottom" />
         </div>
       </div>
 
-      <button className="slot-spin-btn" onClick={spin} disabled={phase !== "idle"}>
-        {phase === "spinning" ? "轉動中…" : "🎰 拉霸抽賽道"}
+      <button
+        className="slot-spin-btn"
+        onClick={spin}
+        disabled={phase !== "idle" || !poolLoaded}
+      >
+        {spinLabel}
       </button>
 
       {phase === "result" && result && (

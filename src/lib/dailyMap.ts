@@ -11,12 +11,39 @@ export interface DailyMapRow {
   prices: number[];
 }
 
+export interface DailyMapMeta {
+  stock_code: string;
+  stock_name: string;
+  difficulty: number;
+}
+
 function headers() {
   return { apikey: KEY!, Authorization: `Bearer ${KEY!}` };
 }
 
 const _hardestCache = new Map<string, Promise<DailyMapRow | null>>();
 const _stockCache   = new Map<string, Promise<DailyMapRow | null>>();
+const _listCache    = new Map<string, Promise<DailyMapMeta[]>>();
+
+// 全市場清單（不含 prices，只用於列表展示 / 隨機抽籤）
+export function fetchDailyMapList(date: string): Promise<DailyMapMeta[]> {
+  if (!_listCache.has(date)) _listCache.set(date, _fetchList(date));
+  return _listCache.get(date)!;
+}
+
+async function _fetchList(date: string): Promise<DailyMapMeta[]> {
+  if (!URL || !KEY) return [];
+  try {
+    const r = await fetch(
+      `${URL}/rest/v1/daily_map?map_date=eq.${date}&select=stock_code,stock_name,difficulty&order=stock_code.asc&limit=2000`,
+      { headers: headers() },
+    );
+    if (!r.ok) return [];
+    return (await r.json()) as DailyMapMeta[];
+  } catch {
+    return [];
+  }
+}
 
 // 今日最難的地圖（每日排名賽用）
 export function fetchHardestDailyMap(date: string): Promise<DailyMapRow | null> {
