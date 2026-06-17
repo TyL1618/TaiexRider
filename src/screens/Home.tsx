@@ -17,9 +17,15 @@ export default function Home({ user, onNav }: { user: User | null; onNav: (s: Sc
   useEffect(() => { setNickname(getPlayerName()); }, [user]);
 
   useEffect(() => {
+    // OAuth redirect 返回時 Supabase 會清理 URL，可能觸發 popstate；壓制一次避免誤跳「離開遊戲」
+    const isOAuthReturn = window.location.hash.includes("access_token")
+      || window.location.search.includes("code=");
+    let suppressNext = isOAuthReturn;
+
     window.history.pushState({ taiexHome: true }, "");
     const onPop = () => {
       if (leavingRef.current) return;
+      if (suppressNext) { suppressNext = false; return; }
       setConfirmLeave(true);
       window.history.pushState({ taiexHome: true }, "");
     };

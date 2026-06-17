@@ -5,7 +5,6 @@ export type { User };
 
 const GOOGLE_CLIENT_ID = "899150298731-tj4fjbobqcmc14d0ne66jdfebtfi24vm.apps.googleusercontent.com";
 
-// GSI 型別宣告（Google Identity Services）
 declare global {
   interface Window {
     google?: {
@@ -13,6 +12,7 @@ declare global {
         id: {
           initialize: (config: {
             client_id: string;
+            nonce?: string;
             callback: (r: { credential: string }) => void;
             auto_select?: boolean;
             cancel_on_tap_outside?: boolean;
@@ -28,43 +28,55 @@ declare global {
   }
 }
 
-// 初始化 One Tap：App 確認未登入後呼叫。
-// 若 GSI 還在載入中，輪詢最多 4 秒等待。
-export function initOneTap(): void {
-  const setup = () => {
-    window.google!.accounts.id.initialize({
-      client_id: GOOGLE_CLIENT_ID,
-      cancel_on_tap_outside: false,
-      callback: async ({ credential }) => {
-        // One Tap 拿到 Google ID Token → 交給 Supabase 換 session
-        await supabase.auth.signInWithIdToken({ provider: "google", token: credential });
-        // 後續由 onAuthStateChange 更新 App 的 user state
-      },
-    });
-    window.google!.accounts.id.prompt((n) => {
-      // 瀏覽器封鎖 One Tap（隱私設定、或已被使用者關閉過）時自動忽略，
-      // 使用者仍可點設定裡的「Google 登入」按鈕走 redirect 流程。
-      if (n.isNotDisplayed() || n.isSkippedMoment()) return;
-    });
-  };
-
-  if (window.google?.accounts?.id) {
-    setup();
-    return;
-  }
-  // GSI 尚未載入（async defer），輪詢等待
-  let tries = 0;
-  const poll = setInterval(() => {
-    if (window.google?.accounts?.id) { clearInterval(poll); setup(); }
-    if (++tries > 20) clearInterval(poll); // 最多等 4 秒
-  }, 200);
+async function generateNonce(): Promise<[string, string]> {
+  const rawBytes = crypto.getRandomValues(new Uint8Array(32));
+  const rawNonce = btoa(String.fromCharCode(...rawBytes));
+  const encoded = new TextEncoder().encode(rawNonce);
+  const hashBuf = await crypto.subtle.digest("SHA-256", encoded);
+  const hashedNonce = btoa(String.fromCharCode(...new Uint8Array(hashBuf)));
+  return [rawNonce, hashedNonce]; // [傳給 Supabase, 傳給 GSI]
 }
 
-// 按鈕觸發登入：使用 redirect 流程（可靠，Supabase 自動處理 callback）
-export async function signInWithGoogle(): Promise<void> {
+function waitForGSI(maxMs = 3000): Promise<boolean> {
+  if (window.google?.accounts?.id) return Promise.resolve(true);
+  return new Promise((resolve) => {
+    let elapsed = 0;
+    const iv = setInterval(() => {
+      if (window.google?.accounts?.id) { clearInterval(iv); resolve(true); return; }
+      elapsed += 200;
+      if (elapsed >= maxMs) { clearInterval(iv); resolve(false); }
+    }, 200);
+  });
+}
+
+async function doRedirect(): Promise<void> {
   await supabase.auth.signInWithOAuth({
     provider: "google",
     options: { redirectTo: window.location.origin },
+  });
+}
+
+// 先嘗試 One Tap（不跳頁、體驗最順）；
+// GSI 未載入或被瀏覽器封鎖時自動 fallback 到 redirect。
+export async function signInWithGoogle(): Promise<void> {
+  const gsiReady = await waitForGSI();
+  if (!gsiReady) return doRedirect();
+
+  const [rawNonce, hashedNonce] = await generateNonce();
+  window.google!.accounts.id.initialize({
+    client_id: GOOGLE_CLIENT_ID,
+    nonce: hashedNonce,         // GSI 收 SHA-256 hash（base64）
+    cancel_on_tap_outside: true,
+    callback: async ({ credential }) => {
+      await supabase.auth.signInWithIdToken({
+        provider: "google",
+        token: credential,
+        nonce: rawNonce,        // Supabase 收原始 nonce
+      });
+    },
+  });
+  window.google!.accounts.id.prompt((n) => {
+    if (n.isNotDisplayed() || n.isSkippedMoment()) doRedirect();
   });
 }
 
