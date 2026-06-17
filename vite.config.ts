@@ -28,6 +28,8 @@ export default defineConfig({
       workbox: {
         // 靜態資源 cache-first；每日賽道 API 之後在 Phase 5 再加 runtimeCaching
         globPatterns: ["**/*.{js,css,html,svg,png,woff2}"],
+        skipWaiting: true,
+        clientsClaim: true,
       },
       devOptions: {
         enabled: false,
