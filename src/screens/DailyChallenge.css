@@ -140,11 +140,37 @@
 }
 
 .rank-section-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   font-size: 0.95rem;
   font-weight: 700;
   letter-spacing: 0.1em;
   color: var(--neon-cyan);
-  text-align: left;
+}
+
+.rank-refresh-btn {
+  background: none;
+  border: none;
+  color: var(--neon-cyan);
+  cursor: pointer;
+  padding: 0.2rem 0.3rem;
+  border-radius: 4px;
+  opacity: 0.6;
+  line-height: 1;
+  transition: opacity 0.15s;
+  display: flex;
+  align-items: center;
+}
+.rank-refresh-btn:hover { opacity: 1; }
+.rank-refresh-btn:disabled { cursor: default; opacity: 0.3; }
+.rank-refresh-btn.spinning svg {
+  animation: rank-spin 0.7s linear infinite;
+}
+
+@keyframes rank-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
 }
 
 .rank-header {

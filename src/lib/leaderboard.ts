@@ -27,6 +27,11 @@ function anonHeaders(): Record<string, string> {
 
 const _topCache = new Map<string, Promise<ScoreRow[]>>();
 
+// 清除某日排行榜快取（手動重整用）
+export function invalidateDailyTop(date: string) {
+  _topCache.delete(date);
+}
+
 // 讀某日排行榜（分數高→時間短，前 N 名）。promise 快取：同一天只打一次。
 export function fetchDailyTop(challengeDate: string, limit = 100): Promise<ScoreRow[]> {
   if (!isLeaderboardConfigured) return Promise.resolve([]);

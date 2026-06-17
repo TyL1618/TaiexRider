@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import Sparkline from "../components/Sparkline";
 import { dailyTrack, dailyKey } from "../data/pick";
-import { fetchDailyTop, isLeaderboardConfigured, type ScoreRow } from "../lib/leaderboard";
+import { fetchDailyTop, invalidateDailyTop, isLeaderboardConfigured, type ScoreRow } from "../lib/leaderboard";
 import { fetchHardestDailyMap } from "../lib/dailyMap";
 import { signInWithGoogle, type User } from "../lib/auth";
 import { getPlayerName } from "../lib/playerId";
@@ -29,6 +29,7 @@ export default function DailyChallenge({
   const [isLive, setIsLive] = useState(false);
   const [rows, setRows] = useState<ScoreRow[]>([]);
   const [loaded, setLoaded] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     window.history.pushState({ taiexDaily: true }, "");
@@ -56,6 +57,18 @@ export default function DailyChallenge({
     });
     return () => { alive = false; };
   }, []);
+
+  const handleRefresh = () => {
+    if (refreshing) return;
+    const key = dailyKey();
+    invalidateDailyTop(key);
+    setRefreshing(true);
+    fetchDailyTop(key).then((r) => {
+      setRows(r);
+      setLoaded(true);
+      setRefreshing(false);
+    });
+  };
 
   return (
     <div className="daily-screen">
@@ -93,7 +106,17 @@ export default function DailyChallenge({
       </div>
 
       <div className="rank-section">
-        <div className="rank-section-title">今日排行榜</div>
+        <div className="rank-section-title">
+          今日排行榜
+          <button
+            className={`rank-refresh-btn${refreshing ? " spinning" : ""}`}
+            onClick={handleRefresh}
+            disabled={refreshing}
+            aria-label="重整排行榜"
+          >
+            <RefreshIcon />
+          </button>
+        </div>
         <div className="rank-header">
           <span className="rk-pos">#</span>
           <span className="rk-score">分數</span>
@@ -127,6 +150,15 @@ export default function DailyChallenge({
         )}
       </div>
     </div>
+  );
+}
+
+function RefreshIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="23 4 23 10 17 10"/>
+      <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+    </svg>
   );
 }
 
