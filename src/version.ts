@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.7.2";
+export const APP_VERSION = "0.8.0";
 
 export interface ChangelogEntry {
   date: string;
@@ -6,6 +6,21 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    date: "2026-06-17 (v0.8.0)",
+    notes: [
+      "Phase 6 音效上線：Web Audio API 程式生成，不需外部音檔",
+      "翻車音效：白噪音爆炸聲（0.55s 衰減）",
+      "完美落地音效：C5→E5→G5 三音上行琶音",
+      "後空翻音效：160→520Hz 上揚 sine（每轉滿一圈觸發）",
+      "完賽音效：C4→E4→G4→C5 四音凱旋琶音",
+      "引擎持續音：鋸齒波，速度 + 著地狀態動態調整音高與音量",
+      "Android 返回鍵 bug 修正：從子頁面返回後短時間內再按不再失效",
+      "桌機 PWA 關視窗加確認對話框（beforeunload）",
+      "排行榜加重整按鈕（↻），按一下清快取重抓最新資料",
+      "修正山峰頂點卡車 bug（峰頂梯形不加 topExtra）",
+    ],
+  },
   {
     date: "2026-06-17 (v0.7.2)",
     notes: [

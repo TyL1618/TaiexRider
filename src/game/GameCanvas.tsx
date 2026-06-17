@@ -5,6 +5,7 @@ import { pricesToTrack, buildTerrainBodies, slopeAt, terrainYAt, type Track } fr
 import { createBike, resetBike, type Bike } from "./bike";
 import { BIKE, CAMERA, COLOR, DRIVE, RULES } from "./constants";
 import { APP_VERSION } from "../version";
+import { playFlip, playPerfectLanding, playCrash, playFinish, startEngine, updateEngine, stopEngine } from "./audio";
 
 export interface GameOverStats {
   score: number;
@@ -378,6 +379,7 @@ let crashTimer = 0;
           bonusPoints += gained;
           totalFlips += flips;
           showToast(`${flips} 圈 +${gained}`);
+          playFlip();
         }
         // 完美落地：用車身中心下方坡面角，比兩輪插值更穩（不受前後輪跨 segment 影響）
         const landSlope = slopeAt(track, c.position.x);
@@ -390,6 +392,7 @@ let crashTimer = 0;
           bonusPoints += perfectBonus;
           perfectLandings++;
           showToast(`完美落地 ${perfectFlips}圈 +${perfectBonus}`);
+          playPerfectLanding();
           perfectFxFrames = 30;
           perfectFxPts = [
             { x: bike.rearWheel.position.x, y: bike.rearWheel.position.y },
@@ -438,6 +441,7 @@ let crashTimer = 0;
         overRef.current = true;
         dyingRef.current = true;
         setDying(true);
+        playCrash(); stopEngine();
         crashTimer = 0;
       } else if (stuckMidAir && !overRef.current) {
         // stuckMidAir 仍需計時確認（瞬間速度<0.5 可能是正常落地）
@@ -453,6 +457,7 @@ let crashTimer = 0;
           overRef.current = true;
           dyingRef.current = true;
           setDying(true);
+          playCrash(); stopEngine();
         }
       } else {
         crashTimer = 0;
@@ -464,6 +469,7 @@ let crashTimer = 0;
         Body.setStatic(bike.rearWheel, true);
         Body.setStatic(bike.frontWheel, true);
         setFinished(true);
+        playFinish(); stopEngine();
         onGameOverRef.current?.({ score: points, timeMs: raceTimeMs, flips: totalFlips, perfect: perfectLandings, finished: true });
       }
       return { grounded: groundedNow, upright };
@@ -862,6 +868,7 @@ let crashTimer = 0;
       if (resetSignal.current !== lastResetSignal) {
         lastResetSignal = resetSignal.current;
         doReset();
+        startEngine();
         last = now;
         acc = 0;
       }
@@ -882,6 +889,9 @@ let crashTimer = 0;
         const r = step(STEP);
         grounded = r.grounded;
         acc -= STEP;
+      }
+      if (!overRef.current && !pausedRef.current) {
+        updateEngine(Math.hypot(bike.chassis.velocity.x, bike.chassis.velocity.y), grounded);
       }
 
       // 鏡頭跟隨 / 終點全覽（dying 時鏡頭凍住，等動畫結束再開始縮放）
@@ -954,10 +964,12 @@ let crashTimer = 0;
         });
       }
     };
+    startEngine();
     raf = requestAnimationFrame(frame);
 
     // ---- 清理 ----
     return () => {
+      stopEngine();
       cancelAnimationFrame(raf);
       window.removeEventListener("pointerdown", press);
       window.removeEventListener("pointerup", release);

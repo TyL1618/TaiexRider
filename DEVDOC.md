@@ -189,6 +189,7 @@ src/
 │   ├── bike.ts            # 機車物理體（chassis + 雙輪 + 約束）
 │   ├── terrain.ts         # 賽道生成 + 碰撞體
 │   ├── constants.ts       # 所有手感參數（DRIVE/BIKE/TRACK/RULES/COLOR）
+│   ├── audio.ts           # Web Audio API 程式生成音效（引擎 + 翻車 + 琶音）
 │   └── camera.ts          # 鏡頭跟隨
 ├── screens/
 │   ├── Home.tsx           # 首頁（三模式入口 + 設定 modal + 返回確認）
@@ -234,7 +235,7 @@ src/
 | Phase 3 | ✅ v0.5.0 | 三模式 UI：每日排名賽 / 隨機拉霸 / 自選賽道 |
 | Phase 4 | ✅ v0.6–0.7 | Supabase 後端：排行榜 + Google One Tap 登入 + 每日全台股自動更新（GitHub Actions） |
 | Phase 5 | 🔜 | PWA 離線快取（Service Worker + IndexedDB） |
-| Phase 6 | 🔜 | 視覺/音效打磨 |
+| Phase 6 | 🟡 v0.8.0 | 音效（Web Audio API 程式生成，v0.8.0 完成）；視覺打磨待續 |
 | Phase 7 | 🔜 | TWA 包裝 + Google Play 上架 |
 
 ---
@@ -243,9 +244,27 @@ src/
 
 - **ETF 含字母代號**：腳本 filter 從 `/^\d{4}$/` 改 `/^\d{4}[A-Z]?$/` 即可納入 00981A 等
 - **Phase 5 離線快取**：每日地圖資料存 IndexedDB，週末 / 無網路仍可玩
-- **Phase 6 音效**：引擎聲 / 落地音 / 翻車音效
+- **Phase 6 視覺打磨**：音效已完成（v0.8.0）；視覺特效待續（粒子優化 / 霓虹光暈等）
 - **Phase 7 TWA**：Bubblewrap 包裝 + Digital Asset Links + Google Play 上架素材
 - **商業模式（Phase 10+）**：看廣告復活一次 / IAP 永久去廣告 / AdMob
+
+---
+
+## 11. 音效系統（`src/game/audio.ts`，v0.8.0）
+
+純 Web Audio API 合成，**不需任何外部音檔**。所有函式都 lazy 建立 `AudioContext`（需使用者互動後才能啟動）。
+
+| 函式 | 觸發時機 | 合成方式 |
+|---|---|---|
+| `playFlip()` | 後空翻計分時 | Sine 160→520Hz，0.28s 上揚 |
+| `playPerfectLanding()` | 完美落地時 | Triangle C5→E5→G5 琶音，3 音間隔 90ms |
+| `playCrash()` | 翻車 / 卡死判定 | 白噪音 bandpass 350Hz，0.55s 衰減 |
+| `playFinish()` | 完賽（抵終點）| Triangle C4→E4→G4→C5 凱旋琶音 |
+| `startEngine()` | 遊戲開始 / 重置 | Sawtooth→lowpass→gain，靜音啟動 |
+| `updateEngine(speed, grounded)` | 每幀（非暫停 / 非結算）| 動態調整振盪頻率與音量 |
+| `stopEngine()` | 翻車 / 完賽 / 元件卸載 | 0.15s 淡出後停止振盪器 |
+
+引擎音在著地時頻率隨速度 50→190Hz，離地降至 38Hz（怠速），透過 `setTargetAtTime` 平滑轉換。
 
 ---
 
