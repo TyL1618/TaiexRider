@@ -145,17 +145,29 @@ export function buildTerrainBodies(track: Track): Body[] {
   // 頂緣兩頂點維持精確不動 → 頂面=折線完全不變、零凸角，手感不受影響。
   const overlap = TRACK.segmentWidth;
 
-  // 頂部左右各多延伸 3px，讓相鄰梯形在頂面接縫處有小重疊，
+  // 頂部左右各多延伸 3px，讓相鄰梯形在谷底接縫處有小重疊，
   // 消除輪子（圓形）從斜角落在兩段 K 棒接縫時插入縫隙的 bug。
+  // ⚠️ 峰頂不延伸：若頂點是山峰（相鄰段都比它低），延伸反而製造左梯形的右垂直壁，
+  //    輪子爬到快到頂時撞到那堵牆就會卡住。峰頂時兩梯形精確共用同一頂點即可。
   const topExtra = 3;
 
   for (let i = 0; i < vertices.length - 1; i++) {
     const a = vertices[i];
     const b = vertices[i + 1];
+
+    // 判斷 a/b 是否為峰頂（y 值最小 = 畫面最高點）
+    const aPrev = i > 0 ? vertices[i - 1] : null;
+    const bNext = i < vertices.length - 2 ? vertices[i + 2] : null;
+    const aIsPeak = aPrev !== null && aPrev.y > a.y && b.y > a.y;
+    const bIsPeak = bNext !== null && a.y > b.y && bNext.y > b.y;
+
+    const leftExtra  = aIsPeak ? 0 : topExtra;
+    const rightExtra = bIsPeak ? 0 : topExtra;
+
     // 凸梯形（y 向下，順時針），上窄下寬：左上 → 右上 → 右下(外擴) → 左下(外擴)
     const verts = [
-      { x: a.x - topExtra, y: a.y },
-      { x: b.x + topExtra, y: b.y },
+      { x: a.x - leftExtra,  y: a.y },
+      { x: b.x + rightExtra, y: b.y },
       { x: b.x + overlap, y: baseY },
       { x: a.x - overlap, y: baseY },
     ];
