@@ -70,6 +70,83 @@
 .home-btn.daily:hover { border-color: var(--neon-amber); box-shadow: 0 0 22px rgba(255, 179, 0, 0.3); background: rgba(255, 179, 0, 0.08); }
 .home-btn.daily .home-btn-main { color: var(--neon-amber); text-shadow: 0 0 10px rgba(255, 179, 0, 0.5); }
 
+/* ---- 設定 modal 帳號區塊 ---- */
+.settings-account {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.8rem;
+  margin-bottom: 0.5rem;
+  background: rgba(45, 226, 230, 0.05);
+  border: 1px solid rgba(45, 226, 230, 0.18);
+  border-radius: 10px;
+}
+.settings-account--guest {
+  align-items: center;
+  gap: 0.6rem;
+}
+.settings-account-info { display: flex; flex-direction: column; gap: 0.2rem; }
+.settings-account-label { font-size: 0.72rem; color: var(--text-dim); letter-spacing: 0.06em; }
+.settings-account-email { font-size: 0.88rem; color: var(--text); }
+
+.settings-nickname-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.2rem;
+}
+.settings-nickname-label {
+  font-size: 0.78rem;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+.settings-nickname-input {
+  flex: 1;
+  background: rgba(45, 226, 230, 0.06);
+  border: 1px solid rgba(45, 226, 230, 0.3);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 0.9rem;
+  padding: 0.28rem 0.5rem;
+  outline: none;
+  min-width: 0;
+}
+.settings-nickname-input:focus { border-color: var(--neon-cyan); }
+
+.settings-signout-btn {
+  align-self: flex-end;
+  background: none;
+  border: 1px solid rgba(255, 100, 100, 0.4);
+  border-radius: 6px;
+  color: rgba(255, 120, 120, 0.9);
+  font-size: 0.78rem;
+  padding: 0.25rem 0.75rem;
+  cursor: pointer;
+  letter-spacing: 0.04em;
+}
+.settings-signout-btn:active { opacity: 0.7; }
+
+.settings-account-hint {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  text-align: center;
+}
+
+.google-signin-btn {
+  display: flex;
+  align-items: center;
+  padding: 0.4rem 1rem;
+  background: #fff;
+  color: #3c4043;
+  font-size: 0.85rem;
+  font-weight: 600;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.35);
+}
+.google-signin-btn:active { transform: scale(0.97); }
+
 .home-foot {
   margin-top: 2.6rem;
   font-size: 0.7rem;

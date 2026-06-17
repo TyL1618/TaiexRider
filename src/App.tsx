@@ -8,14 +8,22 @@ import DailyChallenge from "./screens/DailyChallenge";
 import type { TrackData } from "./data/tracks";
 import { submitDailyScore, fetchDailyTop } from "./lib/leaderboard";
 import { fetchHardestDailyMap } from "./lib/dailyMap";
+import { onAuthStateChange, getUser, type User } from "./lib/auth";
+import { getPlayerName } from "./lib/playerId";
 import { dailyKey } from "./data/pick";
-import { getPlayerId, getPlayerName } from "./lib/playerId";
 
 export default function App() {
-  const [screen, setScreen] = useState<Screen>("home");
-  const [track, setTrack] = useState<TrackData | null>(null);
+  const [screen, setScreen]       = useState<Screen>("home");
+  const [track, setTrack]         = useState<TrackData | null>(null);
   const [isDailyRun, setIsDailyRun] = useState(false);
+  const [user, setUser]           = useState<User | null>(null);
   const goHome = useCallback(() => setScreen("home"), []);
+
+  // 初始化 auth 狀態，並監聽登入 / 登出變化
+  useEffect(() => {
+    getUser().then(setUser);
+    return onAuthStateChange(setUser);
+  }, []);
 
   // App 啟動時預熱每日資料，進 DailyChallenge 時直接從快取拿，不需等待
   useEffect(() => {
@@ -25,17 +33,16 @@ export default function App() {
   }, []);
 
   const handleGameOver = useCallback((stats: GameOverStats) => {
-    if (isDailyRun) {
-      submitDailyScore(getPlayerId(), getPlayerName(), {
-        score: stats.score,
-        timeMs: stats.timeMs,
-        flips: stats.flips,
+    if (isDailyRun && user) {
+      submitDailyScore(getPlayerName(), {
+        score:   stats.score,
+        timeMs:  stats.timeMs,
+        flips:   stats.flips,
         perfect: stats.perfect,
       });
     }
-  }, [isDailyRun]);
+  }, [isDailyRun, user]);
 
-  // 選到賽道 → 進遊戲（離開時 setTrack(null) 會回到原本的選單畫面）
   if (track) {
     return (
       <GameCanvas
@@ -49,13 +56,14 @@ export default function App() {
     );
   }
 
-  if (screen === "custom") return <TrackSelect onPick={setTrack} onBack={goHome} />;
-  if (screen === "random") return <RandomSlot onPick={setTrack} onBack={goHome} />;
-  if (screen === "daily") return (
+  if (screen === "custom")  return <TrackSelect onPick={setTrack} onBack={goHome} />;
+  if (screen === "random")  return <RandomSlot  onPick={setTrack} onBack={goHome} />;
+  if (screen === "daily")   return (
     <DailyChallenge
+      user={user}
       onPlay={(t) => { setIsDailyRun(true); setTrack(t); }}
       onBack={goHome}
     />
   );
-  return <Home onNav={setScreen} />;
+  return <Home user={user} onNav={setScreen} />;
 }

@@ -21,18 +21,17 @@ create index if not exists daily_scores_rank_idx
   on public.daily_scores (challenge_date, score desc, time_ms asc);
 
 -- ── 提交成績 RPC（security definer，upsert-if-better + 合理性驗證）──────────
--- 防偽造設計：
---   1. p_date 已移除：日期由伺服器 current_date 決定，客戶端無法指定任意日期。
---   2. 分數上限 50000（理論最高約 35000，留安全邊際）。
---   3. 時間下限 5s（從技術上無法在 5 秒內跑完賽道）、上限 2h（防整數溢位）。
---   4. flips/perfect 上限 50（遠超實際可能）。
---   5. player_id 強制 UUID 格式（crypto.randomUUID() 格式，過濾手工構造 ID）。
--- 舊版（含 p_date 參數）必須先 DROP 才能改簽名。
+-- 防偽造設計（v0.7 Google 登入版）：
+--   1. p_id 已移除：player_id 由伺服器 auth.uid() 決定，客戶端無法偽造。
+--   2. 必須是已登入用戶（auth.uid() IS NOT NULL），anon 無法呼叫。
+--   3. 日期由伺服器 current_date 決定。
+--   4. 分數 0~50000、時間 1s~2h、flips/perfect 0~50 合理性驗證。
+-- 需先 DROP 舊簽名再建新版。
 
 drop function if exists public.submit_daily_score(date, text, text, int, int, int, int);
+drop function if exists public.submit_daily_score(text, text, int, int, int, int);
 
 create or replace function public.submit_daily_score(
-  p_id      text,
   p_name    text,
   p_score   int,
   p_time    int,
@@ -43,19 +42,22 @@ language plpgsql
 security definer
 set search_path = public
 as $$
+declare
+  v_uid text;
 begin
-  -- 合理性驗證：任何一條不過就靜默拒絕（不回傳錯誤，避免攻擊者得到線索）
+  -- 必須是已登入用戶（Google OAuth），anon 靜默拒絕
+  v_uid := auth.uid()::text;
+  if v_uid is null then return; end if;
+
+  -- 合理性驗證：靜默拒絕（不回傳錯誤，避免攻擊者得到線索）
   if p_score  < 0      or p_score  > 50000   then return; end if;
   if p_time   < 1000   or p_time   > 7200000 then return; end if;
   if p_flips  < 0      or p_flips  > 50      then return; end if;
   if p_perfect < 0     or p_perfect > 50     then return; end if;
-  -- UUID 格式驗證（8-4-4-4-12 hex）
-  if p_id !~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
-  then return; end if;
 
   insert into public.daily_scores
     (challenge_date, player_id, player_name, score, time_ms, flips, perfect)
-  values (current_date, p_id, left(p_name, 16), p_score, p_time, p_flips, p_perfect)
+  values (current_date, v_uid, left(p_name, 16), p_score, p_time, p_flips, p_perfect)
   on conflict (challenge_date, player_id) do update
     set score       = excluded.score,
         time_ms     = excluded.time_ms,
@@ -81,8 +83,8 @@ create policy "anon read scores" on public.daily_scores
 -- 不開放直接 insert/update（一律走 RPC）
 revoke insert, update, delete on public.daily_scores from anon;
 
--- 允許 anon 執行提交 RPC（新簽名，不含 p_date）
-grant execute on function public.submit_daily_score(text, text, int, int, int, int) to anon;
+-- 只允許已登入用戶執行提交 RPC（新簽名，無 p_id）
+grant execute on function public.submit_daily_score(text, int, int, int, int) to authenticated;
 
 -- ── 自動清理（DB > 400 MB 時刪 90 天前成績，由 cron-job.org 每日呼叫）────
 create or replace function public.cleanup_old_scores_if_needed()

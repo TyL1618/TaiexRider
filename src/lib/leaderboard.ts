@@ -1,5 +1,5 @@
 // 排行榜 REST 服務（Phase 4 MVP）：直接 fetch PostgREST，不裝 SDK（零 bundle 成本）。
-// 未設定 .env 時所有函式安全 no-op（回 []/false）→ 不影響現有行為。見 DEVDOC §11。
+// 提交成績需 Google 登入（Supabase Auth），伺服器端用 auth.uid() 決定 player_id。
 
 const URL = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
@@ -21,12 +21,8 @@ export interface SubmitStats {
   perfect: number;
 }
 
-function headers(): Record<string, string> {
-  return {
-    apikey: KEY!,
-    Authorization: `Bearer ${KEY!}`,
-    "Content-Type": "application/json",
-  };
+function anonHeaders(): Record<string, string> {
+  return { apikey: KEY!, Authorization: `Bearer ${KEY!}` };
 }
 
 const _topCache = new Map<string, Promise<ScoreRow[]>>();
@@ -44,7 +40,7 @@ async function _fetchTop(challengeDate: string, limit: number): Promise<ScoreRow
     `&order=score.desc,time_ms.asc&limit=${limit}` +
     `&select=player_name,score,time_ms,flips,perfect`;
   try {
-    const r = await fetch(q, { headers: headers() });
+    const r = await fetch(q, { headers: anonHeaders() });
     if (!r.ok) return [];
     return (await r.json()) as ScoreRow[];
   } catch {
@@ -52,26 +48,39 @@ async function _fetchTop(challengeDate: string, limit: number): Promise<ScoreRow
   }
 }
 
-// 提交成績（走 RPC，後端 upsert-if-better）。日期由伺服器 current_date 決定，不由前端傳入。
+// 提交成績（需 Google 登入）。伺服器端用 auth.uid() 決定 player_id，無法偽造。
+// 成功後清除當日快取，讓下次進排行榜看到最新資料。
 export async function submitDailyScore(
-  playerId: string,
   playerName: string,
   s: SubmitStats,
 ): Promise<boolean> {
   if (!isLeaderboardConfigured) return false;
+  // 動態 import 避免循環依賴，同時讓 supabase 只在需要時初始化
+  const { supabase } = await import("./supabase");
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) return false;
+
   try {
     const r = await fetch(`${URL}/rest/v1/rpc/submit_daily_score`, {
       method: "POST",
-      headers: headers(),
+      headers: {
+        apikey: KEY!,
+        Authorization: `Bearer ${session.access_token}`,
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify({
-        p_id: playerId,
-        p_name: playerName,
-        p_score: Math.round(s.score),
-        p_time: Math.round(s.timeMs),
-        p_flips: s.flips,
+        p_name:    playerName,
+        p_score:   Math.round(s.score),
+        p_time:    Math.round(s.timeMs),
+        p_flips:   s.flips,
         p_perfect: s.perfect,
       }),
     });
+    if (r.ok) {
+      // 清除快取，讓下次進 DailyChallenge 顯示含本次成績的最新排行榜
+      const today = new Date().toISOString().slice(0, 10);
+      _topCache.delete(today);
+    }
     return r.ok;
   } catch {
     return false;
