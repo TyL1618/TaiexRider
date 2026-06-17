@@ -32,13 +32,6 @@ export default function DailyChallenge({
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
-    window.history.pushState({ taiexDaily: true }, "");
-    const onPop = () => onBack();
-    window.addEventListener("popstate", onPop);
-    return () => window.removeEventListener("popstate", onPop);
-  }, [onBack]);
-
-  useEffect(() => {
     let alive = true;
     fetchHardestDailyMap(dailyKey()).then((row) => {
       if (!alive) return;

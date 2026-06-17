@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { APP_VERSION, CHANGELOG } from "../version";
 import { signInWithGoogle, signOut, type User } from "../lib/auth";
 import { getPlayerName, setPlayerName } from "../lib/playerId";
@@ -9,35 +9,10 @@ export type Screen = "home" | "custom" | "random" | "daily";
 export default function Home({ user, onNav }: { user: User | null; onNav: (s: Screen) => void }) {
   const [showSettings, setShowSettings] = useState(false);
   const [showLog, setShowLog]           = useState(false);
-  const [confirmLeave, setConfirmLeave] = useState(false);
   const [nickname, setNickname]         = useState(() => getPlayerName());
-  const leavingRef = useRef(false);
 
   // 登入後同步最新暱稱（Google 名稱可能剛寫入 localStorage）
   useEffect(() => { setNickname(getPlayerName()); }, [user]);
-
-  useEffect(() => {
-    // OAuth redirect 返回時 Supabase 會清理 URL，可能觸發 popstate；壓制一次避免誤跳「離開遊戲」
-    const isOAuthReturn = window.location.hash.includes("access_token")
-      || window.location.search.includes("code=");
-    let suppressNext = isOAuthReturn;
-
-    window.history.pushState({ taiexHome: true }, "");
-    const onPop = () => {
-      if (leavingRef.current) return;
-      if (suppressNext) { suppressNext = false; return; }
-      setConfirmLeave(true);
-      window.history.pushState({ taiexHome: true }, "");
-    };
-    window.addEventListener("popstate", onPop);
-    return () => window.removeEventListener("popstate", onPop);
-  }, []);
-
-  const doLeave = () => {
-    leavingRef.current = true;
-    setConfirmLeave(false);
-    window.history.go(-1);
-  };
 
   return (
     <div className="home-screen">
@@ -134,16 +109,6 @@ export default function Home({ user, onNav }: { user: User | null; onNav: (s: Sc
         </div>
       )}
 
-      {confirmLeave && (
-        <div className="modal-overlay" onClick={() => setConfirmLeave(false)}>
-          <div className="modal-panel" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-title">離開遊戲？</div>
-            <div className="modal-item dim">確定要離開 TAIEX RIDER 嗎？</div>
-            <button className="modal-btn" onClick={doLeave}>確定離開</button>
-            <button className="modal-link" onClick={() => setConfirmLeave(false)}>留下繼續玩</button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

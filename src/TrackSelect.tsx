@@ -41,13 +41,6 @@ export default function TrackSelect({
   useEffect(() => { setVisible(PAGE); }, [mode, sortBy, query]);
 
   useEffect(() => {
-    window.history.pushState({ taiexCustom: true }, "");
-    const onPop = () => onBack();
-    window.addEventListener("popstate", onPop);
-    return () => window.removeEventListener("popstate", onPop);
-  }, [onBack]);
-
-  useEffect(() => {
     fetchDailyMapList(dailyKey()).then((list) => { setRemote(list); setLoaded(true); });
   }, []);
 

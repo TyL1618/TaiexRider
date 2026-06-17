@@ -39,15 +39,11 @@ export default function RandomSlot({
   const timerRef  = useRef<ReturnType<typeof setTimeout>>();
 
   useEffect(() => {
-    window.history.pushState({ taiexRandom: true }, "");
-    const onPop = () => onBack();
-    window.addEventListener("popstate", onPop);
     return () => {
-      window.removeEventListener("popstate", onPop);
       cancelAnimationFrame(rafRef.current);
       clearTimeout(timerRef.current);
     };
-  }, [onBack]);
+  }, []);
 
   useEffect(() => {
     fetchDailyMapList(dailyKey()).then((list) => {
