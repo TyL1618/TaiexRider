@@ -58,6 +58,12 @@ function flipScore(flips: number): number {
   return total;
 }
 
+// 模組載入時就開始抓圖，避免每次進遊戲重新請求造成前幾秒顯示向量備援
+const _bikeImg = new Image();
+let _bikeImgReady = false;
+_bikeImg.onload = () => { _bikeImgReady = true; };
+_bikeImg.src = `${import.meta.env.BASE_URL}bike.png`;
+
 export default function GameCanvas({ prices, label, name, onExit, onGameOver }: GameCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [hud, setHud] = useState<Hud>({
@@ -100,13 +106,8 @@ export default function GameCanvas({ prices, label, name, onExit, onGameOver }: 
     const ctx = canvas.getContext("2d")!;
 
     // ---- 車體貼圖（決定①：整張含輪去背 PNG，輪子不轉）----
-    // 放 public/bike.png；缺檔時 onload 不觸發 → drawBike 自動退回向量備援，不會壞 build
-    const bikeImg = new Image();
-    let bikeImgReady = false;
-    bikeImg.onload = () => {
-      bikeImgReady = true;
-    };
-    bikeImg.src = `${import.meta.env.BASE_URL}bike.png`;
+    // bikeImg 在模組載入時已開始預載（module scope），進遊戲時通常已 ready，不再閃向量備援
+    const bikeImg = _bikeImg;
 
     // ---- 建立世界 ----
     const engine = Engine.create();
@@ -608,7 +609,7 @@ let crashTimer = 0;
       const cAngle = prevChassisAngle + (c.angle - prevChassisAngle) * alpha;
 
       // 有貼圖：整張圖（含輪）貼到車身，不另畫向量輪（決定①：輪子不轉）
-      if (bikeImgReady) {
+      if (_bikeImgReady) {
         const w = BIKE.spriteW;
         const h = w * (bikeImg.naturalHeight / bikeImg.naturalWidth);
         const sw = w * scale; // 隨鏡頭縮放（overview 時縮小，不遮賽道）
