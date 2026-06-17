@@ -106,13 +106,19 @@ $$;
 
 grant execute on function public.cleanup_old_scores_if_needed() to anon;
 
--- ── 每日地圖（GitHub Actions 每日 00:05 台灣時間寫入，前端讀取）──────────
-create table if not exists public.daily_map (
-  map_date   date        primary key,
-  prices     jsonb       not null,
-  label      text        not null default '台股大盤',
-  created_at timestamptz not null default now()
+-- ── 每日地圖（GitHub Actions 21:05 台灣時間抓全台股 + TAIEX，存隔日地圖）──────
+-- (map_date, stock_code) 聯合主鍵：每天 ~960 筆，只保留最近 7 天（腳本自動清理）
+drop table if exists public.daily_map;
+create table public.daily_map (
+  map_date     date        not null,
+  stock_code   text        not null,
+  stock_name   text        not null default '',
+  prices       jsonb       not null,
+  difficulty   numeric     not null default 0,  -- 最大單步漲跌幅，用於選「今日最難地圖」
+  created_at   timestamptz not null default now(),
+  primary key (map_date, stock_code)
 );
+create index daily_map_diff_idx on public.daily_map (map_date, difficulty desc);
 alter table public.daily_map enable row level security;
 drop policy if exists "anon read daily_map" on public.daily_map;
 create policy "anon read daily_map" on public.daily_map

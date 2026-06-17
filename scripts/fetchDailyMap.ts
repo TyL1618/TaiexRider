@@ -1,12 +1,23 @@
-// 每日 00:05 台灣時間由 GitHub Actions 觸發
-// 抓前一個交易日大盤（TAIEX MI_5MINS_INDEX）日盤資料，
-// 以「今日台灣日期」為 map_date upsert 到 Supabase daily_map。
+// 每日 21:05 台灣時間由 GitHub Actions 觸發
+// 抓全台上市股票 + TAIEX 當日日盤，計算難度，以「明日台灣日期」寫入 Supabase daily_map。
+// 清除 7 天前舊資料。
 // 環境變數：SUPABASE_URL, SUPABASE_SERVICE_KEY
 
 const SUPABASE_URL = process.env.SUPABASE_URL!;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY!;
-const UA = { "User-Agent": "Mozilla/5.0 TaiexRider/0.1" };
-const DOWNSAMPLE = 110;
+const UA_TWSE = { "User-Agent": "Mozilla/5.0 TaiexRider/0.1" };
+const UA_YF   = { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" };
+const DOWNSAMPLE  = 110;
+const DELAY_MS    = 3000;  // 3 秒間隔，避免 Yahoo Finance 限流
+const BATCH_SIZE  = 200;   // Supabase 批次寫入大小
+
+interface StockRow {
+  map_date:   string;
+  stock_code: string;
+  stock_name: string;
+  prices:     number[];
+  difficulty: number;
+}
 
 function downsample(arr: number[], target: number): number[] {
   if (arr.length <= target) return arr;
@@ -16,25 +27,83 @@ function downsample(arr: number[], target: number): number[] {
   return out;
 }
 
+function calcDifficulty(prices: number[]): number {
+  let max = 0;
+  for (let i = 1; i < prices.length; i++) {
+    const pct = Math.abs(prices[i] / prices[i - 1] - 1);
+    if (pct > max) max = pct;
+  }
+  return max;
+}
+
 function toYMD8(d: Date): string {
   return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
 }
 
-async function fetchTaiexIntraday(yyyymmdd: string): Promise<number[]> {
-  const url = `https://www.twse.com.tw/exchangeReport/MI_5MINS_INDEX?response=json&date=${yyyymmdd}`;
+const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+
+// 取得全部上市股票代號 + 名稱（TWSE STOCK_DAY_ALL，一次拿全部）
+async function fetchAllListedStocks(): Promise<{ code: string; name: string }[]> {
+  const url = "https://www.twse.com.tw/exchangeReport/STOCK_DAY_ALL?response=json";
+  const j = await (await fetch(url, { headers: UA_TWSE })).json() as
+    { stat: string; fields?: string[]; data?: string[][] };
+  if (j.stat !== "OK" || !j.fields || !j.data) return [];
+  const ci = j.fields.indexOf("證券代號");
+  const ni = j.fields.indexOf("證券名稱");
+  return j.data
+    .map(r => ({ code: r[ci].trim(), name: r[ni].trim() }))
+    .filter(s => /^\d{4}$/.test(s.code)); // 4 碼純數字 = 一般上市股票
+}
+
+// 個股日盤：Yahoo Finance 5 分 K
+async function fetchYahooIntraday(symbol: string): Promise<number[]> {
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=5m&range=1d&includePrePost=false`;
   try {
-    const j = await (await fetch(url, { headers: UA })).json() as
-      { stat: string; data?: string[][] };
-    if (j.stat !== "OK" || !Array.isArray(j.data) || j.data.length === 0) return [];
-    const raw = j.data
-      .map((r) => parseFloat(r[1].replace(/,/g, "")))
-      .filter((v) => Number.isFinite(v) && v > 0);
-    console.log(`  MI_5MINS_INDEX ${yyyymmdd}: ${raw.length} 點 → 降採樣 ${DOWNSAMPLE}`);
-    return downsample(raw, DOWNSAMPLE);
-  } catch (e) {
-    console.error(`  fetch 失敗 ${yyyymmdd}:`, e);
+    const r = await fetch(url, { headers: UA_YF, signal: AbortSignal.timeout(10_000) });
+    const j = await r.json() as Record<string, unknown>;
+    const result = (j.chart as Record<string, unknown>)?.result as Record<string, unknown>[] | undefined;
+    const quotes = (result?.[0]?.indicators as Record<string, unknown>)?.quote as Record<string, unknown>[] | undefined;
+    const arr = (quotes?.[0]?.close as (number | null)[]) ?? [];
+    return arr.filter((v): v is number => v != null && Number.isFinite(v));
+  } catch {
     return [];
   }
+}
+
+// TAIEX 日盤：TWSE MI_5MINS_INDEX，往前找最近交易日
+async function fetchTaiexIntraday(nowTW: Date): Promise<number[]> {
+  for (let back = 1; back <= 7; back++) {
+    const d = new Date(nowTW.getTime() - back * 86_400_000);
+    const url = `https://www.twse.com.tw/exchangeReport/MI_5MINS_INDEX?response=json&date=${toYMD8(d)}`;
+    try {
+      const j = await (await fetch(url, { headers: UA_TWSE })).json() as
+        { stat: string; data?: string[][] };
+      if (j.stat !== "OK" || !j.data || j.data.length === 0) continue;
+      const raw = j.data
+        .map(r => parseFloat(r[1].replace(/,/g, "")))
+        .filter(v => Number.isFinite(v) && v > 0);
+      if (raw.length >= 20) {
+        console.log(`  TAIEX ${toYMD8(d)}: ${raw.length} 點 → 降採樣 ${DOWNSAMPLE}`);
+        return downsample(raw, DOWNSAMPLE);
+      }
+    } catch { /* continue */ }
+  }
+  return [];
+}
+
+// 批次 upsert
+async function upsertBatch(rows: StockRow[]): Promise<void> {
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/daily_map`, {
+    method: "POST",
+    headers: {
+      apikey: SUPABASE_KEY,
+      Authorization: `Bearer ${SUPABASE_KEY}`,
+      "Content-Type": "application/json",
+      Prefer: "resolution=merge-duplicates",
+    },
+    body: JSON.stringify(rows),
+  });
+  if (!r.ok) throw new Error(await r.text());
 }
 
 async function main() {
@@ -43,43 +112,61 @@ async function main() {
     process.exit(1);
   }
 
-  // 台灣時間 = UTC+8；21:05 跑時存「明天」的 map_date，讓 00:00 時前端就能讀到
-  const nowTW = new Date(Date.now() + 8 * 3_600_000);
+  const nowTW      = new Date(Date.now() + 8 * 3_600_000);
   const tomorrowTW = new Date(nowTW.getTime() + 86_400_000);
-  const mapDate = tomorrowTW.toISOString().slice(0, 10); // YYYY-MM-DD，明日台灣日期
-
+  const mapDate    = tomorrowTW.toISOString().slice(0, 10);
   console.log(`目標 map_date: ${mapDate}`);
 
-  // 往前最多 7 天，找最近一個有交易資料的日子
-  let prices: number[] = [];
-  for (let back = 1; back <= 7; back++) {
-    const d = new Date(nowTW.getTime() - back * 86_400_000);
-    prices = await fetchTaiexIntraday(toYMD8(d));
-    if (prices.length >= 20) break;
-    console.log(`  ${toYMD8(d)} 無資料，往前推...`);
+  const rows: StockRow[] = [];
+
+  // TAIEX
+  const taiexPrices = await fetchTaiexIntraday(nowTW);
+  if (taiexPrices.length >= 20) {
+    rows.push({ map_date: mapDate, stock_code: "TAIEX", stock_name: "台股大盤",
+      prices: taiexPrices, difficulty: calcDifficulty(taiexPrices) });
   }
 
-  if (prices.length < 20) {
-    console.error("7 天內找不到有效交易資料，放棄。");
-    process.exit(1);
-  }
+  // 全部上市股票
+  console.log("取得上市股票清單...");
+  const stocks = await fetchAllListedStocks();
+  console.log(`共 ${stocks.length} 支，預估 ${Math.round(stocks.length * DELAY_MS / 60000)} 分鐘`);
 
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/daily_map`, {
-    method: "POST",
-    headers: {
-      apikey: SUPABASE_KEY,
-      Authorization: `Bearer ${SUPABASE_KEY}`,
-      "Content-Type": "application/json",
-      Prefer: "resolution=merge-duplicates",
-    },
-    body: JSON.stringify({ map_date: mapDate, prices, label: "台股大盤" }),
+  let ok = 0, fail = 0;
+  for (let i = 0; i < stocks.length; i++) {
+    const { code, name } = stocks[i];
+    const raw = await fetchYahooIntraday(`${code}.TW`);
+    if (raw.length >= 10) {
+      const prices = downsample(raw, DOWNSAMPLE);
+      rows.push({ map_date: mapDate, stock_code: code, stock_name: name,
+        prices, difficulty: calcDifficulty(prices) });
+      ok++;
+    } else {
+      fail++;
+    }
+    if ((i + 1) % 100 === 0)
+      console.log(`  進度 ${i + 1}/${stocks.length}，成功 ${ok}，失敗 ${fail}`);
+    await sleep(DELAY_MS);
+  }
+  console.log(`\n抓取完成：成功 ${ok}，失敗 ${fail}，共 ${rows.length} 筆`);
+
+  if (rows.length === 0) { console.error("無資料，放棄。"); process.exit(1); }
+
+  // 批次寫入
+  for (let i = 0; i < rows.length; i += BATCH_SIZE) {
+    await upsertBatch(rows.slice(i, i + BATCH_SIZE));
+    process.stdout.write(`\r  寫入 ${Math.min(i + BATCH_SIZE, rows.length)}/${rows.length}`);
+  }
+  console.log("\n寫入完成");
+
+  // 清理 7 天前舊資料
+  const cutoff = new Date(nowTW.getTime() - 7 * 86_400_000).toISOString().slice(0, 10);
+  const del = await fetch(`${SUPABASE_URL}/rest/v1/daily_map?map_date=lt.${cutoff}`, {
+    method: "DELETE",
+    headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
   });
+  if (del.ok) console.log(`舊資料（${cutoff} 前）已清理`);
 
-  if (!res.ok) {
-    console.error("Supabase upsert 失敗：", await res.text());
-    process.exit(1);
-  }
-  console.log(`✅ daily_map ${mapDate} 寫入成功（${prices.length} 點）`);
+  console.log("✅ 完成");
 }
 
 main();

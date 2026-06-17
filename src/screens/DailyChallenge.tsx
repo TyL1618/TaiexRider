@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import Sparkline from "../components/Sparkline";
 import { dailyTrack, dailyKey } from "../data/pick";
 import { fetchDailyTop, isLeaderboardConfigured, type ScoreRow } from "../lib/leaderboard";
-import { fetchDailyMap } from "../lib/dailyMap";
+import { fetchHardestDailyMap } from "../lib/dailyMap";
 import { getPlayerName, setPlayerName } from "../lib/playerId";
 import type { TrackData } from "../data/tracks";
 import "./DailyChallenge.css";
@@ -35,13 +35,13 @@ export default function DailyChallenge({
     return () => window.removeEventListener("popstate", onPop);
   }, [onBack]);
 
-  // 讀今日地圖（Supabase daily_map），失敗則用靜態 fallback
+  // 讀今日最難地圖（Supabase daily_map），失敗則用靜態 fallback
   useEffect(() => {
     let alive = true;
-    fetchDailyMap(dailyKey()).then((prices) => {
+    fetchHardestDailyMap(dailyKey()).then((row) => {
       if (!alive) return;
-      if (prices) {
-        setTrack({ label: "TAIEX", name: "台股大盤", kind: "taiex", mode: "intraday", desc: "前一交易日大盤走勢", prices });
+      if (row) {
+        setTrack({ label: row.stock_code, name: row.stock_name, kind: "taiex", mode: "intraday", desc: "前一交易日走勢", prices: row.prices });
         setIsLive(true);
       }
     });
