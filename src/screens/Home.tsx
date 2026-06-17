@@ -36,7 +36,7 @@ export default function Home({ user, onNav }: { user: User | null; onNav: (s: Sc
   const doLeave = () => {
     leavingRef.current = true;
     setConfirmLeave(false);
-    window.history.go(-2);
+    window.history.go(-1);
   };
 
   return (
