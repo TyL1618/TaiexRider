@@ -41,7 +41,7 @@ export function fetchDailyTop(challengeDate: string, limit = 100): Promise<Score
 
 async function _fetchTop(challengeDate: string, limit: number): Promise<ScoreRow[]> {
   const q =
-    `${URL}/rest/v1/daily_scores_ranked?challenge_date=eq.${challengeDate}` +
+    `${URL}/rest/v1/daily_scores?challenge_date=eq.${challengeDate}` +
     `&order=score.desc,time_ms.asc&limit=${limit}` +
     `&select=player_name,score,time_ms,flips,perfect`;
   try {
