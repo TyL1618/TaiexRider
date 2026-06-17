@@ -6,7 +6,6 @@ import Home, { type Screen } from "./screens/Home";
 import RandomSlot from "./screens/RandomSlot";
 import DailyChallenge from "./screens/DailyChallenge";
 import type { TrackData } from "./data/tracks";
-import { dailyKey } from "./data/pick";
 import { submitDailyScore } from "./lib/leaderboard";
 import { getPlayerId, getPlayerName } from "./lib/playerId";
 
@@ -18,7 +17,7 @@ export default function App() {
 
   const handleGameOver = useCallback((stats: GameOverStats) => {
     if (isDailyRun) {
-      submitDailyScore(dailyKey(), getPlayerId(), getPlayerName(), {
+      submitDailyScore(getPlayerId(), getPlayerName(), {
         score: stats.score,
         timeMs: stats.timeMs,
         flips: stats.flips,

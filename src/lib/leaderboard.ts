@@ -45,9 +45,8 @@ export async function fetchDailyTop(challengeDate: string, limit = 100): Promise
   }
 }
 
-// 提交成績（走 RPC，後端 upsert-if-better）。回傳是否成功送出。
+// 提交成績（走 RPC，後端 upsert-if-better）。日期由伺服器 current_date 決定，不由前端傳入。
 export async function submitDailyScore(
-  challengeDate: string,
   playerId: string,
   playerName: string,
   s: SubmitStats,
@@ -58,7 +57,6 @@ export async function submitDailyScore(
       method: "POST",
       headers: headers(),
       body: JSON.stringify({
-        p_date: challengeDate,
         p_id: playerId,
         p_name: playerName,
         p_score: Math.round(s.score),
