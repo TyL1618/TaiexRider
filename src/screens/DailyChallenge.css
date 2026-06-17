@@ -46,6 +46,33 @@
 .daily-name { font-size: 1.05rem; color: var(--text); }
 .daily-period { font-size: 0.74rem; letter-spacing: 0.08em; color: var(--text-dim); }
 
+.nickname-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 0.8rem;
+  width: 100%;
+  justify-content: center;
+}
+.nickname-label {
+  font-size: 0.82rem;
+  color: var(--text-dim);
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+.nickname-input {
+  background: rgba(45, 226, 230, 0.06);
+  border: 1px solid rgba(45, 226, 230, 0.3);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 0.95rem;
+  padding: 0.3rem 0.6rem;
+  width: 10rem;
+  text-align: center;
+  outline: none;
+}
+.nickname-input:focus { border-color: var(--neon-cyan); }
+
 .daily-challenge-btn {
   margin-top: 1rem;
   padding: 0.85rem 2.4rem;

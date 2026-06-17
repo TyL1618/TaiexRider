@@ -6,11 +6,20 @@ import { createBike, resetBike, type Bike } from "./bike";
 import { BIKE, CAMERA, COLOR, DRIVE, RULES } from "./constants";
 import { APP_VERSION } from "../version";
 
+export interface GameOverStats {
+  score: number;
+  timeMs: number;
+  flips: number;
+  perfect: number;
+  finished: boolean;
+}
+
 interface GameCanvasProps {
   prices: number[];
   label: string;
   name: string;
   onExit: () => void;
+  onGameOver?: (stats: GameOverStats) => void;
 }
 
 interface Hud {
@@ -49,7 +58,7 @@ function flipScore(flips: number): number {
   return total;
 }
 
-export default function GameCanvas({ prices, label, name, onExit }: GameCanvasProps) {
+export default function GameCanvas({ prices, label, name, onExit, onGameOver }: GameCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [hud, setHud] = useState<Hud>({
     distance: 0,
@@ -74,6 +83,8 @@ export default function GameCanvas({ prices, label, name, onExit }: GameCanvasPr
   const dyingRef = useRef(false); // 死亡動畫進行中（在 useEffect 閉包內設定）
   const showChartRef = useRef(false); // 走勢圖模式（canvas 閉包即時讀取）
   const pausedRef = useRef(false); // 暫停（主迴圈閉包即時讀取）
+  const onGameOverRef = useRef(onGameOver);
+  onGameOverRef.current = onGameOver;
   overRef.current = crashed || finished || dyingRef.current;
   showChartRef.current = showChart;
   pausedRef.current = paused || confirmExit || showSettings; // 任一彈窗開啟也凍住遊戲
@@ -439,6 +450,7 @@ let crashTimer = 0;
         Body.setStatic(bike.rearWheel, true);
         Body.setStatic(bike.frontWheel, true);
         setFinished(true);
+        onGameOverRef.current?.({ score: points, timeMs: raceTimeMs, flips: totalFlips, perfect: perfectLandings, finished: true });
       }
       return { grounded: groundedNow, upright };
     };
@@ -897,6 +909,7 @@ let crashTimer = 0;
           dyingRef.current = false;
           setDying(false);
           setCrashed(true);
+          onGameOverRef.current?.({ score: points, timeMs: raceTimeMs, flips: totalFlips, perfect: perfectLandings, finished: false });
         }
       }
       // 鏡頭震動（暫時偏移，渲染後還原，不汙染 camX/camY 平滑狀態）

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import Sparkline from "../components/Sparkline";
 import { dailyTrack, dailyKey } from "../data/pick";
 import { fetchDailyTop, isLeaderboardConfigured, type ScoreRow } from "../lib/leaderboard";
+import { getPlayerName, setPlayerName } from "../lib/playerId";
 import type { TrackData } from "../data/tracks";
 import "./DailyChallenge.css";
 
@@ -22,6 +23,7 @@ export default function DailyChallenge({
   const dateStr = `${today.getFullYear()}/${String(today.getMonth() + 1).padStart(2, "0")}/${String(today.getDate()).padStart(2, "0")}`;
   const [rows, setRows] = useState<ScoreRow[]>([]);
   const [loaded, setLoaded] = useState(false);
+  const [nickname, setNickname] = useState(() => getPlayerName());
 
   useEffect(() => {
     window.history.pushState({ taiexDaily: true }, "");
@@ -60,6 +62,19 @@ export default function DailyChallenge({
           <span className="daily-name">{track.name}</span>
         </div>
         <div className="daily-period">近月日線 ・ 今日地圖</div>
+
+        <div className="nickname-row">
+          <label className="nickname-label">暱稱</label>
+          <input
+            className="nickname-input"
+            value={nickname}
+            maxLength={16}
+            onChange={(e) => {
+              setNickname(e.target.value);
+              setPlayerName(e.target.value);
+            }}
+          />
+        </div>
 
         <button className="daily-challenge-btn" onClick={() => onPlay(track)}>
           開始挑戰
