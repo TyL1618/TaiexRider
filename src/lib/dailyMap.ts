@@ -25,9 +25,9 @@ function headers() {
 }
 
 function nextDay(date: string): string {
-  const d = new Date(date + "T00:00:00");
-  d.setDate(d.getDate() + 1);
-  return d.toISOString().slice(0, 10);
+  // 用純 UTC 運算，避免本地時區偏移導致日期算錯（UTC+8 會讓 setDate+1 仍回傳同一天）
+  const [y, m, d] = date.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d + 1)).toISOString().slice(0, 10);
 }
 
 const _hardestCache = new Map<string, Promise<DailyMapRow | null>>();
