@@ -32,7 +32,7 @@
 | PWA | `vite-plugin-pwa` (Workbox) | `skipWaiting: true` / `clientsClaim: true`（v0.7.2 起新版即時接管）|
 | 後端/資料庫 | Supabase（Postgres + PostgREST + Auth） | 排行榜、每日地圖資料、Google 登入 |
 | 排程 | GitHub Actions cron（每日 21:05 台灣時間） | 抓全台上市股盤中資料存 Supabase |
-| 上架封裝 | Bubblewrap（TWA）— Phase 7 | PWA 包成 Android App Bundle |
+| 上架封裝 | PWABuilder（TWA）— Phase 7 進行中 | PWA 包成 Android 專案 → Android Studio 打包 |
 
 ---
 
@@ -234,19 +234,26 @@ src/
 | Phase 2 | ✅ | 真實股票資料：TWSE 抓取腳本 + 24 支預載 + 賽道選擇 UI |
 | Phase 3 | ✅ v0.5.0 | 三模式 UI：每日排名賽 / 隨機拉霸 / 自選賽道 |
 | Phase 4 | ✅ v0.6–0.7 | Supabase 後端：排行榜 + Google One Tap 登入 + 每日全台股自動更新（GitHub Actions） |
-| Phase 5 | 🔜 | PWA 離線快取（Service Worker + IndexedDB） |
-| Phase 6 | 🟡 v0.8.0 | 音效（Web Audio API 程式生成，v0.8.0 完成）；視覺打磨待續 |
-| Phase 7 | 🔜 | TWA 包裝 + Google Play 上架 |
+| Phase 5 | ✅ v0.9.0 | PWA 離線快取：Workbox runtimeCaching（每日地圖 SWR 24h / 排行榜 NetworkFirst 5s） |
+| Phase 6 | ✅ v0.8–0.9 | 音效（Web Audio API）、夜景城市背景、難度星等 HUD、爆炸粒子強化 |
+| Phase 7 | 🟡 進行中 | TWA 打包（PWABuilder + Android Studio）+ Google Play 上架 + AdMob B 廣告串接 |
 
 ---
 
 ## 9. 未來待辦
 
 - **ETF 含字母代號**：腳本 filter 從 `/^\d{4}$/` 改 `/^\d{4}[A-Z]?$/` 即可納入 00981A 等
-- **Phase 5 離線快取**：每日地圖資料存 IndexedDB，週末 / 無網路仍可玩
-- **Phase 6 視覺打磨**：音效已完成（v0.8.0）；視覺特效待續（粒子優化 / 霓虹光暈等）
-- **Phase 7 TWA**：Bubblewrap 包裝 + Digital Asset Links + Google Play 上架素材
-- **商業模式（Phase 10+）**：看廣告復活一次 / IAP 永久去廣告 / AdMob
+- **ETF 含字母代號**：腳本 filter 從 `/^\d{4}$/` 改 `/^\d{4}[A-Z]?$/` 即可納入 00981A 等
+- **Phase 7 TWA 打包（進行中）**：
+  1. PWABuilder（pwabuilder.com）→ Package ID `com.tylapp.taiexrider`，Include source code 打勾，選 **Other Android** tab 下載 zip
+  2. Android Studio 開啟專案 → Build → 產生 APK/AAB
+  3. Digital Asset Links（`/.well-known/assetlinks.json`）確認網站所有權
+  4. Play Console 上傳 AAB → Internal Testing → 正式發布
+- **AdMob 廣告（Phase 7 後段）**：
+  - 方案 B（Native SDK）：在 Android 專案加 Gradle dependency + JS Bridge
+  - 死亡後「看廣告復活？」→ `window.AdBridge.showRewardedAd()` → 回調復活
+  - IAP：Google Play Billing API（同樣走 JS Bridge）
+- **商業模式**：看廣告復活一次（AdMob Rewarded）/ IAP 永久去廣告
 
 ---
 
