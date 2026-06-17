@@ -145,13 +145,17 @@ export function buildTerrainBodies(track: Track): Body[] {
   // 頂緣兩頂點維持精確不動 → 頂面=折線完全不變、零凸角，手感不受影響。
   const overlap = TRACK.segmentWidth;
 
+  // 頂部左右各多延伸 3px，讓相鄰梯形在頂面接縫處有小重疊，
+  // 消除輪子（圓形）從斜角落在兩段 K 棒接縫時插入縫隙的 bug。
+  const topExtra = 3;
+
   for (let i = 0; i < vertices.length - 1; i++) {
     const a = vertices[i];
     const b = vertices[i + 1];
     // 凸梯形（y 向下，順時針），上窄下寬：左上 → 右上 → 右下(外擴) → 左下(外擴)
     const verts = [
-      { x: a.x, y: a.y },
-      { x: b.x, y: b.y },
+      { x: a.x - topExtra, y: a.y },
+      { x: b.x + topExtra, y: b.y },
       { x: b.x + overlap, y: baseY },
       { x: a.x - overlap, y: baseY },
     ];
