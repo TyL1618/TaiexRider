@@ -10,7 +10,7 @@ import "./DailyChallenge.css";
 
 const fmtMs = (ms: number) => {
   const s = ms / 1000;
-  return `${Math.floor(s / 60)}:${(s % 60).toFixed(1).padStart(4, "0")}`;
+  return `${Math.floor(s / 60)}:${(s % 60).toFixed(3).padStart(6, "0")}`;
 };
 
 export default function DailyChallenge({
