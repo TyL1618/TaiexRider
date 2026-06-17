@@ -33,7 +33,10 @@ async function generateNonce(): Promise<[string, string]> {
   const rawNonce = btoa(String.fromCharCode(...rawBytes));
   const encoded = new TextEncoder().encode(rawNonce);
   const hashBuf = await crypto.subtle.digest("SHA-256", encoded);
-  const hashedNonce = btoa(String.fromCharCode(...new Uint8Array(hashBuf)));
+  // Google GSI 與 Supabase 都期待 hex 格式的 SHA-256 hash（不是 base64）
+  const hashedNonce = Array.from(new Uint8Array(hashBuf))
+    .map(b => b.toString(16).padStart(2, "0"))
+    .join("");
   return [rawNonce, hashedNonce]; // [傳給 Supabase, 傳給 GSI]
 }
 
@@ -68,11 +71,12 @@ export async function signInWithGoogle(): Promise<void> {
     nonce: hashedNonce,         // GSI 收 SHA-256 hash（base64）
     cancel_on_tap_outside: true,
     callback: async ({ credential }) => {
-      await supabase.auth.signInWithIdToken({
+      const { error } = await supabase.auth.signInWithIdToken({
         provider: "google",
         token: credential,
         nonce: rawNonce,        // Supabase 收原始 nonce
       });
+      if (error) { console.error("[auth] signInWithIdToken failed:", error.message); doRedirect(); }
     },
   });
   window.google!.accounts.id.prompt((n) => {
