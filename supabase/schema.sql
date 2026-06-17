@@ -46,7 +46,7 @@ as $$
 begin
   -- 合理性驗證：任何一條不過就靜默拒絕（不回傳錯誤，避免攻擊者得到線索）
   if p_score  < 0      or p_score  > 50000   then return; end if;
-  if p_time   < 5000   or p_time   > 7200000 then return; end if;
+  if p_time   < 1000   or p_time   > 7200000 then return; end if;
   if p_flips  < 0      or p_flips  > 50      then return; end if;
   if p_perfect < 0     or p_perfect > 50     then return; end if;
   -- UUID 格式驗證（8-4-4-4-12 hex）
