@@ -150,6 +150,14 @@
 .track-name { font-size: 0.95rem; color: var(--text); }
 .track-desc { font-size: 0.75rem; color: var(--text-dim); letter-spacing: 0.05em; }
 
+.list-sentinel {
+  padding: 1rem 0 0.5rem;
+  font-size: 0.72rem;
+  color: var(--text-dim);
+  letter-spacing: 0.06em;
+  text-align: center;
+}
+
 /* 選取中載入遮罩 */
 .select-screen.is-picking .track-list { opacity: 0.45; pointer-events: none; }
 

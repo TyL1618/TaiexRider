@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { TRACKS, difficultyStars, trackDifficulty, type TrackData } from "./data/tracks";
 import { fetchDailyMapList, fetchStockDailyMap, type DailyMapMeta } from "./lib/dailyMap";
 import { dailyKey } from "./data/pick";
@@ -8,6 +8,7 @@ type Mode = "intraday" | "monthly";
 type SortBy = "code" | "difficulty";
 
 const SORT_LABELS: Record<SortBy, string> = { code: "股號", difficulty: "困難度" };
+const PAGE = 30; // 每次多顯示幾筆
 
 const LOCAL_MONTHLY  = TRACKS.filter((t) => t.mode === "monthly");
 const LOCAL_INTRADAY = TRACKS.filter((t) => t.mode === "intraday");
@@ -33,6 +34,11 @@ export default function TrackSelect({
   const [remoteList, setRemote]   = useState<DailyMapMeta[]>([]);
   const [remoteLoaded, setLoaded] = useState(false);
   const [picking, setPicking]     = useState(false);
+  const [visibleCount, setVisible] = useState(PAGE);
+  const sentinelRef = useRef<HTMLDivElement>(null);
+
+  // 篩選條件改變時重置可見數量
+  useEffect(() => { setVisible(PAGE); }, [mode, sortBy, query]);
 
   useEffect(() => {
     window.history.pushState({ taiexCustom: true }, "");
@@ -44,6 +50,18 @@ export default function TrackSelect({
   useEffect(() => {
     fetchDailyMapList(dailyKey()).then((list) => { setRemote(list); setLoaded(true); });
   }, []);
+
+  // 捲到底自動載入更多（IntersectionObserver 偵測 sentinel 進入畫面）
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      ([e]) => { if (e.isIntersecting) setVisible((n) => n + PAGE); },
+      { rootMargin: "200px" },
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }); // 無 deps：每次 render 後重新 attach，確保 sentinel 位置正確
 
   // 前日盤中：優先 Supabase，fallback 本地 24 支
   const intradayList = useMemo(() => {
@@ -66,7 +84,6 @@ export default function TrackSelect({
 
   const handlePickIntraday = useCallback(async (item: DailyMapMeta) => {
     if (picking) return;
-    // 本地有的直接用，免去一次 Supabase round-trip
     const local = LOCAL_INTRADAY.find((t) => t.label === item.stock_code);
     if (local) { onPick(local); return; }
     setPicking(true);
@@ -77,6 +94,9 @@ export default function TrackSelect({
   }, [picking, onPick]);
 
   const intradayCount = remoteList.length > 0 ? remoteList.length : LOCAL_INTRADAY.length;
+  const activeList    = mode === "intraday" ? intradayList : monthlyList;
+  const visibleList   = activeList.slice(0, visibleCount);
+  const hasMore       = visibleCount < activeList.length;
 
   return (
     <div className={`select-screen${picking ? " is-picking" : ""}`}>
@@ -115,46 +135,49 @@ export default function TrackSelect({
       </div>
 
       <div className="track-list">
-        {mode === "intraday" ? (
-          !remoteLoaded && remoteList.length === 0 ? (
-            <p className="empty-hint">市場資料載入中…</p>
-          ) : intradayList.length === 0 ? (
-            <p className="empty-hint">找不到「{query}」</p>
-          ) : (
-            intradayList.map((t) => (
-              <button
-                key={t.stock_code}
-                className="track-card"
-                onClick={() => handlePickIntraday(t)}
-                disabled={picking}
-              >
-                <div className="track-card-row">
-                  <span className="track-label">{t.stock_code}</span>
-                  <span className="track-name">{t.stock_name}</span>
-                  <span className="track-diff">{"★".repeat(starsFromScore(t.difficulty))}</span>
-                </div>
-                <span className="track-desc">前日盤中走勢</span>
-              </button>
-            ))
-          )
+        {mode === "intraday" && !remoteLoaded && remoteList.length === 0 ? (
+          <p className="empty-hint">市場資料載入中…</p>
+        ) : activeList.length === 0 ? (
+          <p className="empty-hint">
+            找不到「{query}」
+            {mode === "monthly" && <><br /><span className="empty-sub">近月日線收錄精選 {LOCAL_MONTHLY.length} 支</span></>}
+          </p>
         ) : (
-          monthlyList.length === 0 ? (
-            <p className="empty-hint">
-              找不到「{query}」<br />
-              <span className="empty-sub">近月日線收錄精選 {LOCAL_MONTHLY.length} 支</span>
-            </p>
-          ) : (
-            monthlyList.map((t) => (
-              <button key={t.label} className="track-card" onClick={() => onPick(t)}>
-                <div className="track-card-row">
-                  <span className="track-label">{t.label}</span>
-                  <span className="track-name">{t.name}</span>
-                  <span className="track-diff">{"★".repeat(difficultyStars(t.prices))}</span>
-                </div>
-                <span className="track-desc">{t.desc}</span>
-              </button>
-            ))
-          )
+          <>
+            {mode === "intraday"
+              ? visibleList.map((t) => (
+                  <button
+                    key={(t as DailyMapMeta).stock_code}
+                    className="track-card"
+                    onClick={() => handlePickIntraday(t as DailyMapMeta)}
+                    disabled={picking}
+                  >
+                    <div className="track-card-row">
+                      <span className="track-label">{(t as DailyMapMeta).stock_code}</span>
+                      <span className="track-name">{(t as DailyMapMeta).stock_name}</span>
+                      <span className="track-diff">{"★".repeat(starsFromScore((t as DailyMapMeta).difficulty))}</span>
+                    </div>
+                    <span className="track-desc">前日盤中走勢</span>
+                  </button>
+                ))
+              : visibleList.map((t) => (
+                  <button key={(t as TrackData).label} className="track-card" onClick={() => onPick(t as TrackData)}>
+                    <div className="track-card-row">
+                      <span className="track-label">{(t as TrackData).label}</span>
+                      <span className="track-name">{(t as TrackData).name}</span>
+                      <span className="track-diff">{"★".repeat(difficultyStars((t as TrackData).prices))}</span>
+                    </div>
+                    <span className="track-desc">{(t as TrackData).desc}</span>
+                  </button>
+                ))}
+
+            {/* sentinel：捲到底觸發載入更多 */}
+            <div ref={sentinelRef} className="list-sentinel">
+              {hasMore
+                ? `顯示 ${visibleList.length} / ${activeList.length} 支`
+                : activeList.length > PAGE ? `全部 ${activeList.length} 支已顯示` : ""}
+            </div>
+          </>
         )}
       </div>
 
