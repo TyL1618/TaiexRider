@@ -425,8 +425,21 @@ let crashTimer = 0;
       });
       // 空中完全卡住：飛行中 speed ≈ 6.9，只有真死局（卡谷等）才 < 0.5
       const stuckMidAir = bothWheelsOff && speed < 0.5;
-      const goneWrong = topHit || stuckMidAir;
-      if (goneWrong && !overRef.current) {
+      // topHit（車頂碰地）：瞬間定格，不等計時器
+      if (topHit && !overRef.current) {
+        Body.setStatic(bike.chassis, true);
+        Body.setStatic(bike.rearWheel, true);
+        Body.setStatic(bike.frontWheel, true);
+        spawnDeathParticles(bike.chassis.position.x, bike.chassis.position.y);
+        deathFlashAlpha = 1.0;
+        deathShakeAmp = 8;
+        deathElapsed = 0;
+        overRef.current = true;
+        dyingRef.current = true;
+        setDying(true);
+        crashTimer = 0;
+      } else if (stuckMidAir && !overRef.current) {
+        // stuckMidAir 仍需計時確認（瞬間速度<0.5 可能是正常落地）
         crashTimer += dtMs / 1000;
         if (crashTimer >= RULES.crashUpsideDownSec) {
           Body.setStatic(bike.chassis, true);
@@ -436,7 +449,7 @@ let crashTimer = 0;
           deathFlashAlpha = 1.0;
           deathShakeAmp = 8;
           deathElapsed = 0;
-          overRef.current = true; // 立即阻止物理，不等下次 React 重渲染
+          overRef.current = true;
           dyingRef.current = true;
           setDying(true);
         }

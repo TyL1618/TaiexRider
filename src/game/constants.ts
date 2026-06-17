@@ -12,8 +12,9 @@ export const TRACK = {
   baselineY: 560, // 賽道基準線 (世界座標 y，越大越下面)
   startFlat: 4, // 起點平台補幾個平坦點
   endFlat: 3, // 終點平台補幾個平坦點
-  // 斜率限制：相鄰兩點高度差上限 = tan(maxSlopeDeg) * segmentWidth
-  maxSlopeDeg: 75,
+  // 斜率限制（非對稱）：下坡保留陡度刺激感，上坡限制確保車子爬得上去
+  maxDownSlopeDeg: 75,
+  maxUpSlopeDeg: 55,
   flatBottomW: 80,  // V 谷夾角 < 90° 時插入的平底寬度 (px)，約一個車身長
 } as const;
 

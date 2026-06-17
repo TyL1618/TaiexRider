@@ -17,7 +17,7 @@ export interface Track {
 
 // 價格陣列 → 賽道頂點（DEVDOC 第 4 節）
 export function pricesToTrack(prices: number[]): Track {
-  const { segmentWidth, heightRange, heightMin, heightMax, refPct, baselineY, startFlat, endFlat, maxSlopeDeg, flatBottomW } =
+  const { segmentWidth, heightRange, heightMin, heightMax, refPct, baselineY, startFlat, endFlat, maxDownSlopeDeg, maxUpSlopeDeg, flatBottomW } =
     TRACK;
 
   // 1. 正規化高度（依波動度動態縮放：越狂野的股票地形越高）
@@ -44,22 +44,25 @@ export function pricesToTrack(prices: number[]): Track {
     ...Array(endFlat).fill(prices[prices.length - 1]),
   ];
 
-  // 2. 水平間距固定 + 3. 斜率限制（夾平過陡段，確保爬得上去）
-  const maxDelta = Math.tan((maxSlopeDeg * Math.PI) / 180) * segmentWidth;
+  // 2. 水平間距固定 + 3. 斜率限制（非對稱：下坡 75°/上坡 55°）
+  const maxDeltaDown = Math.tan((maxDownSlopeDeg * Math.PI) / 180) * segmentWidth;
+  const maxDeltaUp   = Math.tan((maxUpSlopeDeg   * Math.PI) / 180) * segmentWidth;
   const vertices: Vec2[] = [];
   let prevY = toY(padded[0]);
   for (let i = 0; i < padded.length; i++) {
     let y = toY(padded[i]);
     if (i > 0) {
       const dy = y - prevY;
-      if (Math.abs(dy) > maxDelta) y = prevY + Math.sign(dy) * maxDelta;
+      // dy > 0 = 地形往下（下坡）；dy < 0 = 地形往上（上坡）
+      const limit = dy > 0 ? maxDeltaDown : maxDeltaUp;
+      if (Math.abs(dy) > limit) y = prevY + Math.sign(dy) * limit;
     }
     vertices.push({ x: i * segmentWidth, y });
     prevY = y;
   }
 
-  // 後處理：V 谷夾角 < 90°（h1×h2 > segW²）時插入一小段平底，讓車有地方轉向再爬坡
-  const threshold = segmentWidth * segmentWidth;
+  // 後處理：上坡 h2 > segmentWidth（>45°）時插入平底，確保車有地方起跑爬坡
+  // 原條件 h1*h2 > segW² 在「緩下坡接陡上坡」時 h1 很小導致條件失敗，改為只看上坡高度。
   const finalVerts: Vec2[] = [];
   let xOff = 0;
   for (let i = 0; i < vertices.length; i++) {
@@ -69,9 +72,8 @@ export function pricesToTrack(prices: number[]): Track {
       i < vertices.length - 1 &&
       vertices[i].y > vertices[i - 1].y &&  // came down (y 向下為正)
       vertices[i].y > vertices[i + 1].y;    // going up
-    const h1 = isValley ? vertices[i].y - vertices[i - 1].y : 0;
     const h2 = isValley ? vertices[i].y - vertices[i + 1].y : 0;
-    if (isValley && h1 * h2 > threshold) {
+    if (isValley && h2 > segmentWidth) {
       // 插入平底段：同高度、往右延伸 flatBottomW
       xOff += flatBottomW;
       finalVerts.push({ x: vertices[i].x + xOff, y: vertices[i].y });
