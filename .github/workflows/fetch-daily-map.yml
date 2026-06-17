@@ -2,7 +2,7 @@ name: Fetch Daily Map
 
 on:
   schedule:
-    - cron: '5 16 * * *'  # 00:05 台灣時間（UTC+8），每天執行
+    - cron: '5 13 * * *'  # 21:05 台灣時間（UTC+8），收盤後備好明日地圖
   workflow_dispatch:        # 允許手動觸發測試
 
 jobs:

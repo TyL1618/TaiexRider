@@ -43,9 +43,10 @@ async function main() {
     process.exit(1);
   }
 
-  // 台灣時間 = UTC+8
+  // 台灣時間 = UTC+8；21:05 跑時存「明天」的 map_date，讓 00:00 時前端就能讀到
   const nowTW = new Date(Date.now() + 8 * 3_600_000);
-  const mapDate = nowTW.toISOString().slice(0, 10); // YYYY-MM-DD，今日台灣日期
+  const tomorrowTW = new Date(nowTW.getTime() + 86_400_000);
+  const mapDate = tomorrowTW.toISOString().slice(0, 10); // YYYY-MM-DD，明日台灣日期
 
   console.log(`目標 map_date: ${mapDate}`);
 
