@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.5.1";
+export const APP_VERSION = "0.7.2";
 
 export interface ChangelogEntry {
   date: string;
@@ -6,6 +6,28 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    date: "2026-06-17 (v0.7.2)",
+    notes: [
+      "自選賽道 / 隨機拉霸：清單從 Supabase 全台上市股（~1000 支）動態讀取，不再侷限內建 24 支",
+      "自選賽道：無限捲動（每次多載 30 筆，捲到底自動觸發）",
+      "隨機拉霸：每次轉動從全台股隨機抽籤，不再只抽 24 支",
+      "修正查詢日期時區 bug（UTC+8 環境下 nextDay 計算錯誤導致仍讀到空資料）",
+      "首頁返回鍵修正：確定離開後不再留在原頁、返回鍵恢復正常",
+      "Service Worker 改為 skipWaiting + clientsClaim，新版部署後重整一次即生效",
+    ],
+  },
+  {
+    date: "2026-06-17 (v0.7.1)",
+    notes: [
+      "Google One Tap 登入：彈出式登入不跳離頁面，GSI 封鎖時自動 fallback 跳轉",
+      "首次登入自動帶入 Google 顯示名稱為排行榜暱稱",
+      "每日排名賽：未登入顯示 Google 登入按鈕；已登入顯示暱稱；⚙ 可改暱稱或登出",
+      "修正 OAuth 返回後誤觸「是否離開遊戲」確認視窗",
+      "每日地圖擴充至全台上市股（~1000 支）：每日 21:05 GitHub Actions 自動更新",
+      "自選 / 排行榜快取：進頁面時幾乎零等待；提交成績後自動清除當日快取",
+    ],
+  },
   {
     date: "2026-06-17 (v0.5.1)",
     notes: [
