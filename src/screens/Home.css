@@ -113,18 +113,111 @@
 }
 .settings-nickname-input:focus { border-color: var(--neon-cyan); }
 
+/* 確認更改鈕：字串有改動才亮起 */
+.settings-confirm-btn {
+  width: 100%;
+  padding: 0.42rem;
+  font-size: 0.82rem;
+  letter-spacing: 0.06em;
+  background: transparent;
+  border: 1px solid rgba(45, 226, 230, 0.18);
+  border-radius: 7px;
+  color: rgba(45, 226, 230, 0.28);
+  cursor: default;
+  transition: all 0.18s;
+  margin-top: 0.25rem;
+}
+.settings-confirm-btn.enabled {
+  border-color: var(--neon-cyan);
+  color: var(--neon-cyan);
+  cursor: pointer;
+  box-shadow: 0 0 10px rgba(45, 226, 230, 0.22);
+}
+.settings-confirm-btn.enabled:active { transform: scale(0.97); }
+
+/* 版本 + 更新日誌 同排 */
+.settings-meta-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 0.75rem;
+}
+.settings-version-text {
+  font-size: 0.82rem;
+  color: var(--text-dim);
+}
+.settings-changelog-btn {
+  font-size: 0.82rem;
+  letter-spacing: 0.06em;
+  color: var(--neon-cyan);
+  background: transparent;
+  border: 1px solid rgba(45, 226, 230, 0.38);
+  border-radius: 6px;
+  padding: 0.28rem 0.75rem;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.settings-changelog-btn:hover {
+  border-color: var(--neon-cyan);
+  box-shadow: 0 0 10px rgba(45, 226, 230, 0.25);
+}
+
+/* 登出區：頂部紅線分隔，底部留間距 */
+.settings-signout-area {
+  width: 100%;
+  padding-top: 0.65rem;
+  border-top: 1px solid rgba(255, 80, 80, 0.15);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
 .settings-signout-btn {
-  align-self: flex-end;
   background: none;
   border: 1px solid rgba(255, 100, 100, 0.4);
   border-radius: 6px;
   color: rgba(255, 120, 120, 0.9);
-  font-size: 0.78rem;
-  padding: 0.25rem 0.75rem;
+  font-size: 0.82rem;
+  padding: 0.32rem 1.2rem;
   cursor: pointer;
   letter-spacing: 0.04em;
+  transition: all 0.15s;
 }
+.settings-signout-btn:hover { border-color: rgba(255, 100, 100, 0.7); }
 .settings-signout-btn:active { opacity: 0.7; }
+
+.settings-logout-confirm {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.55rem;
+  width: 100%;
+}
+.settings-logout-text {
+  font-size: 0.88rem;
+  color: rgba(255, 140, 140, 0.9);
+}
+.settings-logout-btns {
+  display: flex;
+  gap: 0.6rem;
+}
+.settings-cancel-btn {
+  background: none;
+  border: 1px solid rgba(45, 226, 230, 0.3);
+  border-radius: 6px;
+  color: var(--text-dim);
+  font-size: 0.82rem;
+  padding: 0.32rem 1.1rem;
+  cursor: pointer;
+  letter-spacing: 0.04em;
+  transition: all 0.15s;
+}
+.settings-cancel-btn:hover { border-color: var(--neon-cyan); color: var(--neon-cyan); }
+
+/* 關閉鈕：與登出拉開距離 */
+.settings-close-btn { margin-top: 0.3rem; }
 
 .settings-account-hint {
   font-size: 0.8rem;

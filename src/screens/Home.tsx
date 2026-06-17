@@ -10,9 +10,35 @@ export default function Home({ user, onNav }: { user: User | null; onNav: (s: Sc
   const [showSettings, setShowSettings] = useState(false);
   const [showLog, setShowLog]           = useState(false);
   const [nickname, setNickname]         = useState(() => getPlayerName());
+  const [savedName, setSavedName]       = useState(() => getPlayerName());
+  const [logoutConfirm, setLogoutConfirm] = useState(false);
 
-  // 登入後同步最新暱稱（Google 名稱可能剛寫入 localStorage）
-  useEffect(() => { setNickname(getPlayerName()); }, [user]);
+  useEffect(() => {
+    const n = getPlayerName();
+    setNickname(n);
+    setSavedName(n);
+  }, [user]);
+
+  const isDirty = nickname.trim() !== savedName;
+
+  const handleSaveName = () => {
+    const trimmed = nickname.trim() || savedName;
+    setPlayerName(trimmed);
+    setSavedName(trimmed);
+    setNickname(trimmed);
+  };
+
+  const handleSignOut = () => {
+    signOut();
+    setShowSettings(false);
+    setLogoutConfirm(false);
+  };
+
+  const handleCloseSettings = () => {
+    setShowSettings(false);
+    setLogoutConfirm(false);
+    if (isDirty) setNickname(savedName);
+  };
 
   return (
     <div className="home-screen">
@@ -44,7 +70,7 @@ export default function Home({ user, onNav }: { user: User | null; onNav: (s: Sc
       <p className="home-foot">純娛樂・非投資建議</p>
 
       {showSettings && (
-        <div className="modal-overlay" onClick={() => setShowSettings(false)}>
+        <div className="modal-overlay" onClick={handleCloseSettings}>
           <div className="modal-panel" onClick={(e) => e.stopPropagation()}>
             <div className="modal-title">設定</div>
 
@@ -61,14 +87,15 @@ export default function Home({ user, onNav }: { user: User | null; onNav: (s: Sc
                     className="settings-nickname-input"
                     value={nickname}
                     maxLength={16}
-                    onChange={(e) => {
-                      setNickname(e.target.value);
-                      setPlayerName(e.target.value);
-                    }}
+                    onChange={(e) => setNickname(e.target.value)}
                   />
                 </div>
-                <button className="settings-signout-btn" onClick={() => { signOut(); setShowSettings(false); }}>
-                  登出
+                <button
+                  className={`settings-confirm-btn${isDirty ? " enabled" : ""}`}
+                  disabled={!isDirty}
+                  onClick={handleSaveName}
+                >
+                  確認更改
                 </button>
               </div>
             ) : (
@@ -81,11 +108,37 @@ export default function Home({ user, onNav }: { user: User | null; onNav: (s: Sc
             )}
 
             <div className="modal-item">音量（待實作）</div>
-            <div className="modal-item dim">版本 v{APP_VERSION}</div>
-            <button className="modal-link" onClick={() => { setShowSettings(false); setShowLog(true); }}>
-              更新日誌 ›
-            </button>
-            <button className="modal-btn" onClick={() => setShowSettings(false)}>關閉</button>
+
+            <div className="settings-meta-row">
+              <span className="settings-version-text">版本 v{APP_VERSION}</span>
+              <button
+                className="settings-changelog-btn"
+                onClick={() => { setShowSettings(false); setShowLog(true); }}
+              >
+                更新日誌
+              </button>
+            </div>
+
+            {/* 登出區 - 置底，與關閉按鈕有間距 */}
+            {user && (
+              <div className="settings-signout-area">
+                {logoutConfirm ? (
+                  <div className="settings-logout-confirm">
+                    <span className="settings-logout-text">確定要登出？</span>
+                    <div className="settings-logout-btns">
+                      <button className="settings-signout-btn" onClick={handleSignOut}>確定</button>
+                      <button className="settings-cancel-btn" onClick={() => setLogoutConfirm(false)}>取消</button>
+                    </div>
+                  </div>
+                ) : (
+                  <button className="settings-signout-btn" onClick={() => setLogoutConfirm(true)}>
+                    登出
+                  </button>
+                )}
+              </div>
+            )}
+
+            <button className="modal-btn settings-close-btn" onClick={handleCloseSettings}>關閉</button>
           </div>
         </div>
       )}

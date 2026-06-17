@@ -6,9 +6,11 @@ import "./TrackSelect.css";
 
 type Mode = "intraday" | "monthly";
 type SortBy = "code" | "difficulty";
+type SortDir = "asc" | "desc";
 
 const SORT_LABELS: Record<SortBy, string> = { code: "股號", difficulty: "困難度" };
-const PAGE = 30; // 每次多顯示幾筆
+const DEFAULT_DIR: Record<SortBy, SortDir> = { code: "asc", difficulty: "desc" };
+const PAGE = 30;
 
 const LOCAL_MONTHLY  = TRACKS.filter((t) => t.mode === "monthly");
 const LOCAL_INTRADAY = TRACKS.filter((t) => t.mode === "intraday");
@@ -30,6 +32,7 @@ export default function TrackSelect({
 }) {
   const [mode, setMode]           = useState<Mode>("intraday");
   const [sortBy, setSortBy]       = useState<SortBy>("code");
+  const [sortDir, setSortDir]     = useState<SortDir>("asc");
   const [query, setQuery]         = useState("");
   const [remoteList, setRemote]   = useState<DailyMapMeta[]>([]);
   const [remoteLoaded, setLoaded] = useState(false);
@@ -38,7 +41,16 @@ export default function TrackSelect({
   const sentinelRef = useRef<HTMLDivElement>(null);
 
   // 篩選條件改變時重置可見數量
-  useEffect(() => { setVisible(PAGE); }, [mode, sortBy, query]);
+  useEffect(() => { setVisible(PAGE); }, [mode, sortBy, sortDir, query]);
+
+  const handleSortClick = (s: SortBy) => {
+    if (sortBy === s) {
+      setSortDir((d) => d === "asc" ? "desc" : "asc");
+    } else {
+      setSortBy(s);
+      setSortDir(DEFAULT_DIR[s]);
+    }
+  };
 
   useEffect(() => {
     fetchDailyMapList(dailyKey()).then((list) => { setRemote(list); setLoaded(true); });
@@ -56,24 +68,41 @@ export default function TrackSelect({
     return () => obs.disconnect();
   }); // 無 deps：每次 render 後重新 attach，確保 sentinel 位置正確
 
-  // 前日盤中：優先 Supabase，fallback 本地 24 支
+  // 前日盤勢：優先 Supabase，fallback 本地 24 支
   const intradayList = useMemo(() => {
     const src: DailyMapMeta[] = remoteList.length > 0
       ? remoteList
       : LOCAL_INTRADAY.map((t) => ({ stock_code: t.label, stock_name: t.name, difficulty: trackDifficulty(t.prices) }));
     const q = query.trim().toLowerCase();
     let out = q ? src.filter((t) => t.stock_code.includes(q) || t.stock_name.toLowerCase().includes(q)) : src;
-    if (sortBy === "difficulty") out = [...out].sort((a, b) => b.difficulty - a.difficulty);
+    if (sortBy === "difficulty") {
+      out = [...out].sort((a, b) => sortDir === "desc" ? b.difficulty - a.difficulty : a.difficulty - b.difficulty);
+    } else {
+      out = [...out].sort((a, b) => {
+        const cmp = a.stock_code.localeCompare(b.stock_code);
+        return sortDir === "asc" ? cmp : -cmp;
+      });
+    }
     return out;
-  }, [remoteList, sortBy, query]);
+  }, [remoteList, sortBy, sortDir, query]);
 
   // 近月日線：本地 24 支
   const monthlyList = useMemo(() => {
     const q = query.trim().toLowerCase();
     let out = q ? LOCAL_MONTHLY.filter((t) => t.label.toLowerCase().includes(q) || t.name.toLowerCase().includes(q)) : LOCAL_MONTHLY;
-    if (sortBy === "difficulty") out = [...out].sort((a, b) => trackDifficulty(b.prices) - trackDifficulty(a.prices));
+    if (sortBy === "difficulty") {
+      out = [...out].sort((a, b) => {
+        const diff = trackDifficulty(b.prices) - trackDifficulty(a.prices);
+        return sortDir === "desc" ? diff : -diff;
+      });
+    } else {
+      out = [...out].sort((a, b) => {
+        const cmp = (a as typeof LOCAL_MONTHLY[0]).label.localeCompare((b as typeof LOCAL_MONTHLY[0]).label);
+        return sortDir === "asc" ? cmp : -cmp;
+      });
+    }
     return out;
-  }, [sortBy, query]);
+  }, [sortBy, sortDir, query]);
 
   const handlePickIntraday = useCallback(async (item: DailyMapMeta) => {
     if (picking) return;
@@ -98,7 +127,7 @@ export default function TrackSelect({
 
       <div className="mode-tabs">
         <button className={`mode-tab ${mode === "intraday" ? "active" : ""}`} onClick={() => setMode("intraday")}>
-          前日盤中
+          前日盤勢
           <span className="mode-tab-desc">
             {remoteLoaded ? `${intradayCount} 支` : "載入中…"}・盤中走勢
           </span>
@@ -120,8 +149,8 @@ export default function TrackSelect({
         />
         <div className="sort-group">
           {(Object.keys(SORT_LABELS) as SortBy[]).map((s) => (
-            <button key={s} className={`sort-btn ${sortBy === s ? "active" : ""}`} onClick={() => setSortBy(s)}>
-              {SORT_LABELS[s]}
+            <button key={s} className={`sort-btn ${sortBy === s ? "active" : ""}`} onClick={() => handleSortClick(s)}>
+              {SORT_LABELS[s]}{sortBy === s ? (sortDir === "asc" ? " ↑" : " ↓") : ""}
             </button>
           ))}
         </div>
@@ -150,7 +179,7 @@ export default function TrackSelect({
                       <span className="track-name">{(t as DailyMapMeta).stock_name}</span>
                       <span className="track-diff">{"★".repeat(starsFromScore((t as DailyMapMeta).difficulty))}</span>
                     </div>
-                    <span className="track-desc">前日盤中走勢</span>
+                    <span className="track-desc">前日盤勢</span>
                   </button>
                 ))
               : visibleList.map((t) => (

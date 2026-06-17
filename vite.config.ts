@@ -26,10 +26,35 @@ export default defineConfig({
         ],
       },
       workbox: {
-        // 靜態資源 cache-first；每日賽道 API 之後在 Phase 5 再加 runtimeCaching
         globPatterns: ["**/*.{js,css,html,svg,png,woff2}"],
         skipWaiting: true,
         clientsClaim: true,
+        runtimeCaching: [
+          {
+            // 每日地圖：StaleWhileRevalidate，快取 24 小時
+            urlPattern: /\/rest\/v1\/daily_map/,
+            handler: "StaleWhileRevalidate" as const,
+            options: {
+              cacheName: "daily-map-v1",
+              expiration: { maxAgeSeconds: 60 * 60 * 24, maxEntries: 5 },
+            },
+          },
+          {
+            // 排行榜：NetworkFirst，失敗 fallback 到快取（5 分鐘有效）
+            urlPattern: /\/rest\/v1\/daily_scores/,
+            handler: "NetworkFirst" as const,
+            options: {
+              cacheName: "leaderboard-v1",
+              networkTimeoutSeconds: 5,
+              expiration: { maxAgeSeconds: 60 * 5, maxEntries: 5 },
+            },
+          },
+          {
+            // Supabase RPC（submit 等寫入）：NetworkOnly，不快取
+            urlPattern: /\/rest\/v1\/rpc\//,
+            handler: "NetworkOnly" as const,
+          },
+        ],
       },
       devOptions: {
         enabled: false,

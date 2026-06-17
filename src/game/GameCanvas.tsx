@@ -49,6 +49,70 @@ function angleDelta(prev: number, next: number): number {
   return d;
 }
 
+function calcDifficulty(prices: number[]): number {
+  let max = 0;
+  for (let i = 1; i < prices.length; i++) {
+    const pct = Math.abs(prices[i] / prices[i - 1] - 1);
+    if (pct > max) max = pct;
+  }
+  return max;
+}
+
+function difficultyStars(d: number): number {
+  if (d < 0.005) return 1;
+  if (d < 0.02)  return 2;
+  if (d < 0.05)  return 3;
+  if (d < 0.085) return 4;
+  return 5;
+}
+
+// 輕量偽隨機（seeded），給城市天際線用
+function seededRand(seed: number) {
+  let s = (seed ^ 0xdeadbeef) >>> 0;
+  return () => {
+    s = Math.imul(s ^ (s >>> 16), 0x45d9f3b);
+    s = Math.imul(s ^ (s >>> 16), 0x45d9f3b);
+    s = (s ^ (s >>> 16)) >>> 0;
+    return s / 0xffffffff;
+  };
+}
+
+type CityBuilding = {
+  x: number; w: number; hFrac: number;
+  windows: { lx: number; lyFrac: number; color: string }[];
+};
+
+// 生成城市天際線建築群（虛擬寬度 BPERIOD，用 parallax mod 循環）
+const BPERIOD = 2400;
+function generateCity(seed: number): CityBuilding[] {
+  const rand = seededRand(seed);
+  const buildings: CityBuilding[] = [];
+  let bx = 0;
+  while (bx < BPERIOD) {
+    const bw = 30 + rand() * 60;
+    const hFrac = 0.07 + rand() * 0.52;
+    const rows = Math.floor(hFrac * 680 / 16);
+    const cols = Math.max(1, Math.floor((bw - 10) / 14));
+    const windows: CityBuilding["windows"] = [];
+    for (let r = 1; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        if (rand() > 0.4) {
+          windows.push({
+            lx: 5 + c * 14 + rand() * 2,
+            lyFrac: r / rows,
+            color: rand() > 0.55
+              ? `rgba(45,226,230,${(0.45 + rand() * 0.35).toFixed(2)})`
+              : `rgba(255,179,0,${(0.38 + rand() * 0.3).toFixed(2)})`,
+          });
+        }
+      }
+    }
+    buildings.push({ x: bx, w: bw, hFrac, windows });
+    bx += bw + 3 + rand() * 22;
+  }
+  return buildings;
+}
+
 
 // 累積 flips 的遞增總分：1圈100 / 2圈250 / 3圈450 ...
 function flipScore(flips: number): number {
@@ -66,6 +130,8 @@ _bikeImg.onload = () => { _bikeImgReady = true; };
 _bikeImg.src = `${import.meta.env.BASE_URL}bike.png`;
 
 export default function GameCanvas({ prices, label, name, onExit, onGameOver }: GameCanvasProps) {
+  const stars = difficultyStars(calcDifficulty(prices));
+  const cityBuildings = generateCity(prices.length * 31 + Math.round((prices[0] || 0) * 100));
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [hud, setHud] = useState<Hud>({
     distance: 0,
@@ -224,17 +290,24 @@ let crashTimer = 0;
 
     const spawnDeathParticles = (ox: number, oy: number) => {
       deathParticles = [];
-      const cols = [COLOR.bike, COLOR.bike, COLOR.start, "#ffffff"]; // 偏琥珀
-      for (let i = 0; i < 28; i++) {
+      const cols = [
+        COLOR.bike, COLOR.bike,          // 琥珀（主色，較多）
+        COLOR.start, COLOR.start,        // 青
+        "#ff4dff", "#cc44ff",            // 品紅/紫
+        "#ffffff", "#ffffff",            // 白光
+      ];
+      for (let i = 0; i < 42; i++) {
         const a = Math.random() * Math.PI * 2;
-        const spd = 1.5 + Math.random() * 4; // 速度放慢，1.5s 內不飛出螢幕
+        // 分兩速度層：快層爆出遠、慢層漫散近
+        const fast = i < 18;
+        const spd = fast ? 3.5 + Math.random() * 5 : 0.8 + Math.random() * 2.5;
         deathParticles.push({
           x: ox, y: oy,
           vx: Math.cos(a) * spd,
-          vy: Math.sin(a) * spd - 2.5, // 微微朝上爆出
+          vy: Math.sin(a) * spd - (fast ? 3.5 : 1.5),
           life: 1,
           color: cols[Math.floor(Math.random() * cols.length)],
-          size: 2 + Math.random() * 4,
+          size: fast ? 2 + Math.random() * 5 : 1.5 + Math.random() * 3,
         });
       }
     };
@@ -504,6 +577,40 @@ let crashTimer = 0;
     // ---- 渲染（neon）----
     const wx = (x: number) => (x - camX) * scale;
     const wy = (y: number) => (y - camY) * scale;
+
+    // 夜景城市天際線（視差 0.12x，模組化循環 BPERIOD px）
+    const drawCityBg = () => {
+      const rawOffset = camX * 0.12;
+      const offset = ((rawOffset % BPERIOD) + BPERIOD) % BPERIOD;
+      ctx.save();
+      for (let rep = -1; rep <= 1; rep++) {
+        const baseX = rep * BPERIOD - offset;
+        for (const b of cityBuildings) {
+          const sx = baseX + b.x;
+          if (sx + b.w < -10 || sx > W + 10) continue;
+          const bh = b.hFrac * H;
+          const sy = H - bh;
+          // 建築剪影
+          ctx.fillStyle = "#06091a";
+          ctx.fillRect(sx, sy, b.w, bh + 2);
+          // 頂線霓虹光暈
+          ctx.strokeStyle = "rgba(45,226,230,0.18)";
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(sx, sy);
+          ctx.lineTo(sx + b.w, sy);
+          ctx.stroke();
+          // 窗燈
+          for (const win of b.windows) {
+            const wx2 = sx + win.lx;
+            const wy2 = sy + win.lyFrac * bh;
+            ctx.fillStyle = win.color;
+            ctx.fillRect(wx2, wy2, 3, 4);
+          }
+        }
+      }
+      ctx.restore();
+    };
 
     const drawTrack = () => {
       const v = track.vertices;
@@ -824,6 +931,9 @@ let crashTimer = 0;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, W, H);
 
+      // 夜景城市背景（走勢圖模式下也畫，增加質感）
+      drawCityBg();
+
       if (overRef.current && showChartRef.current) {
         // 走勢圖模式：純折線圖，賽道不渲染
         drawMinimap();
@@ -1018,6 +1128,7 @@ let crashTimer = 0;
         <>
           <div className="hud-corner">
             <div>{label} {name}</div>
+            <div className="hud-stars">{"★".repeat(stars)}{"☆".repeat(5 - stars)}</div>
             <div>距離 {hud.distance}m</div>
           </div>
           <button className="icon-btn settings-btn" onClick={() => setShowSettings(true)} aria-label="設定">
