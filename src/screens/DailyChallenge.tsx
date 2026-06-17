@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import Sparkline from "../components/Sparkline";
 import { dailyTrack, dailyKey } from "../data/pick";
 import { fetchDailyTop, isLeaderboardConfigured, type ScoreRow } from "../lib/leaderboard";
+import { fetchDailyMap } from "../lib/dailyMap";
 import { getPlayerName, setPlayerName } from "../lib/playerId";
 import type { TrackData } from "../data/tracks";
 import "./DailyChallenge.css";
@@ -18,9 +19,11 @@ export default function DailyChallenge({
   onPlay: (t: TrackData) => void;
   onBack: () => void;
 }) {
-  const track = dailyTrack();
+  const fallbackTrack = dailyTrack();
   const today = new Date();
   const dateStr = `${today.getFullYear()}/${String(today.getMonth() + 1).padStart(2, "0")}/${String(today.getDate()).padStart(2, "0")}`;
+  const [track, setTrack] = useState<TrackData>(fallbackTrack);
+  const [isLive, setIsLive] = useState(false);
   const [rows, setRows] = useState<ScoreRow[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [nickname, setNickname] = useState(() => getPlayerName());
@@ -31,6 +34,19 @@ export default function DailyChallenge({
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
   }, [onBack]);
+
+  // 讀今日地圖（Supabase daily_map），失敗則用靜態 fallback
+  useEffect(() => {
+    let alive = true;
+    fetchDailyMap(dailyKey()).then((prices) => {
+      if (!alive) return;
+      if (prices) {
+        setTrack({ label: "TAIEX", name: "台股大盤", kind: "taiex", mode: "intraday", desc: "前一交易日大盤走勢", prices });
+        setIsLive(true);
+      }
+    });
+    return () => { alive = false; };
+  }, []);
 
   // 讀今日排行榜（未設定後端時 fetchDailyTop 回 []，走佔位畫面）
   useEffect(() => {
@@ -61,7 +77,7 @@ export default function DailyChallenge({
           <span className="daily-label">{track.label}</span>
           <span className="daily-name">{track.name}</span>
         </div>
-        <div className="daily-period">近月日線 ・ 今日地圖</div>
+        <div className="daily-period">{isLive ? "前日盤勢 ・ 今日地圖" : "近月日線 ・ 今日地圖"}</div>
 
         <div className="nickname-row">
           <label className="nickname-label">暱稱</label>

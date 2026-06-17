@@ -106,6 +106,19 @@ $$;
 
 grant execute on function public.cleanup_old_scores_if_needed() to anon;
 
+-- ── 每日地圖（GitHub Actions 每日 00:05 台灣時間寫入，前端讀取）──────────
+create table if not exists public.daily_map (
+  map_date   date        primary key,
+  prices     jsonb       not null,
+  label      text        not null default '台股大盤',
+  created_at timestamptz not null default now()
+);
+alter table public.daily_map enable row level security;
+drop policy if exists "anon read daily_map" on public.daily_map;
+create policy "anon read daily_map" on public.daily_map
+  for select to anon using (true);
+grant select on public.daily_map to anon;
+
 -- ── 保活表（cron-job.org 每日 ping，見 memory / DEVDOC）─────────
 create table if not exists public.keep_alive (id int primary key, t timestamptz default now());
 insert into public.keep_alive (id) values (1) on conflict do nothing;

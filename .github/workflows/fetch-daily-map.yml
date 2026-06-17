@@ -1,0 +1,22 @@
+name: Fetch Daily Map
+
+on:
+  schedule:
+    - cron: '5 16 * * *'  # 00:05 台灣時間（UTC+8），每天執行
+  workflow_dispatch:        # 允許手動觸發測試
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Fetch TAIEX intraday → Supabase daily_map
+        env:
+          SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: node scripts/fetchDailyMap.ts
