@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.8.0";
+export const APP_VERSION = "0.9.0";
 
 export interface ChangelogEntry {
   date: string;
@@ -6,6 +6,19 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    date: "2026-06-17 (v0.9.0)",
+    notes: [
+      "設定視窗大改版：暱稱確認鈕（字串有改才亮起，確認後才存），登出移至底部獨立區並加二次確認",
+      "版本號與更新日誌（加框線）同排顯示",
+      "Phase 5 PWA 離線快取：每日地圖 StaleWhileRevalidate 24h，排行榜 NetworkFirst 5s timeout",
+      "夜景城市天際線背景（視差 0.12x，seeded 建築群無縫循環）",
+      "HUD 左上顯示難度星等（★☆，依最大振幅 1-5 顆）",
+      "爆炸粒子強化：42 顆（↑14）+ 雙速度層 + 品紅/紫色系",
+      "自選賽道「前日盤中」改名為「前日盤勢」",
+      "排序按鈕加 ↑↓ 方向切換（同欄位再按翻轉，換欄位重設預設方向）",
+    ],
+  },
   {
     date: "2026-06-17 (v0.8.0)",
     notes: [
