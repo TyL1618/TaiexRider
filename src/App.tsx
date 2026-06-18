@@ -21,9 +21,10 @@ export default function App() {
   const [confirmLeave, setConfirmLeave] = useState(false);
 
   // refs 讓 popstate 閉包隨時拿到最新值，不靠 useEffect 依賴陣列
-  const screenRef  = useRef<Screen>("home");
-  const trackRef   = useRef<TrackData | null>(null);
-  const leavingRef = useRef(false);
+  const screenRef      = useRef<Screen>("home");
+  const trackRef       = useRef<TrackData | null>(null);
+  const confirmLeaveRef = useRef(false);
+  confirmLeaveRef.current = confirmLeave; // 每次 render 同步，popstate 閉包讀得到最新值
 
   // 子頁的「‹返回」鈕：退掉子頁那層 history，由 popstate 統一切回首頁，
   // 讓 app 狀態與 history 深度保持同步（避免殘留 entry 造成返回鍵錯亂）。
@@ -56,7 +57,6 @@ export default function App() {
     window.history.pushState({ taiex: true }, "");
 
     const onPop = () => {
-      if (leavingRef.current) return;
       if (suppressNext) {
         suppressNext = false;
         window.history.pushState({ taiex: true }, "");
@@ -65,12 +65,20 @@ export default function App() {
       // 遊戲進行中：GameCanvas 有自己的 listener，這裡不介入
       if (trackRef.current !== null) return;
 
+      // 確認離開視窗開著時：返回鍵 = 取消（關閉視窗），不離開、不關 App。
+      // 補推哨兵避免落到 history 底部被原生返回穿透關閉。
+      if (confirmLeaveRef.current) {
+        setConfirmLeave(false);
+        window.history.pushState({ taiex: true }, "");
+        return;
+      }
+
       if (screenRef.current !== "home") {
         // 子頁面 → 返回首頁：popstate 已消耗子頁那層，現在正停在首頁哨兵，不需補推
         screenRef.current = "home";
         setScreen("home");
       } else {
-        // 首頁 → 確認是否離開 App：補推哨兵留在 App 內，back 不會穿透關閉
+        // 首頁 → 跳離開確認：補推哨兵留在 App 內，back 不會穿透關閉
         setConfirmLeave(true);
         window.history.pushState({ taiex: true }, "");
       }
@@ -89,10 +97,10 @@ export default function App() {
   }, []); // 只在 App 掛載時執行一次，永遠不移除
 
   const doLeave = () => {
-    leavingRef.current = true;
     setConfirmLeave(false);
-    // TWA / 已安裝 PWA：window.close() 才能真正關閉 App；
-    // go(-1) 只會退回初始頁（仍在 App 內），無法關閉。
+    // 正式 TWA（APK）裡 window.close() 會結束 Activity 真正關閉 App。
+    // 「加到主畫面」的安裝版 PWA 可能無效（瀏覽器限制），此情況關不掉屬正常，
+    // 真正上架的 TWA 不受影響。
     window.close();
   };
 
