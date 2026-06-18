@@ -11,6 +11,7 @@ import { fetchHardestDailyMap, fetchDailyMapList } from "./lib/dailyMap";
 import { onAuthStateChange, getUser, type User } from "./lib/auth";
 import { getPlayerName } from "./lib/playerId";
 import { dailyKey } from "./data/pick";
+import { setPlaying } from "./pwa";
 
 export default function App() {
   const [screen, setScreen]         = useState<Screen>("home");
@@ -24,9 +25,10 @@ export default function App() {
   const trackRef   = useRef<TrackData | null>(null);
   const leavingRef = useRef(false);
 
+  // 子頁的「‹返回」鈕：退掉子頁那層 history，由 popstate 統一切回首頁，
+  // 讓 app 狀態與 history 深度保持同步（避免殘留 entry 造成返回鍵錯亂）。
   const goHome = useCallback(() => {
-    screenRef.current = "home";
-    setScreen("home");
+    window.history.back();
   }, []);
 
   // 初始化 auth 狀態，並監聽登入 / 登出變化
@@ -64,14 +66,14 @@ export default function App() {
       if (trackRef.current !== null) return;
 
       if (screenRef.current !== "home") {
-        // 子頁面 → 返回首頁
+        // 子頁面 → 返回首頁：popstate 已消耗子頁那層，現在正停在首頁哨兵，不需補推
         screenRef.current = "home";
         setScreen("home");
       } else {
-        // 首頁 → 確認是否離開 App
+        // 首頁 → 確認是否離開 App：補推哨兵留在 App 內，back 不會穿透關閉
         setConfirmLeave(true);
+        window.history.pushState({ taiex: true }, "");
       }
-      window.history.pushState({ taiex: true }, "");
     };
 
     const onBeforeUnload = (e: BeforeUnloadEvent) => {
@@ -89,7 +91,9 @@ export default function App() {
   const doLeave = () => {
     leavingRef.current = true;
     setConfirmLeave(false);
-    window.history.go(-1);
+    // TWA / 已安裝 PWA：window.close() 才能真正關閉 App；
+    // go(-1) 只會退回初始頁（仍在 App 內），無法關閉。
+    window.close();
   };
 
   const handleGameOver = useCallback((stats: GameOverStats) => {
@@ -106,11 +110,13 @@ export default function App() {
   const handleStartTrack = (t: TrackData) => {
     trackRef.current = t;
     setTrack(t);
+    setPlaying(true); // 遊玩中：暫緩 SW 自動更新 reload
   };
   const handleExitTrack = useCallback(() => {
     trackRef.current = null;
     setTrack(null);
     setIsDailyRun(false);
+    setPlaying(false); // 離開賽道：若有待套用的新版立即 reload
   }, []);
 
   if (track) {
@@ -128,6 +134,9 @@ export default function App() {
   }
 
   const handleNav = (s: Screen) => {
+    // 為子頁新增一層真實 history entry，讓返回鍵有足夠深度緩衝：
+    // 從子頁連按兩次返回 = 退回首頁 + 跳離開確認，不會穿透直接關閉 App。
+    window.history.pushState({ taiex: true }, "");
     screenRef.current = s;
     setScreen(s);
   };

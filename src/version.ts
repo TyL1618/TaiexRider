@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.9.1";
+export const APP_VERSION = "0.9.2";
 
 export interface ChangelogEntry {
   date: string;
@@ -6,6 +6,16 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    date: "2026-06-18 (v0.9.2)",
+    notes: [
+      "自動更新：偵測到新版自動套用並重整，不需再手動清快取（遊玩中先擋，回首頁才更新）",
+      "修正「確定離開」按了關不掉 App（改用 window.close）",
+      "修正從各模式快速連按兩次返回會直接關閉遊戲（每層加真實 history 緩衝）",
+      "自選賽道前日盤勢／每日長征 tab 顯示對應股市日期（m/d 走勢）",
+      "設定新增「遊戲說明」：操作方式、計分規則、每日圖池更新規則、遊戲模式介紹",
+    ],
+  },
   {
     date: "2026-06-17 (v0.9.1)",
     notes: [

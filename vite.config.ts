@@ -7,7 +7,11 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: "autoUpdate",
+      // prompt：偵測到新版時呼叫 onNeedRefresh，由 src/pwa.ts 決定何時 reload
+      // （遊玩中先 defer，回首頁再套用）。injectRegister:null → 不自動注入註冊腳本，
+      // 改由 src/pwa.ts 透過 virtual:pwa-register 手動註冊。
+      registerType: "prompt",
+      injectRegister: null,
       includeAssets: ["favicon.svg"],
       manifest: {
         name: "TaiexRider",
@@ -38,8 +42,8 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ["**/*.{js,css,html,svg,png,woff2}"],
-        skipWaiting: true,
-        clientsClaim: true,
+        // 不設 skipWaiting：prompt 模式需要等待中的新 SW 才能觸發 onNeedRefresh，
+        // 由 updateSW(true) 在適當時機（非遊玩中）主動 skipWaiting + reload。
         runtimeCaching: [
           {
             // 每日地圖：StaleWhileRevalidate，快取 24 小時
