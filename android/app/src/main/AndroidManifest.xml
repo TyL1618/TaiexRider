@@ -35,6 +35,10 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name="com.google.androidbrowserhelper.trusted.ManageDataLauncherActivity"
+            android:exported="false" />
+
         <service
             android:name="com.google.androidbrowserhelper.trusted.DelegationService"
             android:exported="true"
