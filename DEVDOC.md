@@ -31,7 +31,7 @@
 | 物理引擎 | Matter.js | 機車車身/輪胎/地形碰撞 |
 | PWA | `vite-plugin-pwa` (Workbox) | `skipWaiting: true` / `clientsClaim: true`（v0.7.2 起新版即時接管）|
 | 後端/資料庫 | Supabase（Postgres + PostgREST + Auth） | 排行榜、每日地圖資料、Google 登入 |
-| 排程 | GitHub Actions cron（每日 21:05 台灣時間） | 抓全台上市股盤中資料存 Supabase |
+| 排程 | GitHub Actions cron（每日 16:00 台灣時間） | 抓全台上市股盤中資料存 Supabase（Yahoo Finance 源）|
 | 上架封裝 | `androidbrowserhelper:2.7.1`（手動 TWA） | Android Studio 手動建立，package `com.tylapp.taiexrider` |
 
 ---
@@ -53,7 +53,8 @@ alter table public.daily_map enable row level security;
 create policy "public read" on public.daily_map for select using (true);
 ```
 
-每日由 GitHub Actions 更新，`map_date` 存**明天**（台灣時間）讓 00:00 即生效。
+每日由 GitHub Actions 更新。`map_date = 實際交易日 sessionDate + 1`，讓 00:00 即生效。
+⚠️ **不可用「執行當下時間 +1」推算**——GitHub 排程延遲跨午夜會錯位+跳號。`sessionDate` 從 Yahoo 回傳的 K 棒 timestamp 直接讀出（實際交易日），詳見 §3.1 與 CLAUDE.md「時區踩雷」。
 客戶端查詢策略：先查今天 → 空則查明天（`nextDay()` 使用純 UTC 運算避開時區問題）。
 
 ### 2.2 `daily_scores` — 每日排行榜成績
@@ -77,7 +78,8 @@ create policy "auth insert"   on public.daily_scores for insert with check (auth
 create policy "auth update"   on public.daily_scores for update using (auth.uid() is not null);
 ```
 
-提交走 `leaderboard.ts` 的 `submitDailyScore()`，需 Google 登入（`auth.uid()` 伺服器端驗證）。
+提交走 `leaderboard.ts` 的 `submitDailyScore()` → RPC `submit_daily_score`（security definer），需 Google 登入（`auth.uid()` 伺服器端決定 player_id）。
+⚠️ **`challenge_date` 用台灣時區** `(now() at time zone 'Asia/Taipei')::date`，**不可用 `current_date`（UTC）**——台灣午夜後會把成績存到前一天、跟 app 讀的本地日期對不上（看似沒上榜，實際有寫）。詳見 CLAUDE.md「時區踩雷」。
 
 ### 2.3 `keep_alive` — Supabase 保活
 
@@ -94,27 +96,27 @@ cron-job.org 定期 ping，避免 Supabase 免費方案休眠。
 
 ### 3.1 每日更新腳本
 
-**腳本**：`.github/scripts/fetchDailyMap.ts`（Node 22 直跑 `.ts`）
-**觸發**：GitHub Actions `.github/workflows/daily-map.yml`，cron `17 13 * * 1-5`（= 台灣時間 21:17，週一至週五）
+**腳本**：`scripts/fetchDailyMap.ts`（Node 22+ 直跑 `.ts`，type-stripping）
+**觸發**：GitHub Actions `.github/workflows/fetch-daily-map.yml`，cron `0 8 * * *`（= 台灣時間 16:00，收盤後 2.5h）。提早跑 + 錨定交易日 = 即使排程延遲也不跨午夜錯位。
 
 **流程**：
-1. 抓 TWSE `STOCK_DAY_ALL`（全台上市股當日行情，含 `Code`、`OpeningPrice`…`ClosingPrice`）
-2. 過濾：`/^\d{4}$/`（純 4 位數字代號，排除 ETF 字母尾）
-3. 對每支股票抓當日盤中走勢（`MI_5MINS_INDEX` 或 `STOCK_DAY`），降採樣至 ~110 點
-4. 計算 `difficulty`（最大單日漲跌幅方差）
-5. Upsert 至 Supabase `daily_map`，`map_date = 明天台灣時間`
+1. 先抓 TAIEX：Yahoo `^TWII`（5 分 K、`range=1d`），從回傳 timestamp 讀出**實際交易日 sessionDate**，`map_date = sessionDate + 1`。
+2. 抓 TWSE `STOCK_DAY_ALL` 取**上市股票清單**（代號+名稱），過濾 `/^\d{4}$/`（純 4 位數字，排除 ETF 字母尾）。
+3. 對每支股票抓當日盤中走勢：Yahoo `{code}.TW`（5 分 K、`range=1d`），降採樣至 ~110 點。
+4. 計算 `difficulty`（盤中最大單步漲跌幅）。
+5. Upsert 至 Supabase `daily_map`（`Prefer: resolution=merge-duplicates`，衝突鍵 `(map_date, stock_code)`），清除 7 天前舊資料。
 
-> 每日約 ~1000 支股票，失敗容錯繼續（不中斷整批）。
+> 每日約 ~1090 支股票，失敗容錯繼續（不中斷整批）。連假/休市時 Yahoo `range=1d` 自動回最後交易日 → sessionDate 不變 → 持續顯示最後交易日的盤（正確）。
 
-### 3.2 可用 TWSE 端點
+### 3.2 資料源端點
 
-| 用途 | 端點 |
-|---|---|
-| 全市場日線總覽 | `GET https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL` |
-| 個股近一月日線 | `GET https://www.twse.com.tw/exchangeReport/STOCK_DAY?response=json&date=YYYYMM01&stockNo=2330` |
-| 大盤每 5 秒走勢 | `GET https://www.twse.com.tw/exchangeReport/MI_5MINS_INDEX?response=json&date=YYYYMMDD` |
+| 用途 | 端點 | 備註 |
+|---|---|---|
+| 個股盤中 5 分 K | `GET https://query1.finance.yahoo.com/v8/finance/chart/{code}.TW?interval=5m&range=1d` | 主力資料源 |
+| 大盤盤中 5 分 K | `GET https://query1.finance.yahoo.com/v8/finance/chart/%5ETWII?interval=5m&range=1d` | `^TWII`；含 timestamp 可讀交易日 |
+| 上市股票清單 | `GET https://www.twse.com.tw/exchangeReport/STOCK_DAY_ALL?response=json` | 僅取代號+名稱 |
 
-`MI_5MINS_INDEX` 每天約 3241 列（09:00–13:30，每 5 秒），欄位 index 1 = 加權指數。降採樣到 ~110 點使用。
+⚠️ **TWSE `MI_5MINS_INDEX` 已棄用**：對 GitHub runner 不穩定，曾整批失敗 → TAIEX 改走 Yahoo `^TWII`。
 
 ---
 
