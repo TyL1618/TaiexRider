@@ -2,7 +2,8 @@ name: Fetch Daily Map
 
 on:
   schedule:
-    - cron: '5 13 * * *'  # 21:05 台灣時間（UTC+8），收盤後備好明日地圖
+    - cron: '0 8 * * *'  # 16:00 台灣時間（UTC+8），收盤後 2.5h 資料已備好；
+                          # 提早跑 + map_date 錨定交易日，避免 GitHub 延遲跨午夜造成日期錯位
   workflow_dispatch:        # 允許手動觸發測試
 
 jobs:

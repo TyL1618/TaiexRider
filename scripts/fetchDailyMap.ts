@@ -1,7 +1,12 @@
-// 每日 21:05 台灣時間由 GitHub Actions 觸發
-// 抓全台上市股票 + TAIEX 當日日盤，計算難度，以「明日台灣日期」寫入 Supabase daily_map。
+// 每日收盤後由 GitHub Actions 觸發
+// 抓全台上市股票 + TAIEX 當日日盤，計算難度，寫入 Supabase daily_map。
 // 清除 7 天前舊資料。
 // 環境變數：SUPABASE_URL, SUPABASE_SERVICE_KEY
+//
+// ⚠️ map_date 錨定在「實際抓到的交易日 sessionDate」，map_date = sessionDate + 1，
+// 讓 app 在 calendar day = map_date 當天顯示「前日盤勢」(= sessionDate 的走勢)。
+// 不可用「執行當下時間 +1」推算：GitHub 排程常延遲，一旦跨過午夜 now 會多跳一天，
+// 而抓到的盤仍是前一個收盤日 → 造成日期錯位 + 跳號（曾發生 6/17 盤被存成 6/19）。
 
 const SUPABASE_URL = process.env.SUPABASE_URL!;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY!;
@@ -70,9 +75,10 @@ async function fetchYahooIntraday(symbol: string): Promise<number[]> {
   }
 }
 
-// TAIEX 日盤：TWSE MI_5MINS_INDEX，往前找最近交易日
-async function fetchTaiexIntraday(nowTW: Date): Promise<number[]> {
-  for (let back = 1; back <= 7; back++) {
+// 找出最近一個有資料的交易日（從 nowTW 當天 back=0 起往回），回傳該日 TAIEX 走勢 + 日期。
+// back=0 起：收盤後當天即取得，避免延遲到午夜後仍要往回多跳一天。
+async function fetchTaiexSession(nowTW: Date): Promise<{ date: Date; prices: number[] } | null> {
+  for (let back = 0; back <= 8; back++) {
     const d = new Date(nowTW.getTime() - back * 86_400_000);
     const url = `https://www.twse.com.tw/exchangeReport/MI_5MINS_INDEX?response=json&date=${toYMD8(d)}`;
     try {
@@ -84,11 +90,11 @@ async function fetchTaiexIntraday(nowTW: Date): Promise<number[]> {
         .filter(v => Number.isFinite(v) && v > 0);
       if (raw.length >= 20) {
         console.log(`  TAIEX ${toYMD8(d)}: ${raw.length} 點 → 降採樣 ${DOWNSAMPLE}`);
-        return downsample(raw, DOWNSAMPLE);
+        return { date: d, prices: downsample(raw, DOWNSAMPLE) };
       }
     } catch { /* continue */ }
   }
-  return [];
+  return null;
 }
 
 // 批次 upsert
@@ -112,19 +118,18 @@ async function main() {
     process.exit(1);
   }
 
-  const nowTW      = new Date(Date.now() + 8 * 3_600_000);
-  const tomorrowTW = new Date(nowTW.getTime() + 86_400_000);
-  const mapDate    = tomorrowTW.toISOString().slice(0, 10);
-  console.log(`目標 map_date: ${mapDate}`);
+  const nowTW = new Date(Date.now() + 8 * 3_600_000);
+
+  // 錨定實際交易日（不可用 now+1，見檔頭說明）
+  const session = await fetchTaiexSession(nowTW);
+  if (!session) { console.error("找不到最近交易日的 TAIEX 資料，放棄。"); process.exit(1); }
+  const sessionDate = session.date;
+  const mapDate = new Date(sessionDate.getTime() + 86_400_000).toISOString().slice(0, 10);
+  console.log(`交易日 session: ${sessionDate.toISOString().slice(0, 10)} → map_date: ${mapDate}`);
 
   const rows: StockRow[] = [];
-
-  // TAIEX
-  const taiexPrices = await fetchTaiexIntraday(nowTW);
-  if (taiexPrices.length >= 20) {
-    rows.push({ map_date: mapDate, stock_code: "TAIEX", stock_name: "台股大盤",
-      prices: taiexPrices, difficulty: calcDifficulty(taiexPrices) });
-  }
+  rows.push({ map_date: mapDate, stock_code: "TAIEX", stock_name: "台股大盤",
+    prices: session.prices, difficulty: calcDifficulty(session.prices) });
 
   // 全部上市股票
   console.log("取得上市股票清單...");
