@@ -68,6 +68,7 @@ export default function App() {
       // 確認離開視窗開著時：返回鍵 = 取消（關閉視窗），不離開、不關 App。
       // 補推哨兵避免落到 history 底部被原生返回穿透關閉。
       if (confirmLeaveRef.current) {
+        confirmLeaveRef.current = false; // 同步更新，避免連按時第二次 popstate 讀到舊值
         setConfirmLeave(false);
         window.history.pushState({ taiex: true }, "");
         return;
@@ -79,6 +80,7 @@ export default function App() {
         setScreen("home");
       } else {
         // 首頁 → 跳離開確認：補推哨兵留在 App 內，back 不會穿透關閉
+        confirmLeaveRef.current = true; // 同步更新，避免連按時第二次 popstate 讀到舊值
         setConfirmLeave(true);
         window.history.pushState({ taiex: true }, "");
       }
@@ -99,11 +101,13 @@ export default function App() {
   }, []); // 只在 App 掛載時執行一次，永遠不移除
 
   const doLeave = () => {
+    confirmLeaveRef.current = false;
     setConfirmLeave(false);
-    // 正式 TWA（APK）裡 window.close() 會結束 Activity 真正關閉 App。
-    // 「加到主畫面」的安裝版 PWA 可能無效（瀏覽器限制），此情況關不掉屬正常，
-    // 真正上架的 TWA 不受影響。
+    // TWA 裡 window.close() 被 Chrome 封鎖（僅 window.open() 開的頁面才允許）。
+    // 正確做法：耗盡 session history，讓 Android Activity 的 onBackPressed 自然 finish()。
+    // 桌機 PWA 走 window.close()（history.go 到底不會關分頁）。
     window.close();
+    setTimeout(() => window.history.go(-(window.history.length + 5)), 50);
   };
 
   const handleGameOver = useCallback((stats: GameOverStats) => {
