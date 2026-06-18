@@ -41,10 +41,6 @@ function calcDifficulty(prices: number[]): number {
   return max;
 }
 
-function toYMD8(d: Date): string {
-  return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
-}
-
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
 // 取得全部上市股票代號 + 名稱（TWSE STOCK_DAY_ALL，一次拿全部）
@@ -75,26 +71,37 @@ async function fetchYahooIntraday(symbol: string): Promise<number[]> {
   }
 }
 
-// 找出最近一個有資料的交易日（從 nowTW 當天 back=0 起往回），回傳該日 TAIEX 走勢 + 日期。
-// back=0 起：收盤後當天即取得，避免延遲到午夜後仍要往回多跳一天。
-async function fetchTaiexSession(nowTW: Date): Promise<{ date: Date; prices: number[] } | null> {
-  for (let back = 0; back <= 8; back++) {
-    const d = new Date(nowTW.getTime() - back * 86_400_000);
-    const url = `https://www.twse.com.tw/exchangeReport/MI_5MINS_INDEX?response=json&date=${toYMD8(d)}`;
-    try {
-      const j = await (await fetch(url, { headers: UA_TWSE })).json() as
-        { stat: string; data?: string[][] };
-      if (j.stat !== "OK" || !j.data || j.data.length === 0) continue;
-      const raw = j.data
-        .map(r => parseFloat(r[1].replace(/,/g, "")))
-        .filter(v => Number.isFinite(v) && v > 0);
-      if (raw.length >= 20) {
-        console.log(`  TAIEX ${toYMD8(d)}: ${raw.length} 點 → 降採樣 ${DOWNSAMPLE}`);
-        return { date: d, prices: downsample(raw, DOWNSAMPLE) };
-      }
-    } catch { /* continue */ }
+// TAIEX 日盤 + 真正交易日：用 Yahoo ^TWII（與個股同一資料源，比 TWSE 端點可靠）。
+// 交易日直接從回傳的 K 棒 timestamp + 交易所時區偏移算出，不靠執行當下時間推算。
+// 回傳 date 為交易所當地（台灣）日期字串 YYYY-MM-DD。
+async function fetchTaiexSession(): Promise<{ date: string; prices: number[] } | null> {
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/%5ETWII?interval=5m&range=1d&includePrePost=false`;
+  try {
+    const r = await fetch(url, { headers: UA_YF, signal: AbortSignal.timeout(15_000) });
+    const j = await r.json() as Record<string, unknown>;
+    const result = ((j.chart as Record<string, unknown>)?.result as Record<string, unknown>[] | undefined)?.[0];
+    if (!result) return null;
+    const ts = (result.timestamp as number[] | undefined) ?? [];
+    const meta = result.meta as Record<string, unknown> | undefined;
+    const gmtoffset = (meta?.gmtoffset as number | undefined) ?? 28800; // 台灣 +8h
+    const quotes = (result.indicators as Record<string, unknown>)?.quote as Record<string, unknown>[] | undefined;
+    const closes = (quotes?.[0]?.close as (number | null)[]) ?? [];
+    if (ts.length === 0) return null;
+    // 交易所當地日期：把 epoch 秒 + 時區偏移後當成 UTC 讀日期部分
+    const localDate = (epochSec: number) =>
+      new Date((epochSec + gmtoffset) * 1000).toISOString().slice(0, 10);
+    const sessionDate = localDate(ts[ts.length - 1]); // 最後一根 = 最近 session
+    const prices: number[] = [];
+    for (let i = 0; i < ts.length; i++) {
+      const c = closes[i];
+      if (localDate(ts[i]) === sessionDate && c != null && Number.isFinite(c)) prices.push(c);
+    }
+    if (prices.length < 20) return null;
+    console.log(`  TAIEX ${sessionDate}: ${prices.length} 點 → 降採樣 ${DOWNSAMPLE}`);
+    return { date: sessionDate, prices: downsample(prices, DOWNSAMPLE) };
+  } catch {
+    return null;
   }
-  return null;
 }
 
 // 批次 upsert
@@ -121,11 +128,12 @@ async function main() {
   const nowTW = new Date(Date.now() + 8 * 3_600_000);
 
   // 錨定實際交易日（不可用 now+1，見檔頭說明）
-  const session = await fetchTaiexSession(nowTW);
+  const session = await fetchTaiexSession();
   if (!session) { console.error("找不到最近交易日的 TAIEX 資料，放棄。"); process.exit(1); }
-  const sessionDate = session.date;
-  const mapDate = new Date(sessionDate.getTime() + 86_400_000).toISOString().slice(0, 10);
-  console.log(`交易日 session: ${sessionDate.toISOString().slice(0, 10)} → map_date: ${mapDate}`);
+  // map_date = sessionDate + 1 天（UTC 純整數運算，免時區誤差）
+  const [sy, sm, sd] = session.date.split("-").map(Number);
+  const mapDate = new Date(Date.UTC(sy, sm - 1, sd + 1)).toISOString().slice(0, 10);
+  console.log(`交易日 session: ${session.date} → map_date: ${mapDate}`);
 
   const rows: StockRow[] = [];
   rows.push({ map_date: mapDate, stock_code: "TAIEX", stock_name: "台股大盤",
