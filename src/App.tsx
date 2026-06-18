@@ -85,6 +85,8 @@ export default function App() {
     };
 
     const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      // 自動更新觸發的重載：放行，不跳原生確認框（旗標由 src/pwa.ts 設定）
+      if ((window as { __taiexAutoReload?: boolean }).__taiexAutoReload) return;
       e.preventDefault(); // 桌機 PWA 關視窗時跳瀏覽器原生「離開網站？」確認框
     };
 

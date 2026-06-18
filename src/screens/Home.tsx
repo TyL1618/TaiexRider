@@ -71,7 +71,7 @@ export default function Home({ user, onNav }: { user: User | null; onNav: (s: Sc
 
       <p className="home-foot">純娛樂・非投資建議</p>
       <p style={{ textAlign: "center", color: "#ff3b6b", fontWeight: 700, letterSpacing: 1 }}>
-        🔬 自動更新測試 B · 應靜默刷新免詢問
+        🔬 自動更新測試 C · 應完全靜默無視窗
       </p>
 
       {showSettings && (
