@@ -118,6 +118,12 @@ export default function TrackSelect({
   const visibleList   = intradayList.slice(0, visibleCount);
   const hasMore       = visibleCount < intradayList.length;
 
+  // 圖池對應的股市日期（今日 map_date 存的是前一個執行日的盤中走勢）
+  const key = dailyKey();
+  const [ky, km, kd] = key.split("-").map(Number);
+  const prevDay = new Date(Date.UTC(ky, km - 1, kd - 1));
+  const poolDateStr = `${prevDay.getUTCMonth() + 1}/${prevDay.getUTCDate()} 走勢`;
+
   return (
     <div className={`select-screen${picking || longPicking ? " is-picking" : ""}`}>
       <button className="back-btn" onClick={onBack}>‹ 返回</button>
@@ -127,12 +133,12 @@ export default function TrackSelect({
         <button className={`mode-tab ${mode === "intraday" ? "active" : ""}`} onClick={() => setMode("intraday")}>
           前日盤勢
           <span className="mode-tab-desc">
-            {remoteLoaded ? `${intradayCount} 支` : "載入中…"}・盤中走勢
+            {remoteLoaded ? `${intradayCount} 支` : "載入中…"}・{poolDateStr}
           </span>
         </button>
         <button className={`mode-tab ${mode === "long" ? "active" : ""}`} onClick={() => setMode("long")}>
           每日長征
-          <span className="mode-tab-desc">5 股串接・長路線</span>
+          <span className="mode-tab-desc">{poolDateStr}・5 股串接</span>
         </button>
       </div>
 

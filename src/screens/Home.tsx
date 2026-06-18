@@ -9,6 +9,7 @@ export type Screen = "home" | "custom" | "random" | "daily";
 export default function Home({ user, onNav }: { user: User | null; onNav: (s: Screen) => void }) {
   const [showSettings, setShowSettings] = useState(false);
   const [showLog, setShowLog]           = useState(false);
+  const [showHelp, setShowHelp]         = useState(false);
   const [nickname, setNickname]         = useState(() => getPlayerName());
   const [savedName, setSavedName]       = useState(() => getPlayerName());
   const [logoutConfirm, setLogoutConfirm] = useState(false);
@@ -114,6 +115,12 @@ export default function Home({ user, onNav }: { user: User | null; onNav: (s: Sc
               <span className="settings-version-text">版本 v{APP_VERSION}</span>
               <button
                 className="settings-changelog-btn"
+                onClick={() => { setShowSettings(false); setShowHelp(true); }}
+              >
+                遊戲說明
+              </button>
+              <button
+                className="settings-changelog-btn"
                 onClick={() => { setShowSettings(false); setShowLog(true); }}
               >
                 更新日誌
@@ -159,6 +166,51 @@ export default function Home({ user, onNav }: { user: User | null; onNav: (s: Sc
               ))}
             </div>
             <button className="modal-btn" onClick={() => setShowLog(false)}>關閉</button>
+          </div>
+        </div>
+      )}
+
+      {showHelp && (
+        <div className="modal-overlay" onClick={() => setShowHelp(false)}>
+          <div className="modal-panel log" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-title">遊戲說明</div>
+            <div className="log-scroll">
+              <div className="log-entry">
+                <div className="log-date">操作方式</div>
+                <ul className="log-notes">
+                  <li>點擊／按住螢幕任意處 → 車子前進</li>
+                  <li>空中持續按住 → 後空翻</li>
+                  <li>放開 → 車頭自然朝前</li>
+                </ul>
+              </div>
+              <div className="log-entry">
+                <div className="log-date">計分規則</div>
+                <ul className="log-notes">
+                  <li>後空翻每圈得分，翻越多圈得分越高</li>
+                  <li>完美落地（接近水平落地）額外加分</li>
+                  <li>跑得越遠、行進分越高</li>
+                  <li>摔車後進結算，分數不倒退</li>
+                </ul>
+              </div>
+              <div className="log-entry">
+                <div className="log-date">每日圖池</div>
+                <ul className="log-notes">
+                  <li>每天午夜自動更新，載入前一交易日的盤中走勢</li>
+                  <li>六日及假日維持最近一個交易日的走勢圖</li>
+                  <li>全台玩家同一天跑相同賽道</li>
+                </ul>
+              </div>
+              <div className="log-entry">
+                <div className="log-date">遊戲模式</div>
+                <ul className="log-notes">
+                  <li>每日排名賽：全台同圖、登入 Google 參加排行榜</li>
+                  <li>隨機賽道：拉霸隨機抽一支股票</li>
+                  <li>自選賽道・前日盤勢：從全市場約 1000 支自選</li>
+                  <li>自選賽道・每日長征：5 支股票串接的超長路線</li>
+                </ul>
+              </div>
+            </div>
+            <button className="modal-btn" onClick={() => setShowHelp(false)}>關閉</button>
           </div>
         </div>
       )}
