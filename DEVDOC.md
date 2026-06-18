@@ -32,7 +32,7 @@
 | PWA | `vite-plugin-pwa` (Workbox) | `skipWaiting: true` / `clientsClaim: true`（v0.7.2 起新版即時接管）|
 | 後端/資料庫 | Supabase（Postgres + PostgREST + Auth） | 排行榜、每日地圖資料、Google 登入 |
 | 排程 | GitHub Actions cron（每日 21:05 台灣時間） | 抓全台上市股盤中資料存 Supabase |
-| 上架封裝 | PWABuilder（TWA）— Phase 7 進行中 | PWA 包成 Android 專案 → Android Studio 打包 |
+| 上架封裝 | `androidbrowserhelper:2.7.1`（手動 TWA） | Android Studio 手動建立，package `com.tylapp.taiexrider` |
 
 ---
 
@@ -236,19 +236,84 @@ src/
 | Phase 4 | ✅ v0.6–0.7 | Supabase 後端：排行榜 + Google One Tap 登入 + 每日全台股自動更新（GitHub Actions） |
 | Phase 5 | ✅ v0.9.0 | PWA 離線快取：Workbox runtimeCaching（每日地圖 SWR 24h / 排行榜 NetworkFirst 5s） |
 | Phase 6 | ✅ v0.8–0.9 | 音效（Web Audio API）、夜景城市背景、難度星等 HUD、爆炸粒子強化 |
-| Phase 7 | 🟡 進行中 | TWA 打包（PWABuilder + Android Studio）+ Google Play 上架 + AdMob B 廣告串接 |
+| Phase 7 | 🟡 測試中 | TWA 打包上架（手動 Android Studio）+ Google Play 內部測試 + 全螢幕 immersive 調整中 |
 
 ---
 
-## 9. 未來待辦
+## 9. Android TWA 專案配置
+
+### 9.1 專案位置
+
+| 項目 | 路徑 |
+|---|---|
+| Repo 內 Android | `android/`（git 已追蹤） |
+| Android Studio 專案 | `C:\Users\tyl16\AndroidStudioProjects\TaiexRider\` |
+| Keystore | `C:\Users\tyl16\Documents\taiexrider-release.jks` |
+
+> ⚠️ `android/` 與 Android Studio 專案**不會自動同步**。改了 `android/` 內的檔案必須手動複製到 Android Studio 路徑，再重新 Generate Signed Bundle。
+
+### 9.2 關鍵設定
+
+| 項目 | 值 |
+|---|---|
+| Package ID | `com.tylapp.taiexrider` |
+| Keystore alias | `taiexrider` |
+| 上傳金鑰 SHA-256（開發者） | `83:FD:B6:0E:...:1B:4C` |
+| **Google Play 簽署金鑰 SHA-256** | `DB:F0:8B:8F:BA:71:10:51:92:DD:8F:83:B8:4D:92:91:85:34:B0:3E:5B:9B:2A:CA:92:E6:9E:9E:22:9F:57:DA` |
+| assetlinks.json | `public/.well-known/assetlinks.json` → 已設為 Google Play 簽署金鑰 |
+| TWA library | `androidbrowserhelper:2.7.1` |
+| minSdk / targetSdk | 24 / 36 |
+
+> Google Play App Signing 重新簽署 AAB，assetlinks.json 必須用 **Google Play 的 SHA-256**（上傳金鑰不同）。
+
+### 9.3 AndroidManifest.xml 關鍵 meta-data
+
+```xml
+<!-- LauncherActivity 內 -->
+<meta-data
+    android:name="android.support.customtabs.trusted.DEFAULT_URL"
+    android:value="@string/twa_url" />
+<meta-data
+    android:name="android.support.customtabs.trusted.DISPLAY_MODE"
+    android:value="immersive-sticky" />   <!-- 底部導覽列收起，邊緣滑動暫時顯示 -->
+
+<!-- 必須宣告否則 2.7.1 啟動閃退 -->
+<activity
+    android:name="com.google.androidbrowserhelper.trusted.ManageDataLauncherActivity"
+    android:exported="false" />
+```
+
+### 9.4 Android Theme 配置（`res/values/themes.xml`）
+
+```xml
+<style name="Theme.TaiexRider" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+    <item name="android:windowFullscreen">true</item>
+    <item name="android:windowNoTitle">true</item>
+    <item name="android:statusBarColor">@android:color/transparent</item>
+    <item name="android:navigationBarColor">@android:color/transparent</item>
+    <item name="android:windowLayoutInDisplayCutoutMode" tools:targetApi="28">shortEdges</item>
+</style>
+```
+
+> parent 必須是 `NoActionBar` 系列，`DarkActionBar` 會與 immersive mode 衝突。
+
+### 9.5 打包流程（每次更新）
+
+1. 把 `android/` 內改動的檔案複製到 Android Studio 專案對應路徑
+2. `app/build.gradle.kts` 的 `versionCode` + 1（每次上傳都要不同）
+3. Build → Generate Signed Bundle/APK → Android App Bundle → 選 keystore → 產 AAB
+4. Play Console → 測試及發布 → 內部測試 → 建立新版本 → 上傳 AAB → 發布
+
+### 9.6 Google Play 帳號
+
+- 開發者帳號：Harold_Yun（tyl161803@gmail.com）
+- 目前狀態：內部測試軌道，待正式發布
+
+---
+
+## 10. 未來待辦
 
 - **ETF 含字母代號**：腳本 filter 從 `/^\d{4}$/` 改 `/^\d{4}[A-Z]?$/` 即可納入 00981A 等
-- **ETF 含字母代號**：腳本 filter 從 `/^\d{4}$/` 改 `/^\d{4}[A-Z]?$/` 即可納入 00981A 等
-- **Phase 7 TWA 打包（進行中）**：
-  1. PWABuilder（pwabuilder.com）→ Package ID `com.tylapp.taiexrider`，Include source code 打勾，選 **Other Android** tab 下載 zip
-  2. Android Studio 開啟專案 → Build → 產生 APK/AAB
-  3. Digital Asset Links（`/.well-known/assetlinks.json`）確認網站所有權
-  4. Play Console 上傳 AAB → Internal Testing → 正式發布
 - **AdMob 廣告（Phase 7 後段）**：
   - 方案 B（Native SDK）：在 Android 專案加 Gradle dependency + JS Bridge
   - 死亡後「看廣告復活？」→ `window.AdBridge.showRewardedAd()` → 回調復活
@@ -257,7 +322,7 @@ src/
 
 ---
 
-## 11. 音效系統（`src/game/audio.ts`，v0.8.0）
+## 11. 音效系統（`src/game/audio.ts`，v0.8.0 + v0.9.3）
 
 純 Web Audio API 合成，**不需任何外部音檔**。所有函式都 lazy 建立 `AudioContext`（需使用者互動後才能啟動）。
 
@@ -273,9 +338,11 @@ src/
 
 引擎音在著地時頻率隨速度 50→190Hz，離地降至 38Hz（怠速），透過 `setTargetAtTime` 平滑轉換。
 
+v0.9.3 加入 master gain node（`masterGain()`），所有音效都接到同一個 GainNode → `destination`，音量設定存 localStorage key `taiexVolume`（預設 0.8）。`setVolume(v)` / `getVolume()` 供 UI 控制。
+
 ---
 
-## 10. 測試提醒
+## 12. 測試提醒
 
 preview / 隱藏分頁 `document.hidden=true` → `requestAnimationFrame` 暫停 → 主迴圈停住（看起來車不動）。
 
