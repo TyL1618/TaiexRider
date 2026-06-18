@@ -269,13 +269,15 @@ src/
 ### 9.3 AndroidManifest.xml 關鍵 meta-data
 
 ```xml
-<!-- LauncherActivity 內 -->
+<!-- .MainActivity 內（繼承 LauncherActivity 的自訂 Activity） -->
 <meta-data
     android:name="android.support.customtabs.trusted.DEFAULT_URL"
     android:value="@string/twa_url" />
 <meta-data
     android:name="android.support.customtabs.trusted.DISPLAY_MODE"
-    android:value="immersive-sticky" />   <!-- 底部導覽列收起，邊緣滑動暫時顯示 -->
+    android:value="sticky-immersive" />
+<!-- ⚠️ 正確值是 sticky-immersive，不是 immersive-sticky！
+     字串顛倒時 androidbrowserhelper 原始碼直接 fallback 到 DefaultMode，靜默失效。 -->
 
 <!-- 必須宣告否則 2.7.1 啟動閃退 -->
 <activity
@@ -296,6 +298,14 @@ src/
 ```
 
 > parent 必須是 `NoActionBar` 系列，`DarkActionBar` 會與 immersive mode 衝突。
+
+### 9.4b 自訂 MainActivity（`java/com/tylapp/taiexrider/MainActivity.kt`）
+
+繼承 `LauncherActivity`，`onCreate`/`onWindowFocusChanged` 強制設 immersive flags：
+- API 30+：`WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE`
+- API 24–29：`View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY | HIDE_NAVIGATION | FULLSCREEN`
+
+AndroidManifest 的 activity name 改為 `.MainActivity`。
 
 ### 9.5 打包流程（每次更新）
 
