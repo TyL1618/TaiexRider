@@ -25,6 +25,7 @@ export default function App() {
   const trackRef       = useRef<TrackData | null>(null);
   const confirmLeaveRef = useRef(false);
   confirmLeaveRef.current = confirmLeave; // 每次 render 同步，popstate 閉包讀得到最新值
+  const leavingRef = useRef(false); // doLeave 啟動後設 true，阻止 popstate 重開視窗
 
   // 子頁的「‹返回」鈕：退掉子頁那層 history，由 popstate 統一切回首頁，
   // 讓 app 狀態與 history 深度保持同步（避免殘留 entry 造成返回鍵錯亂）。
@@ -57,6 +58,9 @@ export default function App() {
     window.history.pushState({ taiex: true }, "");
 
     const onPop = () => {
+      // doLeave 已啟動：讓 history 自然耗盡，不推哨兵不開視窗，TWA 可順利 finish()
+      if (leavingRef.current) return;
+
       if (suppressNext) {
         suppressNext = false;
         window.history.pushState({ taiex: true }, "");
@@ -101,13 +105,11 @@ export default function App() {
   }, []); // 只在 App 掛載時執行一次，永遠不移除
 
   const doLeave = () => {
+    leavingRef.current = true;      // 先設旗標，讓 popstate 不再推哨兵/開視窗
     confirmLeaveRef.current = false;
     setConfirmLeave(false);
-    // TWA 裡 window.close() 被 Chrome 封鎖（僅 window.open() 開的頁面才允許）。
-    // 正確做法：耗盡 session history，讓 Android Activity 的 onBackPressed 自然 finish()。
-    // 桌機 PWA 走 window.close()（history.go 到底不會關分頁）。
-    window.close();
-    setTimeout(() => window.history.go(-(window.history.length + 5)), 50);
+    window.close();                  // 桌機 PWA 有效；TWA 被封鎖則由下一行接手
+    window.history.go(-window.history.length); // 耗盡 history，TWA canGoBack()→false → finish()
   };
 
   const handleGameOver = useCallback((stats: GameOverStats) => {
