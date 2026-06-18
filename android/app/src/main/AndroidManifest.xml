@@ -22,7 +22,7 @@
 
             <meta-data
                 android:name="android.support.customtabs.trusted.DISPLAY_MODE"
-                android:value="immersive-sticky" />
+                android:value="sticky-immersive" />
 
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
