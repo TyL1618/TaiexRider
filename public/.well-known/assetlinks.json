@@ -1,0 +1,10 @@
+[{
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "com.tylapp.taiexrider",
+    "sha256_cert_fingerprints": [
+      "F7:B0:90:48:84:BF:B4:82:31:82:71:2C:60:DE:06:FC:F8:91:B4:D3:33:7D:55:D5:03:11:08:B7:86:EE:00:F2"
+    ]
+  }
+}]
