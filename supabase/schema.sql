@@ -24,7 +24,9 @@ create index if not exists daily_scores_rank_idx
 -- 防偽造設計（v0.7 Google 登入版）：
 --   1. p_id 已移除：player_id 由伺服器 auth.uid() 決定，客戶端無法偽造。
 --   2. 必須是已登入用戶（auth.uid() IS NOT NULL），anon 無法呼叫。
---   3. 日期由伺服器 current_date 決定。
+--   3. 日期由伺服器決定，用台灣時區（Asia/Taipei）對齊客戶端 dailyKey()。
+--      ⚠️ 不可用 current_date：那是 UTC 日期，台灣午夜~早上 8 點間會少算一天，
+--         成績被存到前一天 challenge_date，跟排行榜讀的本地日期對不上 → 看似沒上榜。
 --   4. 分數 0~50000、時間 1s~2h、flips/perfect 0~50 合理性驗證。
 -- 需先 DROP 舊簽名再建新版。
 
@@ -44,6 +46,7 @@ set search_path = public
 as $$
 declare
   v_uid text;
+  v_today date := (now() at time zone 'Asia/Taipei')::date;  -- 台灣日期，對齊客戶端 dailyKey()
 begin
   -- 必須是已登入用戶（Google OAuth），anon 靜默拒絕
   v_uid := auth.uid()::text;
@@ -57,7 +60,7 @@ begin
 
   insert into public.daily_scores
     (challenge_date, player_id, player_name, score, time_ms, flips, perfect)
-  values (current_date, v_uid, left(p_name, 16), p_score, p_time, p_flips, p_perfect)
+  values (v_today, v_uid, left(p_name, 16), p_score, p_time, p_flips, p_perfect)
   on conflict (challenge_date, player_id) do update
     set score       = excluded.score,
         time_ms     = excluded.time_ms,
