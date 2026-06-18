@@ -13,7 +13,7 @@
         android:theme="@style/Theme.TaiexRider">
 
         <activity
-            android:name="com.google.androidbrowserhelper.trusted.LauncherActivity"
+            android:name=".MainActivity"
             android:exported="true">
 
             <meta-data
