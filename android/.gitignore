@@ -1,0 +1,32 @@
+# Built application files
+*.apk
+*.aar
+*.aab
+*.ap_
+
+# Gradle files
+.gradle/
+build/
+app/build/
+
+# Local configuration (machine-specific SDK path)
+local.properties
+
+# IntelliJ / Android Studio
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Log files
+*.log
+
+# Android Profiling
+*.hprof
+
+# External native build
+.externalNativeBuild/
+.cxx/
+
+# Keep Gradle wrapper jar
+!gradle/wrapper/gradle-wrapper.jar
