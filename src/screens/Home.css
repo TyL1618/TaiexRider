@@ -246,3 +246,29 @@
   letter-spacing: 0.25em;
   color: var(--text-dim);
 }
+
+/* 音量控制列 */
+.settings-volume-row {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  width: 100%;
+  padding: 0.25rem 0;
+}
+.settings-volume-label {
+  font-size: 0.82rem;
+  color: var(--text-dim);
+  white-space: nowrap;
+  min-width: 1.8rem;
+}
+.settings-volume-slider {
+  flex: 1;
+  accent-color: var(--neon-cyan);
+  cursor: pointer;
+}
+.settings-volume-val {
+  font-size: 0.82rem;
+  color: var(--neon-cyan);
+  min-width: 2.6rem;
+  text-align: right;
+}

@@ -1,11 +1,34 @@
 // Web Audio API 程式生成音效 — 不需外部音檔，純振盪器 + 噪音合成
 
+const VOLUME_KEY = "taiexVolume";
+
 let _ctx: AudioContext | null = null;
+let _masterGain: GainNode | null = null;
 
 function ctx(): AudioContext {
   if (!_ctx) _ctx = new AudioContext();
   if (_ctx.state === "suspended") void _ctx.resume();
   return _ctx;
+}
+
+function masterGain(): GainNode {
+  const c = ctx();
+  if (!_masterGain) {
+    _masterGain = c.createGain();
+    _masterGain.gain.value = parseFloat(localStorage.getItem(VOLUME_KEY) ?? "0.8");
+    _masterGain.connect(c.destination);
+  }
+  return _masterGain;
+}
+
+export function setVolume(v: number) {
+  const clamped = Math.max(0, Math.min(1, v));
+  localStorage.setItem(VOLUME_KEY, String(clamped));
+  if (_masterGain) _masterGain.gain.value = clamped;
+}
+
+export function getVolume(): number {
+  return parseFloat(localStorage.getItem(VOLUME_KEY) ?? "0.8");
 }
 
 // ---- 一次性音效 ----
@@ -16,7 +39,7 @@ export function playFlip() {
   const osc = c.createOscillator();
   const gain = c.createGain();
   osc.connect(gain);
-  gain.connect(c.destination);
+  gain.connect(masterGain());
   osc.type = "sine";
   osc.frequency.setValueAtTime(160, now);
   osc.frequency.exponentialRampToValueAtTime(520, now + 0.18);
@@ -34,7 +57,7 @@ export function playPerfectLanding() {
     const osc = c.createOscillator();
     const gain = c.createGain();
     osc.connect(gain);
-    gain.connect(c.destination);
+    gain.connect(masterGain());
     osc.type = "triangle";
     osc.frequency.value = freq;
     const t = now + delay;
@@ -62,7 +85,7 @@ export function playCrash() {
   const gain = c.createGain();
   src.connect(filt);
   filt.connect(gain);
-  gain.connect(c.destination);
+  gain.connect(masterGain());
   gain.gain.setValueAtTime(1.1, now);
   gain.gain.exponentialRampToValueAtTime(0.001, now + 0.55);
   src.start(now);
@@ -77,7 +100,7 @@ export function playFinish() {
     const osc = c.createOscillator();
     const gain = c.createGain();
     osc.connect(gain);
-    gain.connect(c.destination);
+    gain.connect(masterGain());
     osc.type = "triangle";
     osc.frequency.value = freq;
     const t = now + delay;
@@ -108,7 +131,7 @@ export function startEngine() {
   engGain.gain.value = 0;
   engOsc.connect(engFilt);
   engFilt.connect(engGain);
-  engGain.connect(c.destination);
+  engGain.connect(masterGain());
   engOsc.start();
 }
 

@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { APP_VERSION, CHANGELOG } from "../version";
 import { signInWithGoogle, signOut, updateProfileName, type User } from "../lib/auth";
 import { getPlayerName, setPlayerName } from "../lib/playerId";
+import { setVolume, getVolume } from "../game/audio";
 import "./Home.css";
 
 export type Screen = "home" | "custom" | "random" | "daily";
@@ -13,6 +14,7 @@ export default function Home({ user, onNav }: { user: User | null; onNav: (s: Sc
   const [nickname, setNickname]         = useState(() => getPlayerName());
   const [savedName, setSavedName]       = useState(() => getPlayerName());
   const [logoutConfirm, setLogoutConfirm] = useState(false);
+  const [volume, setVolumeState]        = useState(() => Math.round(getVolume() * 100));
 
   useEffect(() => {
     const n = getPlayerName();
@@ -55,24 +57,21 @@ export default function Home({ user, onNav }: { user: User | null; onNav: (s: Sc
         <button className="home-btn daily" onClick={() => onNav("daily")}>
           <span className="home-btn-icon">🏆</span>
           <span className="home-btn-main">每日排名賽</span>
-          <span className="home-btn-desc">全台同圖競技・比分數比時間</span>
+          <span className="home-btn-desc">每日精選賽道，排行競技</span>
         </button>
         <button className="home-btn random" onClick={() => onNav("random")}>
           <span className="home-btn-icon">🎲</span>
           <span className="home-btn-main">隨機賽道</span>
-          <span className="home-btn-desc">拉霸抽一張・隨興開騎</span>
+          <span className="home-btn-desc">前次盤勢圖池，隨機抽取賽道</span>
         </button>
         <button className="home-btn custom" onClick={() => onNav("custom")}>
           <span className="home-btn-icon">📈</span>
           <span className="home-btn-main">自選賽道</span>
-          <span className="home-btn-desc">挑指定股票・日盤或月盤</span>
+          <span className="home-btn-desc">自選股市賽道&每日隨機串聯關卡</span>
         </button>
       </div>
 
       <p className="home-foot">純娛樂・非投資建議</p>
-      <p style={{ textAlign: "center", color: "#ff3b6b", fontWeight: 700, letterSpacing: 1 }}>
-        🔬 自動更新測試 D · 這次該完全無感
-      </p>
 
       {showSettings && (
         <div className="modal-overlay" onClick={handleCloseSettings}>
@@ -112,7 +111,21 @@ export default function Home({ user, onNav }: { user: User | null; onNav: (s: Sc
               </div>
             )}
 
-            <div className="modal-item">音量（待實作）</div>
+            <div className="settings-volume-row">
+              <span className="settings-volume-label">音量</span>
+              <input
+                type="range"
+                className="settings-volume-slider"
+                min={0} max={100} step={5}
+                value={volume}
+                onChange={(e) => {
+                  const v = Number(e.target.value);
+                  setVolumeState(v);
+                  setVolume(v / 100);
+                }}
+              />
+              <span className="settings-volume-val">{volume}%</span>
+            </div>
 
             <div className="settings-meta-row">
               <span className="settings-version-text">版本 v{APP_VERSION}</span>
