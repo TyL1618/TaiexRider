@@ -20,6 +20,10 @@
                 android:name="android.support.customtabs.trusted.DEFAULT_URL"
                 android:value="@string/twa_url" />
 
+            <meta-data
+                android:name="android.support.customtabs.trusted.DISPLAY_MODE"
+                android:value="immersive-sticky" />
+
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
