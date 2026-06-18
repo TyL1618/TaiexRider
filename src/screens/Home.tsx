@@ -70,6 +70,9 @@ export default function Home({ user, onNav }: { user: User | null; onNav: (s: Sc
       </div>
 
       <p className="home-foot">純娛樂・非投資建議</p>
+      <p style={{ textAlign: "center", color: "#ff3b6b", fontWeight: 700, letterSpacing: 1 }}>
+        🔬 自動更新測試 A · 09:55
+      </p>
 
       {showSettings && (
         <div className="modal-overlay" onClick={handleCloseSettings}>
