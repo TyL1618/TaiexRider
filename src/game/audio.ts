@@ -139,7 +139,7 @@ export function updateEngine(speed: number, grounded: boolean) {
   if (!engOsc || !engGain) return;
   const c = ctx();
   const targetFreq = grounded ? Math.min(190, 50 + speed * 10) : 38;
-  const targetVol  = grounded ? Math.min(0.11, 0.03 + speed * 0.005) : 0.015;
+  const targetVol  = grounded ? Math.min(0.32, 0.08 + speed * 0.018) : 0.05;
   engOsc.frequency.setTargetAtTime(targetFreq, c.currentTime, 0.08);
   engGain.gain.setTargetAtTime(targetVol,   c.currentTime, 0.05);
 }

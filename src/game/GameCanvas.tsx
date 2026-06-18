@@ -5,7 +5,7 @@ import { pricesToTrack, buildTerrainBodies, slopeAt, terrainYAt, type Track } fr
 import { createBike, resetBike, type Bike } from "./bike";
 import { BIKE, CAMERA, COLOR, DRIVE, RULES } from "./constants";
 import { APP_VERSION } from "../version";
-import { playFlip, playPerfectLanding, playCrash, playFinish, startEngine, updateEngine, stopEngine } from "./audio";
+import { playFlip, playPerfectLanding, playCrash, playFinish, startEngine, updateEngine, stopEngine, getVolume, setVolume } from "./audio";
 
 export interface GameOverStats {
   score: number;
@@ -150,6 +150,7 @@ export default function GameCanvas({ prices, label, name, onExit, onGameOver, hi
   const [showChart, setShowChart] = useState(false); // 結算時切換 走勢圖/賽道
   const [toast, setToast] = useState<{ text: string; id: number } | null>(null);
   const [showSettings, setShowSettings] = useState(false);
+  const [volume, setVolumeState] = useState(() => Math.round(getVolume() * 100));
   const [paused, setPaused] = useState(false); // 暫停（discussion 第 13 點）
   const [confirmExit, setConfirmExit] = useState(false); // 返回主選單確認
   // 讓事件處理可讀到最新的結束狀態
@@ -1183,7 +1184,21 @@ let crashTimer = 0;
         <div className="overlay" onClick={() => setShowSettings(false)}>
           <div className="settings-panel" onClick={(e) => e.stopPropagation()}>
             <div className="overlay-title">設定</div>
-            <div className="settings-row">音量（待實作）</div>
+            <div className="settings-volume-row">
+              <span className="settings-volume-label">音量</span>
+              <input
+                type="range"
+                className="settings-volume-slider"
+                min={0} max={100} step={5}
+                value={volume}
+                onChange={(e) => {
+                  const v = Number(e.target.value);
+                  setVolumeState(v);
+                  setVolume(v / 100);
+                }}
+              />
+              <span className="settings-volume-val">{volume}%</span>
+            </div>
             <div className="settings-row dim">版本 v{APP_VERSION}</div>
             <button className="overlay-btn ghost" onClick={() => setShowSettings(false)}>
               關閉
