@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.11.0";
+export const APP_VERSION = "0.11.1";
 
 export interface ChangelogEntry {
   date: string;
@@ -6,6 +6,12 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    date: "2026-06-20 (v0.11.1)",
+    notes: [
+      "開機加入深色霓虹 splash：開啟時第一時間顯示品牌畫面、載入完成淡出，減少白屏／啟動空窗的突兀感",
+    ],
+  },
   {
     date: "2026-06-20 (v0.11.0)",
     notes: [

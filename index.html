@@ -11,8 +11,50 @@
     <meta name="robots" content="noindex, nofollow" />
     <title>TaiexRider</title>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <!-- 開機 splash：inline 樣式，第一 byte 即 paint，遮住 TWA 啟動空窗/白屏，React 掛載後淡出移除 -->
+    <style>
+      #boot-splash {
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 1.4rem;
+        background: #05080f;
+        font-family: system-ui, -apple-system, "Segoe UI", Roboto, "PingFang TC", "Microsoft JhengHei", sans-serif;
+        opacity: 1;
+        transition: opacity 0.35s ease;
+      }
+      #boot-splash.hide {
+        opacity: 0;
+        pointer-events: none;
+      }
+      #boot-splash .bs-title {
+        font-size: 2.1rem;
+        font-weight: 800;
+        letter-spacing: 0.18em;
+        color: #2de2e6;
+        text-shadow: 0 0 14px rgba(45, 226, 230, 0.7), 0 0 32px rgba(45, 226, 230, 0.35);
+        animation: bs-pulse 1.4s ease-in-out infinite;
+      }
+      #boot-splash .bs-sub {
+        font-size: 0.8rem;
+        letter-spacing: 0.3em;
+        color: rgba(255, 255, 255, 0.45);
+      }
+      @keyframes bs-pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.55; }
+      }
+    </style>
   </head>
   <body>
+    <div id="boot-splash">
+      <div class="bs-title">TAIEX&nbsp;RIDER</div>
+      <div class="bs-sub">LOADING</div>
+    </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
