@@ -45,6 +45,18 @@ export function resolveSessionDate(date: string): Promise<string> {
   return _sessionCache.get(date)!;
 }
 
+// 由 map_date 推回「實際交易日」(= map_date − 1)。UI 標籤一律用這個，
+// 不可用「今天 − 1」：連假時今天 − 1 ≠ 實際盤勢日（例：週六 6/20 − 1 = 6/19，但盤是 6/18）。
+export function sessionDateFromMapDate(mapDate: string): Date {
+  const [y, m, d] = mapDate.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d - 1));
+}
+
+// 取「目前這一期實際盤勢日」的 Date（resolveSessionDate 回 map_date，再 −1 天）。給標籤顯示用。
+export async function resolveSessionDisplayDate(date: string): Promise<Date> {
+  return sessionDateFromMapDate(await resolveSessionDate(date));
+}
+
 async function _resolveSession(date: string): Promise<string> {
   if (!URL || !KEY) return date;
   try {

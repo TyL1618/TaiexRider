@@ -55,8 +55,13 @@
   position: absolute;
   top: 3.2rem;
   left: 1.1rem;
+  /* 不蓋到右上「返回主選單 / 暫停」鈕：長征模式 name = 5 個股號串接會很長，
+     限寬讓它自動換行（垂直堆疊）而非橫向擋住按鈕 */
+  max-width: calc(100% - 8rem);
   font-size: 0.8rem;
   letter-spacing: 0.08em;
+  line-height: 1.35;
+  word-break: break-word;
   color: var(--text-dim);
   pointer-events: none;
   user-select: none;

@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { TRACKS, trackDifficulty, type TrackData } from "./data/tracks";
-import { fetchDailyMapList, fetchStockDailyMap, type DailyMapMeta } from "./lib/dailyMap";
+import { fetchDailyMapList, fetchStockDailyMap, resolveSessionDisplayDate, type DailyMapMeta } from "./lib/dailyMap";
 import { fetchLongTrack } from "./lib/longTrack";
 import { dailyKey } from "./data/pick";
 import "./TrackSelect.css";
@@ -118,11 +118,15 @@ export default function TrackSelect({
   const visibleList   = intradayList.slice(0, visibleCount);
   const hasMore       = visibleCount < intradayList.length;
 
-  // 圖池對應的股市日期（今日 map_date 存的是前一個執行日的盤中走勢）
-  const key = dailyKey();
-  const [ky, km, kd] = key.split("-").map(Number);
-  const prevDay = new Date(Date.UTC(ky, km - 1, kd - 1));
-  const poolDateStr = `${prevDay.getUTCMonth() + 1}/${prevDay.getUTCDate()} 走勢`;
+  // 圖池對應的股市日期 = 實際盤勢日（resolveSessionDate − 1），連假時 ≠ 今天 − 1。
+  const [poolDateStr, setPoolDateStr] = useState("載入中…");
+  useEffect(() => {
+    let alive = true;
+    resolveSessionDisplayDate(dailyKey()).then((d) => {
+      if (alive) setPoolDateStr(`${d.getUTCMonth() + 1}/${d.getUTCDate()} 走勢`);
+    });
+    return () => { alive = false; };
+  }, []);
 
   return (
     <div className={`select-screen${picking || longPicking ? " is-picking" : ""}`}>

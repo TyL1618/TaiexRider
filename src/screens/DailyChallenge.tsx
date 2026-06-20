@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import Sparkline from "../components/Sparkline";
 import { dailyTrack, dailyKey } from "../data/pick";
 import { fetchDailyTop, invalidateDailyTop, isLeaderboardConfigured, type ScoreRow } from "../lib/leaderboard";
-import { fetchHardestDailyMap, resolveSessionDate } from "../lib/dailyMap";
+import { fetchHardestDailyMap, resolveSessionDate, resolveSessionDisplayDate } from "../lib/dailyMap";
 import { signInWithGoogle, type User } from "../lib/auth";
 import { getPlayerName } from "../lib/playerId";
 import type { TrackData } from "../data/tracks";
@@ -23,8 +23,11 @@ export default function DailyChallenge({
   onBack: () => void;
 }) {
   const fallbackTrack = dailyTrack();
-  const today = new Date();
-  const dateStr = `${today.getFullYear()}/${String(today.getMonth() + 1).padStart(2, "0")}/${String(today.getDate()).padStart(2, "0")}`;
+  // 標題日期 = 實際盤勢日（resolveSessionDate − 1），連假時 ≠ 今天 − 1。先放今天當 fallback，解析後更新。
+  const [dateStr, setDateStr] = useState(() => {
+    const t = new Date();
+    return `${t.getFullYear()}/${String(t.getMonth() + 1).padStart(2, "0")}/${String(t.getDate()).padStart(2, "0")}`;
+  });
   const [track, setTrack] = useState<TrackData>(fallbackTrack);
   const [isLive, setIsLive] = useState(false);
   const [rows, setRows] = useState<ScoreRow[]>([]);
@@ -53,6 +56,15 @@ export default function DailyChallenge({
       return fetchDailyTop(key);
     }).then((r) => {
       if (alive) { setRows(r); setLoaded(true); }
+    });
+    return () => { alive = false; };
+  }, []);
+
+  // 標題日期改用實際盤勢日（= map_date − 1），與畫面顯示的盤一致（連假時 ≠ 今天 − 1）
+  useEffect(() => {
+    let alive = true;
+    resolveSessionDisplayDate(dailyKey()).then((d) => {
+      if (alive) setDateStr(`${d.getUTCFullYear()}/${String(d.getUTCMonth() + 1).padStart(2, "0")}/${String(d.getUTCDate()).padStart(2, "0")}`);
     });
     return () => { alive = false; };
   }, []);
