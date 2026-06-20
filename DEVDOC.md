@@ -79,7 +79,7 @@ create policy "auth update"   on public.daily_scores for update using (auth.uid(
 ```
 
 提交走 `leaderboard.ts` 的 `submitDailyScore()` → RPC `submit_daily_score`（security definer），需 Google 登入（`auth.uid()` 伺服器端決定 player_id）。
-⚠️ **`challenge_date` 用台灣時區** `(now() at time zone 'Asia/Taipei')::date`，**不可用 `current_date`（UTC）**——台灣午夜後會把成績存到前一天、跟 app 讀的本地日期對不上（看似沒上榜，實際有寫）。詳見 CLAUDE.md「時區踩雷」。
+⚠️ **`challenge_date` = `coalesce(max(map_date ≤ 台灣今天), 台灣今天)`**（與前端 `resolveSessionDate()` 同源），讓週末/連假整段成績累積在同一張榜、午夜才換新榜。**不可用 `current_date`（UTC）**（台灣午夜後存到前一天），**也不可只用台灣日曆日**（連假時 ≠ 最後交易日的 map_date，會跟讀取端的 max(map_date) 對不上 → 看似沒上榜）。⚠️ **改 schema 後 push 不會更新 RPC，要手動在 Supabase SQL Editor 跑 `create or replace function submit_daily_score`。** 詳見 CLAUDE.md「排行榜對齊」「時區踩雷」。
 
 ### 2.3 `keep_alive` — Supabase 保活
 
@@ -104,7 +104,7 @@ cron-job.org 定期 ping，避免 Supabase 免費方案休眠。
 2. 抓 TWSE `STOCK_DAY_ALL` 取**上市股票清單**（代號+名稱），過濾 `/^\d{4}$/`（純 4 位數字，排除 ETF 字母尾）。
 3. 對每支股票抓當日盤中走勢：Yahoo `{code}.TW`（5 分 K、`range=1d`），降採樣至 ~110 點。
 4. 計算 `difficulty`（盤中最大單步漲跌幅）。
-5. Upsert 至 Supabase `daily_map`（`Prefer: resolution=merge-duplicates`，衝突鍵 `(map_date, stock_code)`），清除 7 天前舊資料。
+5. Upsert 至 Supabase `daily_map`（`Prefer: resolution=merge-duplicates`，衝突鍵 `(map_date, stock_code)`），清除舊資料。⚠️ **cutoff 錨定剛寫入的 `mapDate − 7 天`，不可錨「執行當下 now − 7 天」**：長連假（過年/長颱風假 > 7 天）map_date 凍住但 now 一直走，用 now-7 會追過當前唯一在用的 map_date 把它刪掉（甚至同一次跑剛寫又刪）→ 掉回靜態盤。錨 mapDate 則任意長度連假當前盤永遠保留。
 
 > 每日約 ~1090 支股票，失敗容錯繼續（不中斷整批）。連假/休市時 Yahoo `range=1d` 自動回最後交易日 → sessionDate 不變 → 持續顯示最後交易日的盤（正確）。
 
