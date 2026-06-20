@@ -106,11 +106,13 @@ export default function TrackSelect({
     if (!result) return;
     onPick({
       label: "長征",
-      name: result.labels.join(" ・ "),
+      name: "5 股串接",
       kind: "stock",
       mode: "long",
       desc: "今日 5 股串接・長征路線",
       prices: result.prices,
+      // 5 個股號改放副標、垂直堆疊（換行），避免 HUD 頂線過長橫向蓋住中央分數
+      subtitle: result.labels.join("\n"),
     });
   }, [longPicking, onPick]);
 

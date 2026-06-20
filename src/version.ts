@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.10.0";
+export const APP_VERSION = "0.10.1";
 
 export interface ChangelogEntry {
   date: string;
@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    date: "2026-06-20 (v0.10.1)",
+    notes: [
+      "修正每日長征遊玩中第 3、4 個股號會跟中央分數重疊：5 個股號改放 HUD 副標、垂直堆疊",
+      "每日排名賽「前日盤勢」文案改為「前次盤勢」（連假/休市時更精準）",
+    ],
+  },
   {
     date: "2026-06-20 (v0.10.0)",
     notes: [

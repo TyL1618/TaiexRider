@@ -96,7 +96,7 @@ export default function DailyChallenge({
           <span className="daily-label">{track.label}</span>
           <span className="daily-name">{track.name}</span>
         </div>
-        <div className="daily-period">{isLive ? "前日盤勢 ・ 今日地圖" : "近月日線 ・ 今日地圖"}</div>
+        <div className="daily-period">{isLive ? "前次盤勢 ・ 今日地圖" : "近月日線 ・ 今日地圖"}</div>
 
         {user ? (
           <div className="auth-row">

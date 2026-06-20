@@ -72,6 +72,7 @@
   color: var(--neon-cyan);
   opacity: 0.85;
   line-height: 1.3;
+  white-space: pre-line; /* 長征 5 股號用 \n 垂直堆疊；經典模式單行不受影響 */
 }
 
 .hud-stars {
