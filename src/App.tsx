@@ -5,6 +5,7 @@ import TrackSelect from "./TrackSelect";
 import Home, { type Screen } from "./screens/Home";
 import RandomSlot from "./screens/RandomSlot";
 import DailyChallenge from "./screens/DailyChallenge";
+import ClassicSelect from "./screens/ClassicSelect";
 import type { TrackData } from "./data/tracks";
 import { submitDailyScore, fetchDailyTop } from "./lib/leaderboard";
 import { fetchHardestDailyMap, fetchDailyMapList, resolveSessionDate } from "./lib/dailyMap";
@@ -144,6 +145,7 @@ export default function App() {
         prices={track.prices}
         label={track.label}
         name={track.name}
+        subtitle={track.subtitle}
         onExit={handleExitTrack}
         onGameOver={handleGameOver}
         hideMinimap={track.mode === "long"}
@@ -159,8 +161,9 @@ export default function App() {
     setScreen(s);
   };
 
-  if (screen === "custom") return <TrackSelect onPick={handleStartTrack} onBack={goHome} />;
-  if (screen === "random") return <RandomSlot  onPick={handleStartTrack} onBack={goHome} />;
+  if (screen === "custom")  return <TrackSelect   onPick={handleStartTrack} onBack={goHome} />;
+  if (screen === "random")  return <RandomSlot    onPick={handleStartTrack} onBack={goHome} />;
+  if (screen === "classic") return <ClassicSelect onPick={handleStartTrack} onBack={goHome} />;
   if (screen === "daily")  return (
     <DailyChallenge
       user={user}

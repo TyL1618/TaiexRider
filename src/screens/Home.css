@@ -70,6 +70,10 @@
 .home-btn.daily:hover { border-color: var(--neon-amber); box-shadow: 0 0 22px rgba(255, 179, 0, 0.3); background: rgba(255, 179, 0, 0.08); }
 .home-btn.daily .home-btn-main { color: var(--neon-amber); text-shadow: 0 0 10px rgba(255, 179, 0, 0.5); }
 
+.home-btn.classic { border-color: rgba(199, 125, 255, 0.4); }
+.home-btn.classic:hover { border-color: #c77dff; box-shadow: 0 0 22px rgba(199, 125, 255, 0.3); background: rgba(199, 125, 255, 0.08); }
+.home-btn.classic .home-btn-main { color: #c77dff; text-shadow: 0 0 10px rgba(199, 125, 255, 0.5); }
+
 /* ---- 設定 modal 帳號區塊 ---- */
 .settings-account {
   display: flex;

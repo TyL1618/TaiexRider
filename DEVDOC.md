@@ -194,13 +194,16 @@ src/
 │   ├── audio.ts           # Web Audio API 程式生成音效（引擎 + 翻車 + 琶音）
 │   └── camera.ts          # 鏡頭跟隨
 ├── screens/
-│   ├── Home.tsx           # 首頁（三模式入口 + 設定 modal + 返回確認）
+│   ├── Home.tsx           # 首頁（四模式入口 + 設定 modal + 返回確認）
 │   ├── DailyChallenge.tsx # 每日排名賽（地圖預覽 + 排行榜 + Google 登入）
+│   ├── ClassicSelect.tsx  # 經典模式（歷史著名盤勢 12 條靜態關卡 + 事件說明）
 │   └── RandomSlot.tsx     # 隨機拉霸（Supabase pool，30 格 × 8 = 240 DOM nodes）
 ├── TrackSelect.tsx        # 自選賽道（Supabase ~1000 支 + 無限捲動 30/次）
 ├── data/
 │   ├── tracks.ts          # 本地內建 24 支賽道（月線 fallback）
 │   ├── pick.ts            # dailyKey() / dailyTrack()
+│   ├── classics.ts        # 經典模式型別 + classicToTrack()
+│   ├── classics.json      # 經典關卡靜態資料（scripts/fetchClassics.ts 一次性產出）
 │   └── sample-*.json      # 預抓樣本（2330/0050/2454/TAIEX）
 ├── lib/
 │   ├── dailyMap.ts        # Supabase daily_map 讀取 + promise 快取

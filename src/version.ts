@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.9.4";
+export const APP_VERSION = "0.10.0";
 
 export interface ChangelogEntry {
   date: string;
@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    date: "2026-06-20 (v0.10.0)",
+    notes: [
+      "新增第四個模式「經典模式」：歷史著名股災／飆漲盤勢做成 12 條永久關卡（台股 2000網路泡沫・2008海嘯・2020 COVID深V・2022空頭・319槍擊・2024史上最大單日跌點；美股 1987黑色星期一・2000網路泡沫・2008海嘯・2020 COVID・GME軋空；日股 1989泡沫頂）",
+      "經典關卡的選單與遊戲內 HUD 顯示事件期間、標的與發生什麼事",
+    ],
+  },
   {
     date: "2026-06-20 (v0.9.4)",
     notes: [

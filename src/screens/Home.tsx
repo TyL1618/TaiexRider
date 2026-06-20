@@ -5,7 +5,7 @@ import { getPlayerName, setPlayerName } from "../lib/playerId";
 import { setVolume, getVolume } from "../game/audio";
 import "./Home.css";
 
-export type Screen = "home" | "custom" | "random" | "daily";
+export type Screen = "home" | "custom" | "random" | "daily" | "classic";
 
 export default function Home({ user, onNav }: { user: User | null; onNav: (s: Screen) => void }) {
   const [showSettings, setShowSettings] = useState(false);
@@ -68,6 +68,11 @@ export default function Home({ user, onNav }: { user: User | null; onNav: (s: Sc
           <span className="home-btn-icon">📈</span>
           <span className="home-btn-main">自選賽道</span>
           <span className="home-btn-desc">自選股市賽道&每日隨機串聯關卡</span>
+        </button>
+        <button className="home-btn classic" onClick={() => onNav("classic")}>
+          <span className="home-btn-icon">🏛️</span>
+          <span className="home-btn-main">經典模式</span>
+          <span className="home-btn-desc">重現歷史著名股災與飆漲盤勢</span>
         </button>
       </div>
 

@@ -67,11 +67,25 @@
   user-select: none;
 }
 
+.hud-sub {
+  font-size: 0.72rem;
+  color: var(--neon-cyan);
+  opacity: 0.85;
+  line-height: 1.3;
+}
+
 .hud-stars {
   font-size: 0.75rem;
   color: var(--neon-amber);
   letter-spacing: 0.04em;
   line-height: 1.3;
+}
+
+.overlay-track-sub {
+  font-size: 0.82rem;
+  color: var(--neon-cyan);
+  opacity: 0.85;
+  margin-top: 0.15rem;
 }
 
 /* 得分提示 toast（中央彈出後淡出上飄）*/

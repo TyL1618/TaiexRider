@@ -19,6 +19,7 @@ interface GameCanvasProps {
   prices: number[];
   label: string;
   name: string;
+  subtitle?: string;   // HUD 副標（經典模式：期間・標的）
   onExit: () => void;
   onGameOver?: (stats: GameOverStats) => void;
   hideMinimap?: boolean;
@@ -130,7 +131,7 @@ let _bikeImgReady = false;
 _bikeImg.onload = () => { _bikeImgReady = true; };
 _bikeImg.src = `${import.meta.env.BASE_URL}bike.png`;
 
-export default function GameCanvas({ prices, label, name, onExit, onGameOver, hideMinimap = false }: GameCanvasProps) {
+export default function GameCanvas({ prices, label, name, subtitle, onExit, onGameOver, hideMinimap = false }: GameCanvasProps) {
   const stars = difficultyStars(calcDifficulty(prices));
   const cityBuildings = generateCity(prices.length * 31 + Math.round((prices[0] || 0) * 100));
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -1130,6 +1131,7 @@ let crashTimer = 0;
         <>
           <div className="hud-corner">
             <div>{label} {name}</div>
+            {subtitle && <div className="hud-sub">{subtitle}</div>}
             <div className="hud-stars">{"★".repeat(stars)}{"☆".repeat(5 - stars)}</div>
             <div>距離 {hud.distance}m</div>
           </div>
@@ -1212,6 +1214,7 @@ let crashTimer = 0;
           <div className="overlay-top">
             <div className="overlay-title">{finished ? "完賽！" : "摔車"}</div>
             <div className="overlay-track-name">{label} {name}</div>
+            {subtitle && <div className="overlay-track-sub">{subtitle}</div>}
             <div className="overlay-score">{hud.points} 分</div>
             <div className="overlay-time">{hud.timer}</div>
             <div className="overlay-stats">
