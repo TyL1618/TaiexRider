@@ -105,7 +105,7 @@ export default function RandomSlot({
           }
           const row = await fetchStockDailyMap(dailyKey(), winner.stock_code);
           if (row) {
-            setResult({ label: row.stock_code, name: row.stock_name, kind: "stock", mode: "intraday", desc: "前日盤中走勢", prices: row.prices });
+            setResult({ label: row.stock_code, name: row.stock_name, kind: "stock", mode: "intraday", desc: "前次盤中走勢", prices: row.prices });
             setPhase("result");
           } else {
             setPhase("idle"); // fetch 失敗，靜默回到待機
@@ -141,7 +141,7 @@ export default function RandomSlot({
       <button className="back-btn" onClick={onBack}>‹ 返回</button>
       <h1 className="slot-title">隨機賽道</h1>
       {poolLoaded && (
-        <p className="slot-pool-hint">{pool.length} 支股票・前日盤中走勢</p>
+        <p className="slot-pool-hint">{pool.length} 支股票・前次盤中走勢</p>
       )}
 
       <div className="slot-machine">

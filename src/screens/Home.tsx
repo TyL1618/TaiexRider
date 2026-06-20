@@ -226,7 +226,7 @@ export default function Home({ user, onNav }: { user: User | null; onNav: (s: Sc
                 <ul className="log-notes">
                   <li>每日排名賽：全台同圖、登入 Google 參加排行榜</li>
                   <li>隨機賽道：拉霸隨機抽一支股票</li>
-                  <li>自選賽道・前日盤勢：從全市場約 1000 支自選</li>
+                  <li>自選賽道・前次盤勢：從全市場約 1000 支自選</li>
                   <li>自選賽道・每日長征：5 支股票串接的超長路線</li>
                 </ul>
               </div>

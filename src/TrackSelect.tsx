@@ -69,7 +69,7 @@ export default function TrackSelect({
     return () => obs.disconnect();
   }); // 無 deps：每次 render 後重新 attach，確保 sentinel 位置正確
 
-  // 前日盤勢：優先 Supabase，fallback 本地 24 支
+  // 前次盤勢：優先 Supabase，fallback 本地 24 支
   const intradayList = useMemo(() => {
     const src: DailyMapMeta[] = remoteList.length > 0
       ? remoteList
@@ -95,7 +95,7 @@ export default function TrackSelect({
     const row = await fetchStockDailyMap(dailyKey(), item.stock_code);
     setPicking(false);
     if (!row) return;
-    onPick({ label: row.stock_code, name: row.stock_name, kind: "stock", mode: "intraday", desc: "前日盤中走勢", prices: row.prices });
+    onPick({ label: row.stock_code, name: row.stock_name, kind: "stock", mode: "intraday", desc: "前次盤中走勢", prices: row.prices });
   }, [picking, onPick]);
 
   const handlePickLong = useCallback(async () => {
@@ -137,7 +137,7 @@ export default function TrackSelect({
 
       <div className="mode-tabs">
         <button className={`mode-tab ${mode === "intraday" ? "active" : ""}`} onClick={() => setMode("intraday")}>
-          前日盤勢
+          前次盤勢
           <span className="mode-tab-desc">
             {remoteLoaded ? `${intradayCount} 支` : "載入中…"}・{poolDateStr}
           </span>
@@ -188,7 +188,7 @@ export default function TrackSelect({
                     <span className="track-name">{t.stock_name}</span>
                     <span className="track-diff">{"★".repeat(starsFromScore(t.difficulty))}</span>
                   </div>
-                  <span className="track-desc">前日盤勢</span>
+                  <span className="track-desc">前次盤勢</span>
                 </button>
               ))}
 
