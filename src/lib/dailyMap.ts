@@ -27,21 +27,19 @@ function headers() {
   return { apikey: KEY!, Authorization: `Bearer ${KEY!}` };
 }
 
-function nextDay(date: string): string {
-  // 用純 UTC 運算，避免本地時區偏移導致日期算錯（UTC+8 會讓 setDate+1 仍回傳同一天）
-  const [y, m, d] = date.split("-").map(Number);
-  return new Date(Date.UTC(y, m - 1, d + 1)).toISOString().slice(0, 10);
-}
-
 const _hardestCache = new Map<string, Promise<DailyMapRow | null>>();
 const _stockCache   = new Map<string, Promise<DailyMapRow | null>>();
 const _listCache    = new Map<string, Promise<DailyMapMeta[]>>();
 const _sessionCache = new Map<string, Promise<string>>();
 
-// 解析「目前這一期」的 map_date：daily_map 中 map_date ≤ nextDay(今天) 的「最大」值。
-// 連假期間日曆日會超過最後交易日的 map_date，用 lte + desc 取最新一期，
-// 才能「一律顯示最後一次盤勢」而非 fallback 靜態盤。查無（或未設定）時回傳 date 本身（穩定 key）。
-// 此 key 同時供排行榜對齊（前端讀／RPC 寫都用 max(map_date)，整個連假累積在同一張榜）。
+// 解析「目前這一期」的 map_date：daily_map 中 map_date ≤ 今天（日曆日）的「最大」值。
+// 上界用「今天」(非 nextDay)，因為 map_date = sessionDate+1 已內建「00:00 才生效」：
+//   - 週五 16:00 cron 把週五盤存成 map_date=週六，週五當天 max(≤週五)=週四盤（不會提早跳）；
+//     週六 00:00 起 max(≤週六)=週六 → 切到週五盤。精準在午夜換圖。
+//   - 連假/多日休市：日曆日超過最後交易日的 map_date，lte + desc 取「最近一期」往回 fallback
+//     → 整段沿用最後交易日的盤；下個交易日盤抓到、隔天 00:00 才換。
+// 若該交易日盤勢與前一期相同（休市重抓同一 sessionDate），寫入端 upsert 同一 map_date → 不產生新期，自然沿用。
+// 查無（或未設定）時回傳 date 本身（穩定 key）。此 key 同時供排行榜對齊（前端讀／RPC 寫都用 max(map_date)）。
 export function resolveSessionDate(date: string): Promise<string> {
   if (!_sessionCache.has(date)) _sessionCache.set(date, _resolveSession(date));
   return _sessionCache.get(date)!;
@@ -51,7 +49,7 @@ async function _resolveSession(date: string): Promise<string> {
   if (!URL || !KEY) return date;
   try {
     const r = await fetch(
-      `${URL}/rest/v1/daily_map?map_date=lte.${nextDay(date)}&order=map_date.desc&limit=1&select=map_date`,
+      `${URL}/rest/v1/daily_map?map_date=lte.${date}&order=map_date.desc&limit=1&select=map_date`,
       { headers: headers() },
     );
     if (r.ok) {

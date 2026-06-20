@@ -49,11 +49,12 @@ set search_path = public
 as $$
 declare
   v_uid text;
-  -- 台灣日曆日（容忍排程延遲 +1 天）為上界，取 daily_map 最新一期 map_date 當 challenge_date。
-  -- 與前端 resolveSessionDate 同源；連假整段沿用同一張榜。DB 無 map_date 時 fallback 台灣日曆日。
-  v_bound date := (now() at time zone 'Asia/Taipei')::date + 1;
+  -- challenge_date = daily_map 中 map_date ≤ 台灣今天（日曆日）的「最大」值，與前端 resolveSessionDate 同源。
+  -- 上界用「今天」(非 +1)：map_date = sessionDate+1 已內建「00:00 才生效」，週末/連假整段沿用最後交易日那張榜，
+  -- 隔天交易日盤抓到後在 00:00 才換新榜。DB 無 map_date 時 fallback 台灣日曆日。
   v_today date := coalesce(
-    (select max(map_date) from public.daily_map where map_date <= v_bound),
+    (select max(map_date) from public.daily_map
+       where map_date <= (now() at time zone 'Asia/Taipei')::date),
     (now() at time zone 'Asia/Taipei')::date
   );
 begin

@@ -55,7 +55,7 @@ create policy "public read" on public.daily_map for select using (true);
 
 每日由 GitHub Actions 更新。`map_date = 實際交易日 sessionDate + 1`，讓 00:00 即生效。
 ⚠️ **不可用「執行當下時間 +1」推算**——GitHub 排程延遲跨午夜會錯位+跳號。`sessionDate` 從 Yahoo 回傳的 K 棒 timestamp 直接讀出（實際交易日），詳見 §3.1 與 CLAUDE.md「時區踩雷」。
-客戶端查詢策略（連假安全）：`resolveSessionDate()` 取 daily_map 中 `map_date ≤ nextDay(今天)` 的 **max**（最新一期），地圖與排行榜 challenge key 全部對齊它。⚠️ 不可只查「今天/明天」——`map_date = sessionDate+1` 只撐一天，連假第二天起日曆日就超過它 → 掉回靜態盤。RPC `submit_daily_score` 的 `challenge_date` 也用 `max(map_date)`（同源），連假整段累積在同一張榜。詳見 CLAUDE.md「app 讀取（連假安全）」。
+客戶端查詢策略（連假安全 + 午夜換圖）：`resolveSessionDate()` 取 daily_map 中 `map_date ≤ **今天**（日曆日）` 的 **max**（最近一期），地圖與排行榜 challenge key 全部對齊它。上界用「今天」即可午夜換圖（`map_date=sessionDate+1` 內建 00:00 才生效）；連假時日曆日超過最後交易日的 map_date → lte+desc 往回沿用最近一期，下個交易日盤抓到隔天 00:00 才換。⚠️ 不可只查「今天/明天」精準比對——連假第二天起日曆日就錯過 → 掉回靜態盤。RPC `submit_daily_score` 的 `challenge_date` 也用 `max(map_date ≤ 台灣今天)`（同源），連假整段累積在同一張榜。詳見 CLAUDE.md「app 讀取（連假安全 + 午夜換圖）」。
 
 ### 2.2 `daily_scores` — 每日排行榜成績
 
