@@ -45,3 +45,30 @@
   color: var(--text);
   opacity: 0.85;
 }
+
+.classic-record {
+  align-self: stretch;
+  margin-top: 0.15rem;
+  padding-top: 0.4rem;
+  border-top: 1px solid rgba(45, 226, 230, 0.15);
+  font-size: 0.78rem;
+  text-align: right;
+  color: var(--neon-amber);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.classic-record .cr-name { font-weight: 700; }
+.classic-record .cr-empty { color: var(--text-dim); }
+
+.classic-login {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.9rem;
+}
+.classic-login-hint {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+}

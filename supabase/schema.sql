@@ -121,6 +121,63 @@ $$;
 
 grant execute on function public.cleanup_old_scores_if_needed() to anon;
 
+-- ── 經典模式紀錄保持者 ────────────────────────────────────────────
+-- 經典關卡是固定地形，每關只保留「單一紀錄保持者」(level_id 主鍵，整表 ~12 列)。
+-- 分數高優先、同分時間短覆蓋。需登入(auth.uid)才算紀錄。
+create table if not exists public.classic_records (
+  level_id     text          primary key,
+  player_id    text          not null,
+  player_name  text          not null,
+  score        int           not null,
+  time_ms      int           not null,
+  updated_at   timestamptz   not null default now()
+);
+
+alter table public.classic_records enable row level security;
+drop policy if exists "anon read classic" on public.classic_records;
+create policy "anon read classic" on public.classic_records
+  for select to anon using (true);
+revoke insert, update, delete on public.classic_records from anon;
+
+-- 提交經典紀錄（security definer，upsert-if-better）。player_id 由 auth.uid() 決定，無法偽造。
+drop function if exists public.submit_classic_record(text, text, int, int);
+create or replace function public.submit_classic_record(
+  p_level text,
+  p_name  text,
+  p_score int,
+  p_time  int
+) returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_uid text;
+begin
+  v_uid := auth.uid()::text;
+  if v_uid is null then return; end if;                  -- 需登入
+  if p_level is null or length(p_level) > 32 then return; end if;
+  if p_score < 0    or p_score > 50000   then return; end if;
+  if p_time  < 1000 or p_time  > 7200000 then return; end if;
+
+  insert into public.classic_records
+    (level_id, player_id, player_name, score, time_ms, updated_at)
+  values (p_level, v_uid, left(p_name, 16), p_score, p_time, now())
+  on conflict (level_id) do update
+    set player_id   = excluded.player_id,
+        player_name = excluded.player_name,
+        score       = excluded.score,
+        time_ms     = excluded.time_ms,
+        updated_at  = now()
+    -- 只有「分數更高，或同分但時間更短」才覆蓋保持者
+    where excluded.score > public.classic_records.score
+       or (excluded.score = public.classic_records.score
+           and excluded.time_ms < public.classic_records.time_ms);
+end;
+$$;
+
+grant execute on function public.submit_classic_record(text, text, int, int) to authenticated;
+
 -- ── 每日地圖（GitHub Actions 21:05 台灣時間抓全台股 + TAIEX，存隔日地圖）──────
 -- (map_date, stock_code) 聯合主鍵：每天 ~960 筆，只保留最近 7 天（腳本自動清理）
 drop table if exists public.daily_map;

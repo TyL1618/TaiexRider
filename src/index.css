@@ -112,6 +112,21 @@ body {
 }
 .modal-item { font-size: 0.95rem; letter-spacing: 0.08em; color: var(--text); }
 .modal-item.dim { font-size: 0.82rem; color: var(--text-dim); line-height: 1.6; }
+
+/* 離開確認：標題加大加亮，讓人清楚知道「可以離開」 */
+.modal-title.leave-title {
+  font-size: 1.45rem;
+  color: var(--neon-amber);
+  text-shadow: 0 0 14px rgba(255, 179, 0, 0.55);
+  line-height: 1.4;
+}
+.modal-leave-hint {
+  font-size: 0.95rem;
+  letter-spacing: 0.06em;
+  color: var(--text);
+  opacity: 0.9;
+  margin: 0.1rem 0 0.2rem;
+}
 .modal-link {
   font-size: 0.82rem; letter-spacing: 0.08em; color: var(--neon-cyan);
   background: transparent; border: none; cursor: pointer; padding: 0.2rem;

@@ -197,6 +197,38 @@
 
 .long-track-btn:not(:disabled):active { transform: scale(0.97); }
 
+/* 今日 5 股走勢預覽（純呈現，不可點）*/
+.long-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  width: 100%;
+  max-width: 340px;
+}
+.long-preview-title {
+  font-size: 0.8rem;
+  letter-spacing: 0.1em;
+  color: var(--text-dim);
+  text-align: center;
+}
+.long-preview-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.6rem 0.75rem;
+  background: rgba(45, 226, 230, 0.04);
+  border: 1px solid rgba(45, 226, 230, 0.2);
+  border-radius: 10px;
+}
+.long-preview-info {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+.lp-code { font-size: 0.9rem; font-weight: 700; color: var(--neon-cyan); }
+.lp-name { font-size: 0.78rem; color: var(--text-dim); }
+.long-preview-item svg { width: 100%; height: auto; }
+
 /* 選取中載入遮罩 */
 .select-screen.is-picking .track-list { opacity: 0.45; pointer-events: none; }
 

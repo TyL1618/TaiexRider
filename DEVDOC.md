@@ -90,6 +90,21 @@ insert into public.keep_alive values (1, now()) on conflict (id) do nothing;
 
 cron-job.org 定期 ping，避免 Supabase 免費方案休眠。
 
+### 2.4 `classic_records` — 經典模式紀錄保持者
+
+```sql
+create table if not exists public.classic_records (
+  level_id     text primary key,          -- 每關只一列 = 保持者
+  player_id    text not null,
+  player_name  text not null,
+  score        int  not null,
+  time_ms      int  not null,
+  updated_at   timestamptz not null default now()
+);
+```
+
+經典關卡是固定地形，適合永久排行榜。提交走 RPC `submit_classic_record(p_level,p_name,p_score,p_time)`（security definer，需登入；分數高優先、同分時間短才覆蓋）。前端 `src/lib/classicRecords.ts` 讀取（整表 ~12 列、Map 快取）+ 提交。⚠️ 改 schema 後 push 不會更新，要手動在 Supabase SQL Editor 跑建表 + `create or replace function`。
+
 ---
 
 ## 3. 資料管線（Data Pipeline）
@@ -208,12 +223,14 @@ src/
 ├── lib/
 │   ├── dailyMap.ts        # Supabase daily_map 讀取 + promise 快取
 │   ├── leaderboard.ts     # Supabase daily_scores 讀寫
+│   ├── classicRecords.ts  # Supabase classic_records 讀寫（經典紀錄保持者）
+│   ├── longTrack.ts       # 每日長征串接 + fetchLongPreview（5 股預覽）
 │   ├── auth.ts            # Google One Tap 登入 / signOut
-│   └── playerId.ts        # localStorage UUID + 暱稱
+│   └── playerId.ts        # localStorage UUID + 暱稱（clampNameWidth 限長）
 ├── components/
 │   └── Sparkline.tsx      # 折線圖元件
 ├── version.ts             # APP_VERSION + CHANGELOG（遊戲內更新日誌）
-└── App.tsx                # 路由：home / daily / random / custom / game
+└── App.tsx                # 路由：home / daily / random / custom / classic / game
 ```
 
 ---

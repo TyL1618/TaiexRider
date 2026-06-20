@@ -24,5 +24,6 @@ export function classicToTrack(c: ClassicLevel): TrackData {
     desc: c.blurb,
     prices: c.prices,
     subtitle: `${c.period}・${c.index}`,
+    classicId: c.id,
   };
 }

@@ -61,6 +61,7 @@ export interface TrackData {
   desc: string;          // 簡短描述
   prices: number[];
   subtitle?: string;     // 遊戲內 HUD 副標（經典模式用：期間・標的）
+  classicId?: string;    // 經典關卡 id（用於提交紀錄保持者）
 }
 
 // 月盤在前（決定人氣排序順序）；日盤接在後、維持相同股票順序。

@@ -63,6 +63,27 @@ export function fetchLongTrack(date: string): Promise<LongTrackResult | null> {
   return _cache.get(date)!;
 }
 
+// 今日長征預覽：回傳那 5 隻的個股走勢（代號+名稱+prices），只供 UI 呈現走勢圖。
+// 與 fetchLongTrack 同一組 seeded picks（所見即所騎）；fetchStockDailyMap 有快取，按下長征不會重抓。
+export interface LongPick { code: string; name: string; prices: number[]; }
+
+const _previewCache = new Map<string, Promise<LongPick[]>>();
+
+export function fetchLongPreview(date: string): Promise<LongPick[]> {
+  if (!_previewCache.has(date)) _previewCache.set(date, _preview(date));
+  return _previewCache.get(date)!;
+}
+
+async function _preview(date: string): Promise<LongPick[]> {
+  const pool = await fetchDailyMapList(date);
+  if (pool.length === 0) return [];
+  const picks = pickItems(pool, Math.min(STOCK_COUNT, pool.length), dateToSeed(date));
+  const rows  = await Promise.all(picks.map((p) => fetchStockDailyMap(date, p.stock_code)));
+  return picks
+    .map((p, i) => ({ code: p.stock_code, name: p.stock_name, prices: rows[i]?.prices ?? [] }))
+    .filter((x) => x.prices.length > 1);
+}
+
 async function _fetch(date: string): Promise<LongTrackResult | null> {
   const pool = await fetchDailyMapList(date);
   if (pool.length === 0) return null;

@@ -1,7 +1,8 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { TRACKS, trackDifficulty, type TrackData } from "./data/tracks";
 import { fetchDailyMapList, fetchStockDailyMap, resolveSessionDisplayDate, type DailyMapMeta } from "./lib/dailyMap";
-import { fetchLongTrack } from "./lib/longTrack";
+import { fetchLongTrack, fetchLongPreview, type LongPick } from "./lib/longTrack";
+import Sparkline from "./components/Sparkline";
 import { dailyKey } from "./data/pick";
 import "./TrackSelect.css";
 
@@ -38,8 +39,21 @@ export default function TrackSelect({
   const [remoteLoaded, setLoaded]     = useState(false);
   const [picking, setPicking]         = useState(false);
   const [longPicking, setLongPicking] = useState(false);
+  const [longPreview, setLongPreview] = useState<LongPick[]>([]);
+  const [previewLoaded, setPreviewLoaded] = useState(false);
   const [visibleCount, setVisible]    = useState(PAGE);
   const sentinelRef = useRef<HTMLDivElement>(null);
+
+  // 進「每日長征」tab 時抓 5 股預覽走勢（純呈現）
+  useEffect(() => {
+    if (mode !== "long") return;
+    let alive = true;
+    setPreviewLoaded(false);
+    fetchLongPreview(dailyKey()).then((p) => {
+      if (alive) { setLongPreview(p); setPreviewLoaded(true); }
+    });
+    return () => { alive = false; };
+  }, [mode]);
 
   // 篩選條件改變時重置可見數量
   useEffect(() => { setVisible(PAGE); }, [mode, sortBy, sortDir, query]);
@@ -222,6 +236,22 @@ export default function TrackSelect({
                   ? "市場資料載入中…"
                   : "今日長征 →"}
               </button>
+            )}
+
+            {/* 今日 5 股走勢預覽（純呈現，不可點）；超出畫面由 track-list 捲動 */}
+            {previewLoaded && longPreview.length > 0 && (
+              <div className="long-preview">
+                <div className="long-preview-title">今日 5 股走勢</div>
+                {longPreview.map((p) => (
+                  <div className="long-preview-item" key={p.code}>
+                    <div className="long-preview-info">
+                      <span className="lp-code">{p.code}</span>
+                      <span className="lp-name">{p.name}</span>
+                    </div>
+                    <Sparkline prices={p.prices} width={300} height={46} />
+                  </div>
+                ))}
+              </div>
             )}
           </div>
         )}

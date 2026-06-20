@@ -24,6 +24,31 @@ export function getPlayerName(): string {
   return n;
 }
 
+// 暱稱長度以「顯示寬度」計：全形（中日韓/全形符號）=2、英數=1，上限 12 寬
+// → 約 6 個中文 或 12 個英文，避免排行榜名字過長撐成兩排。
+const WIDE_CHAR =
+  /[ᄀ-ᅟ⺀-꓏가-힣豈-﫿︰-﹏＀-｠￠-￦]/;
+
+export const NAME_MAX_WIDTH = 12;
+
+export function nameWidth(s: string): number {
+  let w = 0;
+  for (const ch of s) w += WIDE_CHAR.test(ch) ? 2 : 1;
+  return w;
+}
+
+// 依顯示寬度截斷（不切壞 surrogate pair；for..of 走 code point）
+export function clampNameWidth(s: string, max = NAME_MAX_WIDTH): string {
+  let w = 0, out = "";
+  for (const ch of s) {
+    const cw = WIDE_CHAR.test(ch) ? 2 : 1;
+    if (w + cw > max) break;
+    w += cw;
+    out += ch;
+  }
+  return out;
+}
+
 export function setPlayerName(name: string): void {
-  localStorage.setItem(NAME_KEY, name.trim().slice(0, 16) || getPlayerName());
+  localStorage.setItem(NAME_KEY, clampNameWidth(name.trim()) || getPlayerName());
 }

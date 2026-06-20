@@ -8,6 +8,7 @@ import DailyChallenge from "./screens/DailyChallenge";
 import ClassicSelect from "./screens/ClassicSelect";
 import type { TrackData } from "./data/tracks";
 import { submitDailyScore, fetchDailyTop } from "./lib/leaderboard";
+import { submitClassicRecord } from "./lib/classicRecords";
 import { fetchHardestDailyMap, fetchDailyMapList, resolveSessionDate } from "./lib/dailyMap";
 import { onAuthStateChange, getUser, type User } from "./lib/auth";
 import { getPlayerName } from "./lib/playerId";
@@ -26,7 +27,7 @@ export default function App() {
   const trackRef       = useRef<TrackData | null>(null);
   const confirmLeaveRef = useRef(false);
   confirmLeaveRef.current = confirmLeave; // 每次 render 同步，popstate 閉包讀得到最新值
-  const leavingRef = useRef(false); // doLeave 啟動後設 true，阻止 popstate 重開視窗
+  const leavingRef = useRef(false); // 觸發離開後設 true，阻止後續 popstate 補哨兵
 
   // 子頁的「‹返回」鈕：退掉子頁那層 history，由 popstate 統一切回首頁，
   // 讓 app 狀態與 history 深度保持同步（避免殘留 entry 造成返回鍵錯亂）。
@@ -61,7 +62,7 @@ export default function App() {
     window.history.pushState({ taiex: true }, "");
 
     const onPop = () => {
-      // doLeave 已啟動：讓 history 自然耗盡，不推哨兵不開視窗，TWA 可順利 finish()
+      // 已觸發離開：讓 history 自然耗盡，不推哨兵不開視窗，TWA 可順利 finish()
       if (leavingRef.current) return;
 
       if (suppressNext) {
@@ -72,12 +73,14 @@ export default function App() {
       // 遊戲進行中：GameCanvas 有自己的 listener，這裡不介入
       if (trackRef.current !== null) return;
 
-      // 確認離開視窗開著時：返回鍵 = 取消（關閉視窗），不離開、不關 App。
-      // 補推哨兵避免落到 history 底部被原生返回穿透關閉。
+      // 確認離開視窗開著時「再按一次返回鍵」= 離開：耗盡 history 讓 TWA 自然 finish()。
+      // （改用返回鍵當離開動作，比 window.close() 可靠——TWA 封鎖 window.close()。）
       if (confirmLeaveRef.current) {
-        confirmLeaveRef.current = false; // 同步更新，避免連按時第二次 popstate 讀到舊值
+        leavingRef.current = true;       // 阻止後續 popstate 補哨兵
+        confirmLeaveRef.current = false;
         setConfirmLeave(false);
-        window.history.pushState({ taiex: true }, "");
+        window.close();                   // 桌機 PWA 有效；TWA 被封鎖則由下一行接手
+        window.history.go(-window.history.length);
         return;
       }
 
@@ -107,14 +110,6 @@ export default function App() {
     };
   }, []); // 只在 App 掛載時執行一次，永遠不移除
 
-  const doLeave = () => {
-    leavingRef.current = true;      // 先設旗標，讓 popstate 不再推哨兵/開視窗
-    confirmLeaveRef.current = false;
-    setConfirmLeave(false);
-    window.close();                  // 桌機 PWA 有效；TWA 被封鎖則由下一行接手
-    window.history.go(-window.history.length); // 耗盡 history，TWA canGoBack()→false → finish()
-  };
-
   const handleGameOver = useCallback((stats: GameOverStats) => {
     if (isDailyRun && user) {
       submitDailyScore(getPlayerName(), {
@@ -123,6 +118,11 @@ export default function App() {
         flips:   stats.flips,
         perfect: stats.perfect,
       });
+    }
+    // 經典模式：提交紀錄保持者（需登入）。level id 隨 TrackData 帶入。
+    const classicId = trackRef.current?.classicId;
+    if (classicId && user) {
+      submitClassicRecord(classicId, getPlayerName(), { score: stats.score, timeMs: stats.timeMs });
     }
   }, [isDailyRun, user]);
 
@@ -163,7 +163,7 @@ export default function App() {
 
   if (screen === "custom")  return <TrackSelect   onPick={handleStartTrack} onBack={goHome} />;
   if (screen === "random")  return <RandomSlot    onPick={handleStartTrack} onBack={goHome} />;
-  if (screen === "classic") return <ClassicSelect onPick={handleStartTrack} onBack={goHome} />;
+  if (screen === "classic") return <ClassicSelect user={user} onPick={handleStartTrack} onBack={goHome} />;
   if (screen === "daily")  return (
     <DailyChallenge
       user={user}
@@ -177,10 +177,9 @@ export default function App() {
       {confirmLeave && (
         <div className="modal-overlay" onClick={() => setConfirmLeave(false)}>
           <div className="modal-panel" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-title">離開遊戲？</div>
-            <div className="modal-item dim">確定要離開 TAIEX RIDER 嗎？</div>
-            <button className="modal-btn" onClick={doLeave}>確定離開</button>
-            <button className="modal-link" onClick={() => setConfirmLeave(false)}>留下繼續玩</button>
+            <div className="modal-title leave-title">再按一次返回鍵即可離開</div>
+            <div className="modal-leave-hint">或點下方按鈕留下繼續玩</div>
+            <button className="modal-btn" onClick={() => setConfirmLeave(false)}>留下繼續玩</button>
           </div>
         </div>
       )}

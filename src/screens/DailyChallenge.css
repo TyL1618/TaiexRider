@@ -185,7 +185,7 @@
 .rk-pos { width: 2.5rem; text-align: left; }
 .rk-score { flex: 1; text-align: right; }
 .rk-time { flex: 1; text-align: right; }
-.rk-user { flex: 1.4; text-align: right; }
+.rk-user { flex: 1.4; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .rank-list { display: flex; flex-direction: column; }
 .rank-row {

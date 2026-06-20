@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { APP_VERSION, CHANGELOG } from "../version";
 import { signInWithGoogle, signOut, updateProfileName, type User } from "../lib/auth";
-import { getPlayerName, setPlayerName } from "../lib/playerId";
+import { getPlayerName, setPlayerName, clampNameWidth } from "../lib/playerId";
 import { setVolume, getVolume } from "../game/audio";
 import "./Home.css";
 
@@ -95,8 +95,8 @@ export default function Home({ user, onNav }: { user: User | null; onNav: (s: Sc
                   <input
                     className="settings-nickname-input"
                     value={nickname}
-                    maxLength={16}
-                    onChange={(e) => setNickname(e.target.value)}
+                    maxLength={12}
+                    onChange={(e) => setNickname(clampNameWidth(e.target.value))}
                   />
                 </div>
                 <button

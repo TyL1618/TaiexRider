@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.10.1";
+export const APP_VERSION = "0.11.0";
 
 export interface ChangelogEntry {
   date: string;
@@ -6,6 +6,15 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    date: "2026-06-20 (v0.11.0)",
+    notes: [
+      "經典模式新增「紀錄保持者」：登入後通關自動提交，每關只留分數最高（同分比時間短）的保持者，選單卡片右下角顯示 ID／分數／時間",
+      "返回離開改為「再按一次返回鍵即可離開」（移除確定離開按鈕，對 TWA 更可靠）",
+      "排行榜暱稱改以顯示寬度限長（約 6 個中文／12 個英文），名字不再撐成兩排",
+      "每日長征 tab 新增「今日 5 股走勢」預覽圖（純呈現，超出畫面可捲動）",
+    ],
+  },
   {
     date: "2026-06-20 (v0.10.1)",
     notes: [
