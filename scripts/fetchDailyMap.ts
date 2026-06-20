@@ -125,8 +125,6 @@ async function main() {
     process.exit(1);
   }
 
-  const nowTW = new Date(Date.now() + 8 * 3_600_000);
-
   // 錨定實際交易日（不可用 now+1，見檔頭說明）
   const session = await fetchTaiexSession();
   if (!session) { console.error("找不到最近交易日的 TAIEX 資料，放棄。"); process.exit(1); }
@@ -171,8 +169,12 @@ async function main() {
   }
   console.log("\n寫入完成");
 
-  // 清理 7 天前舊資料
-  const cutoff = new Date(nowTW.getTime() - 7 * 86_400_000).toISOString().slice(0, 10);
+  // 清理舊資料：cutoff 錨定「剛寫入的 map_date」往前 7 天，不是錨「執行當下 now」。
+  // ⚠️ 長連假（過年/長颱風假 > 7 天）若用 now-7：map_date 凍在最後交易日不動、now 一直往前走，
+  //    超過 7 天後 cutoff 會追過當前唯一在用的 map_date 把它刪掉（甚至同一次跑剛 upsert 又刪掉）
+  //    → app 掉回靜態盤。錨 mapDate 則當前盤永遠保留，任意長度連假都安全。
+  const [cy, cm, cd] = mapDate.split("-").map(Number);
+  const cutoff = new Date(Date.UTC(cy, cm - 1, cd - 7)).toISOString().slice(0, 10);
   const del = await fetch(`${SUPABASE_URL}/rest/v1/daily_map?map_date=lt.${cutoff}`, {
     method: "DELETE",
     headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
