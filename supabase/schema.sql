@@ -24,9 +24,12 @@ create index if not exists daily_scores_rank_idx
 -- 防偽造設計（v0.7 Google 登入版）：
 --   1. p_id 已移除：player_id 由伺服器 auth.uid() 決定，客戶端無法偽造。
 --   2. 必須是已登入用戶（auth.uid() IS NOT NULL），anon 無法呼叫。
---   3. 日期由伺服器決定，用台灣時區（Asia/Taipei）對齊客戶端 dailyKey()。
---      ⚠️ 不可用 current_date：那是 UTC 日期，台灣午夜~早上 8 點間會少算一天，
---         成績被存到前一天 challenge_date，跟排行榜讀的本地日期對不上 → 看似沒上榜。
+--   3. 日期由伺服器決定 = 「目前這一期」session = daily_map 中 ≤ 台灣今天(+1容忍) 的 max(map_date)。
+--      ⚠️ 不可用 current_date（UTC）：台灣午夜~早上 8 點間會少算一天 → 成績掛前一天 → 看似沒上榜。
+--      ⚠️ 也不可只用台灣日曆日：連假/多日休市時，最後交易日的 map_date 不再等於日曆日，
+--         排行榜讀取端（resolveSessionDate）用的是 max(map_date)，這裡必須同源，
+--         否則連假第二天起成績掛在不同 key → 整張榜對不上。max(map_date) 連假整段不變 = 同一張榜。
+--         找不到任何 map_date 時 fallback 台灣日曆日（DB 空或首次部署的保險）。
 --   4. 分數 0~50000、時間 1s~2h、flips/perfect 0~50 合理性驗證。
 -- 需先 DROP 舊簽名再建新版。
 
@@ -46,7 +49,13 @@ set search_path = public
 as $$
 declare
   v_uid text;
-  v_today date := (now() at time zone 'Asia/Taipei')::date;  -- 台灣日期，對齊客戶端 dailyKey()
+  -- 台灣日曆日（容忍排程延遲 +1 天）為上界，取 daily_map 最新一期 map_date 當 challenge_date。
+  -- 與前端 resolveSessionDate 同源；連假整段沿用同一張榜。DB 無 map_date 時 fallback 台灣日曆日。
+  v_bound date := (now() at time zone 'Asia/Taipei')::date + 1;
+  v_today date := coalesce(
+    (select max(map_date) from public.daily_map where map_date <= v_bound),
+    (now() at time zone 'Asia/Taipei')::date
+  );
 begin
   -- 必須是已登入用戶（Google OAuth），anon 靜默拒絕
   v_uid := auth.uid()::text;

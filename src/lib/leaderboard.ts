@@ -2,6 +2,7 @@
 // 提交成績需 Google 登入（Supabase Auth），伺服器端用 auth.uid() 決定 player_id。
 
 import { dailyKey } from "../data/pick";
+import { resolveSessionDate } from "./dailyMap";
 
 const URL = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
@@ -84,9 +85,10 @@ export async function submitDailyScore(
       }),
     });
     if (r.ok) {
-      // 清除快取，讓下次進 DailyChallenge 顯示含本次成績的最新排行榜
-      // ⚠️ 用 dailyKey()（本地日期），不可用 toISOString()（UTC）——否則台灣午夜後清錯 key
-      _topCache.delete(dailyKey());
+      // 清除快取，讓下次進 DailyChallenge 顯示含本次成績的最新排行榜。
+      // ⚠️ key 用「目前這一期」session（= max(map_date)），與讀取端 fetchDailyTop 同源，
+      // RPC 寫入也是 max(map_date)，連假整段累積在同一張榜。不可用 toISOString()（UTC）。
+      _topCache.delete(await resolveSessionDate(dailyKey()));
     }
     return r.ok;
   } catch {

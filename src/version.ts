@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.9.2";
+export const APP_VERSION = "0.9.4";
 
 export interface ChangelogEntry {
   date: string;
@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    date: "2026-06-20 (v0.9.4)",
+    notes: [
+      "修正連假/多日休市時每日盤勢會掉回靜態測試盤：地圖改讀「最新一期」(max map_date ≤ 今天)，連假整段持續顯示最後交易日的盤",
+      "排行榜連假整段沿用同一張榜累積：讀取/提交/RPC 全部錨定 max(map_date)，不再隨日曆日換到空榜",
+    ],
+  },
   {
     date: "2026-06-18 (v0.9.2)",
     notes: [

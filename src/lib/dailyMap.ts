@@ -1,9 +1,12 @@
-// 每日地圖讀取：從 Supabase daily_map 撈今日地圖，未設定或失敗回 null（caller 用靜態 fallback）
+// 每日地圖讀取：從 Supabase daily_map 撈「最新一期」地圖，未設定或失敗回 null（caller 用靜態 fallback）
 // promise 快取：同一個 date 只打一次 Supabase；App.tsx 啟動時預熱，
 // 讓進入 DailyChallenge 時幾乎不需等待。
 //
-// 注意：GitHub Actions 在 21:05 台灣時間執行，把 map_date 存成「明天」讓 00:00 即生效。
-// 因此 fetch 時若今天查無資料，自動試明天日期。
+// ⚠️ 連假/多日休市：cron 把 map_date 存成 sessionDate+1（只覆蓋 session 後「一天」）。
+// 若用「今天 / 明天」精準比對，連假第二天起日曆日就超過 map_date → 查無 → fallback 靜態 24 支。
+// 正解：解析「目前這一期」= daily_map 中 map_date ≤ 今天(+1容忍) 的「最大」map_date（resolveSessionDate），
+// 三個 fetcher 全部對齊它 → 連假整段都讀到最後一個交易日的盤（「一律顯示最後一次盤勢」）。
+// 下個交易日開盤當晚跑完才出現更大的 map_date，自動換新圖。
 
 const URL = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
@@ -33,6 +36,31 @@ function nextDay(date: string): string {
 const _hardestCache = new Map<string, Promise<DailyMapRow | null>>();
 const _stockCache   = new Map<string, Promise<DailyMapRow | null>>();
 const _listCache    = new Map<string, Promise<DailyMapMeta[]>>();
+const _sessionCache = new Map<string, Promise<string>>();
+
+// 解析「目前這一期」的 map_date：daily_map 中 map_date ≤ nextDay(今天) 的「最大」值。
+// 連假期間日曆日會超過最後交易日的 map_date，用 lte + desc 取最新一期，
+// 才能「一律顯示最後一次盤勢」而非 fallback 靜態盤。查無（或未設定）時回傳 date 本身（穩定 key）。
+// 此 key 同時供排行榜對齊（前端讀／RPC 寫都用 max(map_date)，整個連假累積在同一張榜）。
+export function resolveSessionDate(date: string): Promise<string> {
+  if (!_sessionCache.has(date)) _sessionCache.set(date, _resolveSession(date));
+  return _sessionCache.get(date)!;
+}
+
+async function _resolveSession(date: string): Promise<string> {
+  if (!URL || !KEY) return date;
+  try {
+    const r = await fetch(
+      `${URL}/rest/v1/daily_map?map_date=lte.${nextDay(date)}&order=map_date.desc&limit=1&select=map_date`,
+      { headers: headers() },
+    );
+    if (r.ok) {
+      const rows = (await r.json()) as { map_date: string }[];
+      if (rows[0]?.map_date) return rows[0].map_date;
+    }
+  } catch { /* fall through → 回傳 date 本身 */ }
+  return date;
+}
 
 // 全市場清單（不含 prices，只用於列表展示 / 隨機抽籤）
 export function fetchDailyMapList(date: string): Promise<DailyMapMeta[]> {
@@ -43,16 +71,13 @@ export function fetchDailyMapList(date: string): Promise<DailyMapMeta[]> {
 async function _fetchList(date: string): Promise<DailyMapMeta[]> {
   if (!URL || !KEY) return [];
   try {
-    for (const d of [date, nextDay(date)]) {
-      const r = await fetch(
-        `${URL}/rest/v1/daily_map?map_date=eq.${d}&select=stock_code,stock_name,difficulty&order=stock_code.asc&limit=2000`,
-        { headers: headers() },
-      );
-      if (!r.ok) continue;
-      const rows = (await r.json()) as DailyMapMeta[];
-      if (rows.length > 0) return rows;
-    }
-    return [];
+    const d = await resolveSessionDate(date);
+    const r = await fetch(
+      `${URL}/rest/v1/daily_map?map_date=eq.${d}&select=stock_code,stock_name,difficulty&order=stock_code.asc&limit=2000`,
+      { headers: headers() },
+    );
+    if (!r.ok) return [];
+    return (await r.json()) as DailyMapMeta[];
   } catch {
     return [];
   }
@@ -67,16 +92,14 @@ export function fetchHardestDailyMap(date: string): Promise<DailyMapRow | null> 
 async function _fetchHardest(date: string): Promise<DailyMapRow | null> {
   if (!URL || !KEY) return null;
   try {
-    for (const d of [date, nextDay(date)]) {
-      const r = await fetch(
-        `${URL}/rest/v1/daily_map?map_date=eq.${d}&order=difficulty.desc&limit=1&select=stock_code,stock_name,prices`,
-        { headers: headers() },
-      );
-      if (!r.ok) continue;
-      const rows = (await r.json()) as DailyMapRow[];
-      if (rows[0]) return rows[0];
-    }
-    return null;
+    const d = await resolveSessionDate(date);
+    const r = await fetch(
+      `${URL}/rest/v1/daily_map?map_date=eq.${d}&order=difficulty.desc&limit=1&select=stock_code,stock_name,prices`,
+      { headers: headers() },
+    );
+    if (!r.ok) return null;
+    const rows = (await r.json()) as DailyMapRow[];
+    return rows[0] ?? null;
   } catch {
     return null;
   }
@@ -92,16 +115,14 @@ export function fetchStockDailyMap(date: string, code: string): Promise<DailyMap
 async function _fetchStock(date: string, code: string): Promise<DailyMapRow | null> {
   if (!URL || !KEY) return null;
   try {
-    for (const d of [date, nextDay(date)]) {
-      const r = await fetch(
-        `${URL}/rest/v1/daily_map?map_date=eq.${d}&stock_code=eq.${code}&limit=1&select=stock_code,stock_name,prices`,
-        { headers: headers() },
-      );
-      if (!r.ok) continue;
-      const rows = (await r.json()) as DailyMapRow[];
-      if (rows[0]) return rows[0];
-    }
-    return null;
+    const d = await resolveSessionDate(date);
+    const r = await fetch(
+      `${URL}/rest/v1/daily_map?map_date=eq.${d}&stock_code=eq.${code}&limit=1&select=stock_code,stock_name,prices`,
+      { headers: headers() },
+    );
+    if (!r.ok) return null;
+    const rows = (await r.json()) as DailyMapRow[];
+    return rows[0] ?? null;
   } catch {
     return null;
   }

@@ -7,7 +7,7 @@ import RandomSlot from "./screens/RandomSlot";
 import DailyChallenge from "./screens/DailyChallenge";
 import type { TrackData } from "./data/tracks";
 import { submitDailyScore, fetchDailyTop } from "./lib/leaderboard";
-import { fetchHardestDailyMap, fetchDailyMapList } from "./lib/dailyMap";
+import { fetchHardestDailyMap, fetchDailyMapList, resolveSessionDate } from "./lib/dailyMap";
 import { onAuthStateChange, getUser, type User } from "./lib/auth";
 import { getPlayerName } from "./lib/playerId";
 import { dailyKey } from "./data/pick";
@@ -43,8 +43,10 @@ export default function App() {
   useEffect(() => {
     const date = dailyKey();
     fetchHardestDailyMap(date);
-    fetchDailyTop(date);
     fetchDailyMapList(date);
+    // 排行榜預熱用「目前這一期」session key（與 DailyChallenge 讀取端同源），
+    // 連假期間日曆日 ≠ map_date，用 dailyKey 預熱會打到空榜的快取。
+    resolveSessionDate(date).then((key) => fetchDailyTop(key));
   }, []);
 
   // 集中 history 管理：一個永不卸載的 listener，消除子頁 ↔ 首頁切換的 listener 空窗期。

@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Sparkline from "../components/Sparkline";
 import { dailyTrack, dailyKey } from "../data/pick";
 import { fetchDailyTop, invalidateDailyTop, isLeaderboardConfigured, type ScoreRow } from "../lib/leaderboard";
-import { fetchHardestDailyMap } from "../lib/dailyMap";
+import { fetchHardestDailyMap, resolveSessionDate } from "../lib/dailyMap";
 import { signInWithGoogle, type User } from "../lib/auth";
 import { getPlayerName } from "../lib/playerId";
 import type { TrackData } from "../data/tracks";
@@ -30,6 +30,9 @@ export default function DailyChallenge({
   const [rows, setRows] = useState<ScoreRow[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  // 排行榜的「目前這一期」key（= max(map_date)），連假整段沿用同一張榜。
+  // 非日曆日 dailyKey()，避免連假第二天起換到空榜。handleRefresh 也讀它。
+  const sessionKeyRef = useRef<string>(dailyKey());
 
   useEffect(() => {
     let alive = true;
@@ -45,7 +48,10 @@ export default function DailyChallenge({
 
   useEffect(() => {
     let alive = true;
-    fetchDailyTop(dailyKey()).then((r) => {
+    resolveSessionDate(dailyKey()).then((key) => {
+      sessionKeyRef.current = key;
+      return fetchDailyTop(key);
+    }).then((r) => {
       if (alive) { setRows(r); setLoaded(true); }
     });
     return () => { alive = false; };
@@ -53,7 +59,7 @@ export default function DailyChallenge({
 
   const handleRefresh = () => {
     if (refreshing) return;
-    const key = dailyKey();
+    const key = sessionKeyRef.current;
     invalidateDailyTop(key);
     setRefreshing(true);
     fetchDailyTop(key).then((r) => {
