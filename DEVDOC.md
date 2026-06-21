@@ -258,7 +258,10 @@ src/
 | Phase 4 | ✅ v0.6–0.7 | Supabase 後端：排行榜 + Google One Tap 登入 + 每日全台股自動更新（GitHub Actions） |
 | Phase 5 | ✅ v0.9.0 | PWA 離線快取：Workbox runtimeCaching（每日地圖 SWR 24h / 排行榜 NetworkFirst 5s） |
 | Phase 6 | ✅ v0.8–0.9 | 音效（Web Audio API）、夜景城市背景、難度星等 HUD、爆炸粒子強化 |
-| Phase 7 | 🟡 測試中 | TWA 打包上架（手動 Android Studio）+ Google Play 內部測試 + 全螢幕 immersive 調整中 |
+| Phase 7 | 🟡 封測中 | TWA 打包上架（手動 Android Studio）；全螢幕 immersive ✅ 已完成；Google Play **封閉測試**（門檻：12 名測試者 + 連續 14 天） |
+| Phase 8 | 🟡 持續優化 | v0.9.4 連假讀取/排行榜跨連假同榜修正（`max(map_date ≤ 今天)`）；**v0.10 經典模式**（12 條歷史盤勢靜態關卡）；**v0.11 經典紀錄保持者**（`classic_records`，每關單一保持者）、返回離開改「再按一次返回鍵」、暱稱顯示寬度限長（12 寬）、每日長征 5 股預覽圖、開機深色霓虹 splash（`index.html` inline，#5 的 B）|
+
+> **🟠 待辦（Phase 7 收尾）**：TWA 啟動仍會閃一下 Chrome 網址列（封測版實測），需 Android splash（androidbrowserhelper `SPLASH_SCREEN_BACKGROUND_COLOR=#05080f` + 圖）遮住啟動空窗（#5 的 A，需重打包 AAB）。詳見 CLAUDE.md 交接 #5。
 
 ---
 
