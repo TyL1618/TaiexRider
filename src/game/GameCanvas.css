@@ -271,6 +271,14 @@
   box-shadow: none;
 }
 
+/* 看廣告復活（琥珀色鏤空，視覺上與一般按鈕區分） */
+.overlay-btn.ad-btn {
+  background: transparent;
+  color: var(--neon-amber);
+  border: 1px solid var(--neon-amber);
+  box-shadow: 0 0 12px rgba(255, 179, 0, 0.2);
+}
+
 .ctrl-hint {
   position: absolute;
   bottom: calc(1.1rem + env(safe-area-inset-bottom, 0px));

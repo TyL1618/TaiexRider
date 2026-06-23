@@ -23,6 +23,7 @@ interface GameCanvasProps {
   onExit: () => void;
   onGameOver?: (stats: GameOverStats) => void;
   hideMinimap?: boolean;
+  revivalEnabled?: boolean; // 每日排名賽：死亡後可「看廣告復活」（每局一次）
 }
 
 interface Hud {
@@ -131,7 +132,7 @@ let _bikeImgReady = false;
 _bikeImg.onload = () => { _bikeImgReady = true; };
 _bikeImg.src = `${import.meta.env.BASE_URL}bike.png`;
 
-export default function GameCanvas({ prices, label, name, subtitle, onExit, onGameOver, hideMinimap = false }: GameCanvasProps) {
+export default function GameCanvas({ prices, label, name, subtitle, onExit, onGameOver, hideMinimap = false, revivalEnabled = false }: GameCanvasProps) {
   const stars = difficultyStars(calcDifficulty(prices));
   const cityBuildings = generateCity(prices.length * 31 + Math.round((prices[0] || 0) * 100));
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -155,6 +156,7 @@ export default function GameCanvas({ prices, label, name, subtitle, onExit, onGa
   const [paused, setPaused] = useState(false); // 暫停（discussion 第 13 點）
   const [confirmExit, setConfirmExit] = useState(false); // 返回主選單確認
   const [showStartPrompt, setShowStartPrompt] = useState(true); // 觸碰才開始計時
+  const [revivalUsed, setRevivalUsed] = useState(false); // 每局限復活一次
   // 讓事件處理可讀到最新的結束狀態
   const overRef = useRef(false);
   const dyingRef = useRef(false); // 死亡動畫進行中（在 useEffect 閉包內設定）
@@ -190,7 +192,7 @@ export default function GameCanvas({ prices, label, name, subtitle, onExit, onGa
 
     const spawnX = track.startX;
     // 懸空高度：初始進場與復活都從空中落下，等觸碰才計時；復活落下時間即為自然懲罰
-    const HOVER_HEIGHT = 100;
+    const HOVER_HEIGHT = 67;
     const spawnY = track.vertices[0].y - BIKE.wheelDropY - BIKE.wheelRadius - 1 - HOVER_HEIGHT;
     const bike: Bike = createBike(world, spawnX, spawnY);
 
@@ -1269,12 +1271,23 @@ let crashTimer = 0;
             <div className="chart-toggle-area" style={{ cursor: "default" }} />
           )}
           <div className="overlay-bottom">
-            <button className="overlay-btn" onClick={requestReset}>
-              再玩一次
-            </button>
-            <button className="overlay-btn ghost" onClick={onExit}>
-              返回主選單
-            </button>
+            {revivalEnabled ? (
+              <>
+                {crashed && !revivalUsed && (
+                  <button className="overlay-btn ad-btn" onClick={() => { setRevivalUsed(true); requestReset(); }}>
+                    看廣告復活
+                  </button>
+                )}
+                <button className="overlay-btn ghost" onClick={onExit}>
+                  返回排名賽
+                </button>
+              </>
+            ) : (
+              <>
+                <button className="overlay-btn" onClick={requestReset}>再玩一次</button>
+                <button className="overlay-btn ghost" onClick={onExit}>返回主選單</button>
+              </>
+            )}
           </div>
         </div>
       )}

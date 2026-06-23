@@ -21,6 +21,7 @@ export default function App() {
   const [isDailyRun, setIsDailyRun] = useState(false);
   const [user, setUser]             = useState<User | null>(null);
   const [confirmLeave, setConfirmLeave] = useState(false);
+  const gameKeyRef = useRef(0); // 每次 handleStartTrack +1，確保新局 GameCanvas 重建（revivalUsed 重置）
 
   // refs 讓 popstate 閉包隨時拿到最新值，不靠 useEffect 依賴陣列
   const screenRef      = useRef<Screen>("home");
@@ -127,6 +128,7 @@ export default function App() {
   }, [isDailyRun, user]);
 
   const handleStartTrack = (t: TrackData) => {
+    gameKeyRef.current++;
     trackRef.current = t;
     setTrack(t);
     setPlaying(true); // 遊玩中：暫緩 SW 自動更新 reload
@@ -141,7 +143,7 @@ export default function App() {
   if (track) {
     return (
       <GameCanvas
-        key={track.label + track.mode}
+        key={gameKeyRef.current}
         prices={track.prices}
         label={track.label}
         name={track.name}
@@ -149,6 +151,7 @@ export default function App() {
         onExit={handleExitTrack}
         onGameOver={handleGameOver}
         hideMinimap={track.mode === "long"}
+        revivalEnabled={isDailyRun}
       />
     );
   }

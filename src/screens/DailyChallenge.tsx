@@ -5,6 +5,7 @@ import { fetchDailyTop, invalidateDailyTop, isLeaderboardConfigured, type ScoreR
 import { fetchHardestDailyMap, resolveSessionDate, resolveSessionDisplayDate } from "../lib/dailyMap";
 import { signInWithGoogle, type User } from "../lib/auth";
 import { getPlayerName } from "../lib/playerId";
+import { getAttempts, incrementAttempts, MAX_ATTEMPTS, FREE_ATTEMPTS } from "../lib/challengeAttempts";
 import type { TrackData } from "../data/tracks";
 import "./DailyChallenge.css";
 
@@ -36,6 +37,7 @@ export default function DailyChallenge({
   // 排行榜的「目前這一期」key（= max(map_date)），連假整段沿用同一張榜。
   // 非日曆日 dailyKey()，避免連假第二天起換到空榜。handleRefresh 也讀它。
   const sessionKeyRef = useRef<string>(dailyKey());
+  const [attempts, setAttempts] = useState(() => getAttempts(dailyKey()));
 
   useEffect(() => {
     let alive = true;
@@ -53,6 +55,7 @@ export default function DailyChallenge({
     let alive = true;
     resolveSessionDate(dailyKey()).then((key) => {
       sessionKeyRef.current = key;
+      if (alive) setAttempts(getAttempts(key)); // 用正確的 session key 重新讀取次數
       return fetchDailyTop(key);
     }).then((r) => {
       if (alive) { setRows(r); setLoaded(true); }
@@ -111,9 +114,29 @@ export default function DailyChallenge({
           </div>
         )}
 
-        <button className="daily-challenge-btn" onClick={() => onPlay(track)}>
-          開始挑戰
-        </button>
+        {(() => {
+          const canPlay = attempts < MAX_ATTEMPTS;
+          const showAd  = attempts >= FREE_ATTEMPTS;
+          const num     = attempts + 1; // 即將進行的第幾次
+          const handleStart = () => {
+            incrementAttempts(sessionKeyRef.current);
+            setAttempts(prev => prev + 1);
+            onPlay(track);
+          };
+          return (
+            <button
+              className={`daily-challenge-btn${showAd && canPlay ? " ad" : ""}${!canPlay ? " maxed" : ""}`}
+              disabled={!canPlay}
+              onClick={canPlay ? handleStart : undefined}
+            >
+              {!canPlay
+                ? "今日已達上限"
+                : showAd
+                  ? `看廣告開始 (${num}/5)`
+                  : `開始挑戰 (${num}/5)`}
+            </button>
+          );
+        })()}
       </div>
 
       <div className="rank-section">

@@ -129,6 +129,23 @@
 }
 .daily-challenge-btn:active { transform: scale(0.97); }
 
+/* 看廣告開始（第 3~5 次，鏤空琥珀色） */
+.daily-challenge-btn.ad {
+  background: transparent;
+  color: var(--neon-amber);
+  border: 2px solid var(--neon-amber);
+  box-shadow: 0 0 14px rgba(255, 179, 0, 0.25);
+}
+
+/* 今日已達上限 */
+.daily-challenge-btn.maxed,
+.daily-challenge-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
 /* ---- 排行榜 ---- */
 .rank-section {
   width: 100%;
