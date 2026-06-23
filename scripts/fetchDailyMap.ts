@@ -32,13 +32,36 @@ function downsample(arr: number[], target: number): number[] {
   return out;
 }
 
+// 地形複雜度 = 振幅 × (1 + 折返次數)
+// 振幅：全日 (high - low) / open，衡量賽道總高度差。
+// 折返次數：相鄰顯著方向改變（相對 open 累積移動 > 0.3% 才算一次轉折），
+//   過濾微小噪音；折返越多代表賽道越崎嶇。
+// 這樣漲停/跌停板股（振幅高但折返少）不再壟斷排名賽地圖。
 function calcDifficulty(prices: number[]): number {
-  let max = 0;
+  if (prices.length < 2) return 0;
+  const open = prices[0];
+  if (open === 0) return 0;
+
+  const hi = Math.max(...prices);
+  const lo = Math.min(...prices);
+  const amplitude = (hi - lo) / open;
+
+  const threshold = open * 0.003; // 0.3% 閾值
+  let reversals = 0;
+  let lastDir = 0; // 1 = 上漲方向, -1 = 下跌方向
+  let lastSignificantPrice = prices[0];
+
   for (let i = 1; i < prices.length; i++) {
-    const pct = Math.abs(prices[i] / prices[i - 1] - 1);
-    if (pct > max) max = pct;
+    const move = prices[i] - lastSignificantPrice;
+    if (Math.abs(move) >= threshold) {
+      const dir = move > 0 ? 1 : -1;
+      if (lastDir !== 0 && dir !== lastDir) reversals++;
+      lastDir = dir;
+      lastSignificantPrice = prices[i];
+    }
   }
-  return max;
+
+  return amplitude * (1 + reversals);
 }
 
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
