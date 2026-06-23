@@ -3,6 +3,7 @@ import { APP_VERSION, CHANGELOG } from "../version";
 import { signInWithGoogle, signOut, updateProfileName, type User } from "../lib/auth";
 import { getPlayerName, setPlayerName, clampNameWidth } from "../lib/playerId";
 import { setVolume, getVolume } from "../game/audio";
+import { detectEnv } from "../lib/ads";
 import "./Home.css";
 
 export type Screen = "home" | "custom" | "random" | "daily" | "classic";
@@ -133,7 +134,7 @@ export default function Home({ user, onNav }: { user: User | null; onNav: (s: Sc
             </div>
 
             <div className="settings-meta-row">
-              <span className="settings-version-text">版本 v{APP_VERSION}</span>
+              <span className="settings-version-text">版本 v{APP_VERSION}・{detectEnv() === "twa" ? "App" : "網頁"}</span>
               <button
                 className="settings-changelog-btn"
                 onClick={() => { setShowSettings(false); setShowHelp(true); }}
