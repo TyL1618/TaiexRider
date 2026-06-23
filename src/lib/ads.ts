@@ -45,6 +45,29 @@ export function detectEnv(): AdEnv {
   return isInsideTWA() ? "twa" : "web";
 }
 
+// 診斷用：回報偵測訊號原始值，供真機驗證為何 TWA 沒被認出。
+// display-mode standalone 在「TWA」與「PWA 加到主畫面」都成立，故不能單獨當判斷，僅輔助診斷。
+export function getAdDebugInfo(): string {
+  const ref = typeof document !== "undefined" ? document.referrer : "";
+  let flag = "?";
+  try {
+    flag = localStorage.getItem(TWA_FLAG) ?? "-";
+  } catch {
+    flag = "x";
+  }
+  const standalone =
+    typeof window !== "undefined" && window.matchMedia
+      ? window.matchMedia("(display-mode: standalone)").matches
+      : false;
+  const fullscreen =
+    typeof window !== "undefined" && window.matchMedia
+      ? window.matchMedia("(display-mode: fullscreen)").matches
+      : false;
+  const dm = fullscreen ? "fs" : standalone ? "sa" : "browser";
+  // 例： ref="android-app://com.tylapp.taiexrider" flag=1 dm=fs
+  return `ref="${ref || "(空)"}" flag=${flag} dm=${dm}`;
+}
+
 // 初始化廣告（網頁層）。只有「非 TWA」且「已設定 pub ID」才載入 AdSense。
 export function initAds(): void {
   const env = detectEnv();

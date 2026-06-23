@@ -3,7 +3,7 @@ import { APP_VERSION, CHANGELOG } from "../version";
 import { signInWithGoogle, signOut, updateProfileName, type User } from "../lib/auth";
 import { getPlayerName, setPlayerName, clampNameWidth } from "../lib/playerId";
 import { setVolume, getVolume } from "../game/audio";
-import { detectEnv } from "../lib/ads";
+import { detectEnv, getAdDebugInfo } from "../lib/ads";
 import "./Home.css";
 
 export type Screen = "home" | "custom" | "random" | "daily" | "classic";
@@ -147,6 +147,11 @@ export default function Home({ user, onNav }: { user: User | null; onNav: (s: Sc
               >
                 更新日誌
               </button>
+            </div>
+
+            {/* 廣告偵測診斷（驗證 TWA 偵測用，驗證完移除）*/}
+            <div className="settings-row dim" style={{ fontSize: "0.62rem", wordBreak: "break-all", opacity: 0.5 }}>
+              {detectEnv()} ・ {getAdDebugInfo()}
             </div>
 
             {/* 登出區 - 置底，與關閉按鈕有間距 */}
