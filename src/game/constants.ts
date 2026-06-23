@@ -6,9 +6,9 @@
 export const TRACK = {
   segmentWidth: 80, // 每個資料點的水平間距 (px)，越小坡越陡（Route B 由 120 收窄）
   heightRange: 420,  // 基準 heightRange（對應 REF_PCT 的單步漲幅，越大地形越高）
-  heightMin: 250,    // 最平穩賽道的最小高度（不讓 TAIEX 完全變水平）
-  heightMax: 1000,   // 最狂野賽道的高度上限
-  refPct: 0.022,     // 對應 heightRange 的「基準單步漲幅」，越小越放大地形起伏
+  heightMin: 350,    // 最平穩賽道的最小高度（不讓 TAIEX 完全變水平）
+  heightMax: 1400,   // 最狂野賽道的高度上限
+  refPct: 0.015,     // 對應 heightRange 的「基準單步漲幅」，越小越放大地形起伏
   baselineY: 560, // 賽道基準線 (世界座標 y，越大越下面)
   startFlat: 4, // 起點平台補幾個平坦點
   endFlat: 3, // 終點平台補幾個平坦點
