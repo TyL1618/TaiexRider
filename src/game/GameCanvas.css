@@ -4,6 +4,35 @@
   overflow: hidden;
 }
 
+/* ---- 觸碰開始提示（懸空等待期） ---- */
+.start-prompt {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  pointer-events: none;
+  user-select: none;
+  animation: startPulse 1.2s ease-in-out infinite;
+}
+.start-prompt-text {
+  font-size: 1.4rem;
+  font-weight: 600;
+  color: #2de2e6;
+  text-shadow: 0 0 16px rgba(45, 226, 230, 0.9), 0 0 4px #fff;
+  letter-spacing: 0.08em;
+}
+.start-prompt-sub {
+  font-size: 0.8rem;
+  color: rgba(45, 226, 230, 0.55);
+  margin-top: 6px;
+  letter-spacing: 0.2em;
+}
+@keyframes startPulse {
+  0%, 100% { opacity: 0.35; }
+  50%       { opacity: 1; }
+}
+
 .game-canvas {
   display: block;
   width: 100%;

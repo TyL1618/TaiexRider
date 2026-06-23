@@ -154,6 +154,7 @@ export default function GameCanvas({ prices, label, name, subtitle, onExit, onGa
   const [volume, setVolumeState] = useState(() => Math.round(getVolume() * 100));
   const [paused, setPaused] = useState(false); // 暫停（discussion 第 13 點）
   const [confirmExit, setConfirmExit] = useState(false); // 返回主選單確認
+  const [showStartPrompt, setShowStartPrompt] = useState(true); // 觸碰才開始計時
   // 讓事件處理可讀到最新的結束狀態
   const overRef = useRef(false);
   const dyingRef = useRef(false); // 死亡動畫進行中（在 useEffect 閉包內設定）
@@ -188,9 +189,17 @@ export default function GameCanvas({ prices, label, name, subtitle, onExit, onGa
     Composite.add(world, buildTerrainBodies(track));
 
     const spawnX = track.startX;
-    // 輪底剛好貼地：車身中心 = 地面 - 輪軸偏移 - 輪半徑（直接落在路面，不從空中掉）
-    const spawnY = track.vertices[0].y - BIKE.wheelDropY - BIKE.wheelRadius - 1;
+    // 懸空高度：初始進場與復活都從空中落下，等觸碰才計時；復活落下時間即為自然懲罰
+    const HOVER_HEIGHT = 100;
+    const spawnY = track.vertices[0].y - BIKE.wheelDropY - BIKE.wheelRadius - 1 - HOVER_HEIGHT;
     const bike: Bike = createBike(world, spawnX, spawnY);
+
+    // 初始凍結：等待觸碰，車身靜止懸空，不開始計時也不允許翻滾
+    Body.setStatic(bike.chassis, true);
+    Body.setStatic(bike.rearWheel, true);
+    Body.setStatic(bike.frontWheel, true);
+    let waitingToStart = true;
+    let hasEverGrounded = false; // 首次落地後才開放空中翻滾
 
     // ---- 插值用：記錄上一物理步的位置/角度，渲染時平滑消除步進鋸齒 ----
     let prevChassisPos = { x: bike.chassis.position.x, y: bike.chassis.position.y };
@@ -222,6 +231,15 @@ export default function GameCanvas({ prices, label, name, subtitle, onExit, onGa
     let throttle = false;
     const press = () => {
       if (overRef.current) return;
+      if (waitingToStart) {
+        // 第一次觸碰：解凍車身，開始計時，啟動引擎聲
+        Body.setStatic(bike.chassis, false);
+        Body.setStatic(bike.rearWheel, false);
+        Body.setStatic(bike.frontWheel, false);
+        waitingToStart = false;
+        setShowStartPrompt(false);
+        startEngine();
+      }
       throttle = true;
     };
     const release = () => {
@@ -353,6 +371,13 @@ let crashTimer = 0;
       scale = 1;
       targetScale = 1;
       overviewComputed = false;
+      // 重置為等待觸碰狀態（再玩一次也從懸空開始）
+      waitingToStart = true;
+      hasEverGrounded = false;
+      Body.setStatic(bike.chassis, true);
+      Body.setStatic(bike.rearWheel, true);
+      Body.setStatic(bike.frontWheel, true);
+      setShowStartPrompt(true);
       setCrashed(false);
       setFinished(false);
       setDying(false);
@@ -404,8 +429,9 @@ let crashTimer = 0;
         let av = da * DRIVE.groundAlignGain;
         if (Math.abs(av) > DRIVE.groundedAvMax) av = Math.sign(av) * DRIVE.groundedAvMax;
         Body.setAngularVelocity(c, av);
-      } else if (throttle) {
-        // 空中按住 → 後空翻（任意角度均可持續旋轉；移除 cos 條件，修「倒置區間停轉」bug）
+      } else if (throttle && hasEverGrounded) {
+        // 空中按住 → 後空翻（首次落地後才開放，避免懸空落下時誤觸翻滾）
+        // 任意角度均可持續旋轉；移除 cos 條件，修「倒置區間停轉」bug
         const nv = Math.max(-DRIVE.airSpinMax, c.angularVelocity - DRIVE.airSpinAccel);
         Body.setAngularVelocity(c, nv);
       } else {
@@ -435,6 +461,7 @@ let crashTimer = 0;
       const c = bike.chassis;
       const groundedNow = rearContacts > 0 || frontContacts > 0;
       const airborneFully = rearContacts === 0 && frontContacts === 0;
+      if (groundedNow && !hasEverGrounded) hasEverGrounded = true;
 
       // 空中累積旋轉 / 滯空時間
       if (!groundedNow) {
@@ -981,7 +1008,6 @@ let crashTimer = 0;
       if (resetSignal.current !== lastResetSignal) {
         lastResetSignal = resetSignal.current;
         doReset();
-        startEngine();
         last = now;
         acc = 0;
       }
@@ -994,7 +1020,7 @@ let crashTimer = 0;
       let dt = now - last;
       last = now;
       if (dt > 60) dt = 60; // 防止分頁切回時爆衝
-      if (!overRef.current) raceTimeMs += dt;
+      if (!overRef.current && !waitingToStart) raceTimeMs += dt;
       acc += dt;
 
       let grounded = false;
@@ -1077,7 +1103,7 @@ let crashTimer = 0;
         });
       }
     };
-    startEngine();
+    // startEngine() 在 press() 內首次觸碰時才呼叫（需要使用者手勢才能啟動 AudioContext）
     raf = requestAnimationFrame(frame);
 
     // ---- 清理 ----
@@ -1178,9 +1204,16 @@ let crashTimer = 0;
         </div>
       )}
 
-      {!crashed && !finished && <div className={`throttle-dot ${hud.throttle ? "on" : ""}`} />}
+      {showStartPrompt && !crashed && !finished && !dying && (
+        <div className="start-prompt">
+          <div className="start-prompt-text">觸碰螢幕開始</div>
+          <div className="start-prompt-sub">TAP TO RIDE</div>
+        </div>
+      )}
 
-      {!crashed && !finished && <div className="ctrl-hint">按住畫面 = 前進 ・ 空中按住 = 後空翻</div>}
+      {!crashed && !finished && !showStartPrompt && <div className={`throttle-dot ${hud.throttle ? "on" : ""}`} />}
+
+      {!crashed && !finished && !showStartPrompt && <div className="ctrl-hint">按住畫面 = 前進 ・ 空中按住 = 後空翻</div>}
 
       {showSettings && (
         <div className="overlay" onClick={() => setShowSettings(false)}>
