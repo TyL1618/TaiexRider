@@ -187,7 +187,26 @@ y[i] = baselineY - (price[i] - min) / (max - min) × scaledHeight
 
 ### 5.3 摔車判定
 
-車身 crashZone（5 個局部點：前擾流→風鏡→油箱→座椅前/後緣）轉為世界座標，任一點低於地形且翻過 90°（cos < 0）→ 判死（0.1s 緩衝）。雙輪離地 + 速度 < 0.5 超時 → stuckMidAir 保底。
+車身 crashZone（5 個局部點：前擾流→風鏡→油箱→座椅前/後緣）轉為世界座標，任一點低於地形且翻過 90°（cos < 0）→ 判死（0.1s 緩衝）。雙輪離地 + 速度 < 0.5 超時 → stuckMidAir 保底。⚠️ 死亡條件均加 `!waitingToStart` guard：懸空等待期間不觸發。
+
+### 5.4 懸空公平計時（Suspended Start）
+
+每次出發時（含復活後），車輛靜止懸空在地面上方 `HOVER_HEIGHT=67px`：三個物理體全設 static，`waitingToStart=true`，HUD 計時凍結。第一次 pointerdown 事件才解除 static、`waitingToStart=false`、計時開始。確保計時器不受生成→落地動畫時間影響，對排行榜公平。
+
+### 5.5 挑戰次數上限（每日排名賽）
+
+- 每日限 `MAX_ATTEMPTS=5` 次，前 `FREE_ATTEMPTS=2` 次免費，後 3 次按鈕顯示「看廣告開始」（廣告尚未串接，目前直接進遊戲）。
+- 次數以 localStorage key `tr_daily_att_{sessionDate}` 儲存，`sessionDate = resolveSessionDate()` 結果（連假整段用同一個 key）。
+- 進入遊戲時才 `incrementAttempts()`（非按鈕按下時），確保只有真的開始才計次。
+- 邏輯在 `src/lib/challengeAttempts.ts`，UI 在 `DailyChallenge.tsx`。
+
+### 5.6 死亡後復活（Revival）
+
+- 僅每日排名賽啟用（`GameCanvas` prop `revivalEnabled={isDailyRun}`）。
+- 死亡後出現「看廣告復活」琥珀色按鈕（`.overlay-btn.ad-btn`），每局限一次（`revivalUsed` state）。
+- 復活邏輯（`doRevive()`）：讀死亡時的 `chassis.position.x`，`terrainYAt()` 算地形高度，在正上方 `HOVER_HEIGHT` 重新 setPosition + setVelocity(0) + setStatic(true) → 進入懸空等待狀態。分數、計時、翻轉紀錄保留（不呼叫 `doReset()`）。
+- 實作：`reviveSignal` ref（與 `resetSignal` 平行），frame loop 偵測 signal 變化觸發 `doRevive()`。
+- 每次 `handleStartTrack` 讓 `gameKeyRef.current++`，作為 `<GameCanvas key>` 確保新局重建（`revivalUsed` 重置）。
 
 ### 5.4 物理踩雷
 
@@ -221,12 +240,14 @@ src/
 │   ├── classics.json      # 經典關卡靜態資料（scripts/fetchClassics.ts 一次性產出）
 │   └── sample-*.json      # 預抓樣本（2330/0050/2454/TAIEX）
 ├── lib/
-│   ├── dailyMap.ts        # Supabase daily_map 讀取 + promise 快取
-│   ├── leaderboard.ts     # Supabase daily_scores 讀寫
-│   ├── classicRecords.ts  # Supabase classic_records 讀寫（經典紀錄保持者）
-│   ├── longTrack.ts       # 每日長征串接 + fetchLongPreview（5 股預覽）
-│   ├── auth.ts            # Google One Tap 登入 / signOut
-│   └── playerId.ts        # localStorage UUID + 暱稱（clampNameWidth 限長）
+│   ├── dailyMap.ts           # Supabase daily_map 讀取 + promise 快取
+│   ├── leaderboard.ts        # Supabase daily_scores 讀寫
+│   ├── classicRecords.ts     # Supabase classic_records 讀寫（經典紀錄保持者）
+│   ├── longTrack.ts          # 每日長征串接 + fetchLongPreview（5 股預覽）
+│   ├── auth.ts               # Google One Tap 登入 / signOut
+│   ├── playerId.ts           # localStorage UUID + 暱稱（clampNameWidth 限長）
+│   ├── challengeAttempts.ts  # 每日排名賽挑戰次數（localStorage，MAX 5 / FREE 2）
+│   └── ads.ts                # TWA 環境偵測 + AdSense/AdMob 雙軌 scaffold（Phase 1 無廣告）
 ├── components/
 │   └── Sparkline.tsx      # 折線圖元件
 ├── version.ts             # APP_VERSION + CHANGELOG（遊戲內更新日誌）
@@ -259,7 +280,7 @@ src/
 | Phase 5 | ✅ v0.9.0 | PWA 離線快取：Workbox runtimeCaching（每日地圖 SWR 24h / 排行榜 NetworkFirst 5s） |
 | Phase 6 | ✅ v0.8–0.9 | 音效（Web Audio API）、夜景城市背景、難度星等 HUD、爆炸粒子強化 |
 | Phase 7 | 🟡 封測中 | TWA 打包上架（手動 Android Studio）；全螢幕 immersive ✅ 已完成；Google Play **封閉測試**（門檻：12 名測試者 + 連續 14 天） |
-| Phase 8 | 🟡 持續優化 | v0.9.4 連假讀取/排行榜跨連假同榜修正（`max(map_date ≤ 今天)`）；**v0.10 經典模式**（12 條歷史盤勢靜態關卡）；**v0.11 經典紀錄保持者**（`classic_records`，每關單一保持者）、返回離開改「再按一次返回鍵」、暱稱顯示寬度限長（12 寬）、每日長征 5 股預覽圖、開機深色霓虹 splash（`index.html` inline，#5 的 B）|
+| Phase 8 | 🟡 持續優化 | v0.9.4 連假讀取/排行榜跨連假同榜修正（`max(map_date ≤ 今天)`）；**v0.10 經典模式**（12 條歷史盤勢靜態關卡）；**v0.11 經典紀錄保持者**（`classic_records`，每關單一保持者）、返回離開改「再按一次返回鍵」、暱稱顯示寬度限長（12 寬）、每日長征 5 股預覽圖、開機深色霓虹 splash；**v0.12 懸空公平計時 + 每日排名賽每日 5 次上限（前 2 免費/後 3 看廣告）+ 死後原地復活（分數保留）+ 廣告雙軌 scaffold（`ads.ts` TWA 偵測，Phase 1 無廣告）** |
 
 > **🟠 待辦（Phase 7 收尾）**：TWA 啟動仍會閃一下 Chrome 網址列（封測版實測），需 Android splash（androidbrowserhelper `SPLASH_SCREEN_BACKGROUND_COLOR=#05080f` + 圖）遮住啟動空窗（#5 的 A，需重打包 AAB）。詳見 CLAUDE.md 交接 #5。
 

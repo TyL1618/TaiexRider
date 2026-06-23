@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.11.1";
+export const APP_VERSION = "0.12.0";
 
 export interface ChangelogEntry {
   date: string;
@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    date: "2026-06-23 (v0.12.0)",
+    notes: [
+      "每日排名賽每日最多挑戰 5 次（前 2 次免費，後 3 次開始按鈕會標示需看廣告），計次顯示於按鈕（第 N/5 次）",
+      "每日排名賽挑戰死亡後可在死亡位置原地復活：不回到起點，分數／翻轉紀錄保留，再次懸空等待觸碰即可繼續",
+      "懸空公平計時：每次出發時車輛先懸停於地面上方，計時器凍結至第一次觸碰才同步啟動，確保計時不受生成落地時間影響",
+    ],
+  },
   {
     date: "2026-06-20 (v0.11.1)",
     notes: [
