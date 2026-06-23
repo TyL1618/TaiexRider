@@ -518,12 +518,13 @@ let crashTimer = 0;
       if (distScore > maxDistScore) maxDistScore = distScore;
       points = bonusPoints + maxDistScore;
 
-      // 死亡判定
+      // 死亡判定（懸空等待觸碰期間完全略過：static 車身 velocity=0、雙輪離地，
+      // 否則 stuckMidAir 會把「等待中」誤判成卡死 → 開場立刻爆炸）
       const bothWheelsOff = rearContacts === 0 && frontContacts === 0;
       const speed = Math.hypot(c.velocity.x, c.velocity.y);
       // 車頂碰地：把局部 crashZone 座標轉世界，任一點低於地形 → 死
       // 前提：車身真的「翻過 90°」(cos < crashTipCos)，爬陡坡前傾(<90°)不誤判（discussion 第 1 點）
-      const tippedOver = Math.cos(c.angle) < RULES.crashTipCos;
+      const tippedOver = !waitingToStart && Math.cos(c.angle) < RULES.crashTipCos;
       const ca = Math.cos(c.angle), sa = Math.sin(c.angle);
       const topHit = tippedOver && BIKE.crashZone.some(({ x: lx, y: ly }) => {
         const wx = ca * lx - sa * ly + c.position.x;
@@ -531,7 +532,7 @@ let crashTimer = 0;
         return wy > terrainYAt(track, wx);
       });
       // 空中完全卡住：飛行中 speed ≈ 6.9，只有真死局（卡谷等）才 < 0.5
-      const stuckMidAir = bothWheelsOff && speed < 0.5;
+      const stuckMidAir = !waitingToStart && bothWheelsOff && speed < 0.5;
       // topHit（車頂碰地）：瞬間定格，不等計時器
       if (topHit && !overRef.current) {
         Body.setStatic(bike.chassis, true);
