@@ -170,9 +170,11 @@ export default function GameCanvas({ prices, label, name, subtitle, onExit, onGa
 
   // 外部觸發重置（R 鍵 / 按鈕）
   const resetSignal = useRef(0);
-  const requestReset = () => {
-    resetSignal.current++;
-  };
+  const requestReset = () => { resetSignal.current++; };
+
+  // 外部觸發復活（死亡位置上方懸空，保留分數/時間）
+  const reviveSignal = useRef(0);
+  const requestRevive = () => { reviveSignal.current++; };
 
   useEffect(() => {
     const canvas = canvasRef.current!;
@@ -379,6 +381,53 @@ let crashTimer = 0;
       Body.setStatic(bike.chassis, true);
       Body.setStatic(bike.rearWheel, true);
       Body.setStatic(bike.frontWheel, true);
+      setShowStartPrompt(true);
+      setCrashed(false);
+      setFinished(false);
+      setDying(false);
+      setShowChart(false);
+      setToast(null);
+    };
+
+    // 復活：在死亡位置上方懸空，保留分數/時間，重置碰撞與特效狀態
+    const doRevive = () => {
+      const deathX = bike.chassis.position.x;
+      const terrainY = terrainYAt(track, deathX);
+      const reviveY = terrainY - BIKE.wheelDropY - BIKE.wheelRadius - 1 - HOVER_HEIGHT;
+
+      Body.setPosition(bike.chassis,    { x: deathX,                       y: reviveY });
+      Body.setPosition(bike.rearWheel,  { x: deathX - BIKE.wheelBaseHalf,  y: reviveY + BIKE.wheelDropY });
+      Body.setPosition(bike.frontWheel, { x: deathX + BIKE.wheelBaseHalf,  y: reviveY + BIKE.wheelDropY });
+
+      for (const b of [bike.chassis, bike.rearWheel, bike.frontWheel]) {
+        Body.setVelocity(b, { x: 0, y: 0 });
+        Body.setAngularVelocity(b, 0);
+        Body.setStatic(b, true);
+      }
+      Body.setAngle(bike.chassis, 0);
+
+      prevChassisPos   = { ...bike.chassis.position };
+      prevChassisAngle = bike.chassis.angle;
+      prevRearPos      = { ...bike.rearWheel.position };
+      prevRearAngle    = bike.rearWheel.angle;
+      prevFrontPos     = { ...bike.frontWheel.position };
+      prevFrontAngle   = bike.frontWheel.angle;
+
+      rearContacts = 0; frontContacts = 0; chassisContacts = 0;
+      throttle = false;
+      prevAngle = 0;
+      airRotation = 0; airTime = 0; airborneSteps = 0;
+      crashTimer = 0;
+      wasGrounded = false;
+      perfectFxFrames = 0; perfectFxPts = [];
+      deathParticles = []; deathFlashAlpha = 0; deathShakeAmp = 0; deathElapsed = 0;
+      dyingRef.current = false;
+      waitingToStart = true;
+      hasEverGrounded = false;
+      scale = 1; targetScale = 1; overviewComputed = false;
+      // 分數、時間、totalFlips、perfectLandings 刻意不清零
+
+      overRef.current = false;
       setShowStartPrompt(true);
       setCrashed(false);
       setFinished(false);
@@ -1004,13 +1053,20 @@ let crashTimer = 0;
     let last = performance.now();
     let acc = 0;
     let raf = 0;
-    let lastResetSignal = resetSignal.current;
+    let lastResetSignal  = resetSignal.current;
+    let lastReviveSignal = reviveSignal.current;
 
     const frame = (now: number) => {
       raf = requestAnimationFrame(frame);
       if (resetSignal.current !== lastResetSignal) {
         lastResetSignal = resetSignal.current;
         doReset();
+        last = now;
+        acc = 0;
+      }
+      if (reviveSignal.current !== lastReviveSignal) {
+        lastReviveSignal = reviveSignal.current;
+        doRevive();
         last = now;
         acc = 0;
       }
@@ -1274,7 +1330,7 @@ let crashTimer = 0;
             {revivalEnabled ? (
               <>
                 {crashed && !revivalUsed && (
-                  <button className="overlay-btn ad-btn" onClick={() => { setRevivalUsed(true); requestReset(); }}>
+                  <button className="overlay-btn ad-btn" onClick={() => { setRevivalUsed(true); requestRevive(); }}>
                     看廣告復活
                   </button>
                 )}
