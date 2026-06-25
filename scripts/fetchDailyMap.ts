@@ -120,35 +120,49 @@ async function fetchYahooIntraday(symbol: string): Promise<number[]> {
 
 // TAIEX 日盤 + 真正交易日：用 Yahoo ^TWII（與個股同一資料源，比 TWSE 端點可靠）。
 // 交易日直接從回傳的 K 棒 timestamp + 交易所時區偏移算出，不靠執行當下時間推算。
+// range=1d 若不夠（盤中手動觸發、當日資料不完整），自動 fallback 到 range=5d 取最近完整 session。
 // 回傳 date 為交易所當地（台灣）日期字串 YYYY-MM-DD。
 async function fetchTaiexSession(): Promise<{ date: string; prices: number[] } | null> {
-  const url = `https://query1.finance.yahoo.com/v8/finance/chart/%5ETWII?interval=5m&range=1d&includePrePost=false`;
-  try {
-    const r = await fetch(url, { headers: UA_YF, signal: AbortSignal.timeout(15_000) });
-    const j = await r.json() as Record<string, unknown>;
-    const result = ((j.chart as Record<string, unknown>)?.result as Record<string, unknown>[] | undefined)?.[0];
-    if (!result) return null;
-    const ts = (result.timestamp as number[] | undefined) ?? [];
-    const meta = result.meta as Record<string, unknown> | undefined;
-    const gmtoffset = (meta?.gmtoffset as number | undefined) ?? 28800; // 台灣 +8h
-    const quotes = (result.indicators as Record<string, unknown>)?.quote as Record<string, unknown>[] | undefined;
-    const closes = (quotes?.[0]?.close as (number | null)[]) ?? [];
-    if (ts.length === 0) return null;
-    // 交易所當地日期：把 epoch 秒 + 時區偏移後當成 UTC 讀日期部分
-    const localDate = (epochSec: number) =>
-      new Date((epochSec + gmtoffset) * 1000).toISOString().slice(0, 10);
-    const sessionDate = localDate(ts[ts.length - 1]); // 最後一根 = 最近 session
-    const prices: number[] = [];
-    for (let i = 0; i < ts.length; i++) {
-      const c = closes[i];
-      if (localDate(ts[i]) === sessionDate && c != null && Number.isFinite(c)) prices.push(c);
+  const localDate = (epochSec: number, gmtoffset: number) =>
+    new Date((epochSec + gmtoffset) * 1000).toISOString().slice(0, 10);
+
+  for (const range of ["1d", "5d"] as const) {
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/%5ETWII?interval=5m&range=${range}&includePrePost=false`;
+    try {
+      const r = await fetch(url, { headers: UA_YF, signal: AbortSignal.timeout(15_000) });
+      const j = await r.json() as Record<string, unknown>;
+      const result = ((j.chart as Record<string, unknown>)?.result as Record<string, unknown>[] | undefined)?.[0];
+      if (!result) continue;
+      const ts = (result.timestamp as number[] | undefined) ?? [];
+      if (ts.length === 0) continue;
+      const meta = result.meta as Record<string, unknown> | undefined;
+      const gmtoffset = (meta?.gmtoffset as number | undefined) ?? 28800; // 台灣 +8h
+      const closes = ((result.indicators as Record<string, unknown>)?.quote as Record<string, unknown>[] | undefined)?.[0]?.close as (number | null)[] ?? [];
+
+      // 把所有資料按日期分組
+      const byDate = new Map<string, number[]>();
+      for (let i = 0; i < ts.length; i++) {
+        const c = closes[i];
+        if (c == null || !Number.isFinite(c)) continue;
+        const d = localDate(ts[i], gmtoffset);
+        if (!byDate.has(d)) byDate.set(d, []);
+        byDate.get(d)!.push(c);
+      }
+      // 從最新往舊找第一個 >= 20 點的完整 session
+      const sortedDates = Array.from(byDate.keys()).sort().reverse();
+      for (const sessionDate of sortedDates) {
+        const prices = byDate.get(sessionDate)!;
+        if (prices.length >= 20) {
+          console.log(`  TAIEX ${sessionDate}: ${prices.length} 點 → 降採樣 ${DOWNSAMPLE}${range === "5d" ? " (5d fallback)" : ""}`);
+          return { date: sessionDate, prices: downsample(prices, DOWNSAMPLE) };
+        }
+      }
+      // 當前 range 全都不夠，繼續嘗試下一個 range
+    } catch {
+      continue;
     }
-    if (prices.length < 20) return null;
-    console.log(`  TAIEX ${sessionDate}: ${prices.length} 點 → 降採樣 ${DOWNSAMPLE}`);
-    return { date: sessionDate, prices: downsample(prices, DOWNSAMPLE) };
-  } catch {
-    return null;
   }
+  return null;
 }
 
 // 批次 upsert
