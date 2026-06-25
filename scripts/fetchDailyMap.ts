@@ -104,15 +104,21 @@ async function fetchAllListedStocks(): Promise<{ code: string; name: string }[]>
 }
 
 // 個股日盤：Yahoo Finance 5 分 K
-async function fetchYahooIntraday(symbol: string): Promise<number[]> {
-  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=5m&range=1d&includePrePost=false`;
+// targetDate: 要抓的交易日（YYYY-MM-DD）；range: 由 main() 依當下時間決定（1d/5d）
+async function fetchYahooIntraday(symbol: string, targetDate: string, range: string): Promise<number[]> {
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=5m&range=${range}&includePrePost=false`;
   try {
     const r = await fetch(url, { headers: UA_YF, signal: AbortSignal.timeout(10_000) });
     const j = await r.json() as Record<string, unknown>;
     const result = (j.chart as Record<string, unknown>)?.result as Record<string, unknown>[] | undefined;
-    const quotes = (result?.[0]?.indicators as Record<string, unknown>)?.quote as Record<string, unknown>[] | undefined;
-    const arr = (quotes?.[0]?.close as (number | null)[]) ?? [];
-    return arr.filter((v): v is number => v != null && Number.isFinite(v));
+    const meta = result?.[0]?.meta as Record<string, unknown> | undefined;
+    const gmtoffset = (meta?.gmtoffset as number | undefined) ?? 28800;
+    const ts = (result?.[0]?.timestamp as number[] | undefined) ?? [];
+    const arr = ((result?.[0]?.indicators as Record<string, unknown>)?.quote as Record<string, unknown>[] | undefined)?.[0]?.close as (number | null)[] ?? [];
+    return arr.filter((v, i): v is number => {
+      if (v == null || !Number.isFinite(v) || !ts[i]) return false;
+      return new Date((ts[i] + gmtoffset) * 1000).toISOString().slice(0, 10) === targetDate;
+    });
   } catch {
     return [];
   }
@@ -198,6 +204,13 @@ async function main() {
   rows.push({ map_date: mapDate, stock_code: "TAIEX", stock_name: "台股大盤",
     prices: session.prices, difficulty: calcDifficulty(session.prices) });
 
+  // 決定要用哪個 range 抓個股：
+  // 正常排程（收盤後 16:00）→ session.date = 台灣今日 → range=1d 即可。
+  // 盤中手動觸發 → session.date = 昨天（今日資料不完整）→ 用 range=5d 並過濾 session.date。
+  const taiwanToday = new Date(Date.now() + 8 * 3600 * 1000).toISOString().slice(0, 10);
+  const stockRange = session.date === taiwanToday ? "1d" : "5d";
+  if (stockRange === "5d") console.log(`  盤中觸發，個股改用 range=5d 過濾 ${session.date}`);
+
   // 全部上市股票
   console.log("取得上市股票清單...");
   const stocks = await fetchAllListedStocks();
@@ -206,7 +219,7 @@ async function main() {
   let ok = 0, fail = 0;
   for (let i = 0; i < stocks.length; i++) {
     const { code, name } = stocks[i];
-    const raw = await fetchYahooIntraday(`${code}.TW`);
+    const raw = await fetchYahooIntraday(`${code}.TW`, session.date, stockRange);
     if (raw.length >= 10) {
       const prices = downsample(raw, DOWNSAMPLE);
       rows.push({ map_date: mapDate, stock_code: code, stock_name: name,
