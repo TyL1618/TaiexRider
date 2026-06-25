@@ -67,16 +67,40 @@ function calcDifficulty(prices: number[]): number {
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
 // 取得全部上市股票代號 + 名稱（TWSE STOCK_DAY_ALL，一次拿全部）
+// TWSE 偶爾忽略 response=json 回傳 CSV；先拿 text，嘗試 JSON，失敗則 CSV fallback。
 async function fetchAllListedStocks(): Promise<{ code: string; name: string }[]> {
   const url = "https://www.twse.com.tw/exchangeReport/STOCK_DAY_ALL?response=json";
-  const j = await (await fetch(url, { headers: UA_TWSE })).json() as
-    { stat: string; fields?: string[]; data?: string[][] };
-  if (j.stat !== "OK" || !j.fields || !j.data) return [];
-  const ci = j.fields.indexOf("證券代號");
-  const ni = j.fields.indexOf("證券名稱");
-  return j.data
-    .map(r => ({ code: r[ci].trim(), name: r[ni].trim() }))
-    .filter(s => /^\d{4}$/.test(s.code)); // 4 碼純數字 = 一般上市股票
+  try {
+    const text = await (await fetch(url, { headers: UA_TWSE })).text();
+    // --- 嘗試 JSON ---
+    try {
+      const j = JSON.parse(text) as { stat: string; fields?: string[]; data?: string[][] };
+      if (j.stat !== "OK" || !j.fields || !j.data) return [];
+      const ci = j.fields.indexOf("證券代號");
+      const ni = j.fields.indexOf("證券名稱");
+      return j.data
+        .map(r => ({ code: r[ci].trim(), name: r[ni].trim() }))
+        .filter(s => /^\d{4}$/.test(s.code));
+    } catch {
+      // --- CSV fallback（TWSE 偶發回傳原始 CSV）---
+      console.warn("  STOCK_DAY_ALL 回傳非 JSON，改用 CSV 解析");
+      const lines = text.split(/\r?\n/).filter(l => l.trim());
+      if (lines.length < 2) return [];
+      const headers = lines[0].split(",").map(h => h.trim().replace(/^"/, "").replace(/"$/, ""));
+      const ci = headers.indexOf("證券代號");
+      const ni = headers.indexOf("證券名稱");
+      if (ci < 0 || ni < 0) { console.error("  找不到欄位：", headers.join(",")); return []; }
+      return lines.slice(1)
+        .map(line => {
+          const cols = line.split(",");
+          return { code: (cols[ci] ?? "").trim().replace(/"/g, ""), name: (cols[ni] ?? "").trim().replace(/"/g, "") };
+        })
+        .filter(s => /^\d{4}$/.test(s.code));
+    }
+  } catch (e) {
+    console.error("  fetchAllListedStocks 失敗：", e);
+    return [];
+  }
 }
 
 // 個股日盤：Yahoo Finance 5 分 K
