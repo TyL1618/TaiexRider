@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.12.10";
+export const APP_VERSION = "0.12.11";
 
 export interface ChangelogEntry {
   date: string;
@@ -6,6 +6,12 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    date: "2026-07-02 (v0.12.11)",
+    notes: [
+      "每日排名賽新增「全服死亡熱點」：走勢圖下方紅色熱度條顯示今天全服玩家都摔在賽道哪段，賽道上死亡最多的 3 個位置會出現 ☠️ 標記",
+    ],
+  },
   {
     date: "2026-07-02 (v0.12.10)",
     notes: [

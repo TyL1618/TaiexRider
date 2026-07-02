@@ -8,6 +8,7 @@ import { APP_VERSION } from "../version";
 import { playFlip, playPerfectLanding, playCrash, playFinish, startEngine, updateEngine, stopEngine, getVolume, setVolume } from "./audio";
 import { logEvent } from "../lib/analytics";
 import { haptics } from "../lib/haptics";
+import { fetchDeathHeatmap } from "../lib/deathHeatmap";
 
 export interface GameOverStats {
   score: number;
@@ -244,6 +245,22 @@ export default function GameCanvas({ prices, label, name, subtitle, onExit, onGa
 
     const track: Track = pricesToTrack(prices);
     Composite.add(world, buildTerrainBodies(track));
+
+    // 全服死亡熱點（每日排名賽限定）：今日死亡最多的前 3 個位置畫 ☠️ 標記
+    // （黑魂血跡式社群感；資料匿名彙總，fetch 失敗/尚無資料 = 空陣列不顯示）
+    let heatSpots: { x: number; deaths: number }[] = [];
+    if (analyticsMode === "daily") {
+      fetchDeathHeatmap().then((rows) => {
+        heatSpots = rows
+          .filter((r) => r.deaths > 0)
+          .sort((a, b) => b.deaths - a.deaths)
+          .slice(0, 3)
+          .map((r) => ({
+            x: track.startX + ((r.bucket - 0.5) / 20) * (track.finishX - track.startX),
+            deaths: r.deaths,
+          }));
+      }).catch(() => {});
+    }
 
     const spawnX = track.startX;
     // 懸空高度：初始進場與復活都從空中落下，等觸碰才計時；復活落下時間即為自然懲罰
@@ -1136,6 +1153,24 @@ let crashTimer = 0;
       } else {
         // 賽道模式（遊戲中 + 結算賽道視角 + 死亡動畫）
         drawTrack();
+        // 全服死亡熱點 ☠️（每日賽）：漂浮在地形上方，數字 = 今日陣亡人次
+        if (heatSpots.length > 0) {
+          ctx.save();
+          ctx.textAlign = "center";
+          for (const s of heatSpots) {
+            const sx = wx(s.x);
+            if (sx < -40 || sx > W + 40) continue;
+            const sy = wy(terrainYAt(track, s.x) - 46);
+            ctx.globalAlpha = 0.8;
+            ctx.font = `${Math.max(10, 15 * scale)}px sans-serif`;
+            ctx.fillText("☠️", sx, sy);
+            ctx.globalAlpha = 0.6;
+            ctx.fillStyle = "#ff4dff";
+            ctx.font = `${Math.max(8, 10 * scale)}px sans-serif`;
+            ctx.fillText(`×${s.deaths}`, sx, sy + 13 * scale);
+          }
+          ctx.restore();
+        }
         drawFlag(track.vertices[0].x, track.vertices[0].y, COLOR.start, "START");
         drawFlag(track.finishX, track.vertices[track.vertices.length - 1].y, COLOR.finish, "FIN");
         drawBike(alpha);

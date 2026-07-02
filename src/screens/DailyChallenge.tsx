@@ -7,6 +7,7 @@ import { signInWithGoogle, type User } from "../lib/auth";
 import { getPlayerName } from "../lib/playerId";
 import { getAttempts, incrementAttempts, MAX_ATTEMPTS, FREE_ATTEMPTS } from "../lib/challengeAttempts";
 import { recordStreak, getStreak, playedThisSession } from "../lib/streak";
+import { fetchDeathHeatmap, type HeatBucket } from "../lib/deathHeatmap";
 import type { TrackData } from "../data/tracks";
 import "./DailyChallenge.css";
 
@@ -41,6 +42,13 @@ export default function DailyChallenge({
   const [attempts, setAttempts] = useState(() => getAttempts(dailyKey()));
   const [streak, setStreak] = useState(0);
   const [streakLive, setStreakLive] = useState(false); // 本期已參賽（🔥 實心）或待延續（提示）
+  const [heat, setHeat] = useState<HeatBucket[]>([]); // 今日全服死亡熱點（20 等分）
+
+  useEffect(() => {
+    let alive = true;
+    fetchDeathHeatmap().then((rows) => { if (alive) setHeat(rows); });
+    return () => { alive = false; };
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -101,6 +109,23 @@ export default function DailyChallenge({
         <div className="daily-chart">
           <Sparkline prices={track.prices} width={320} height={150} />
         </div>
+
+        {(() => {
+          const total = heat.reduce((s, h) => s + h.deaths, 0);
+          if (total === 0) return null;
+          const maxD = Math.max(...heat.map((h) => h.deaths));
+          const cells = Array.from({ length: 20 }, (_, i) => heat.find((h) => h.bucket === i + 1)?.deaths ?? 0);
+          return (
+            <div className="death-heat">
+              <div className="death-heat-strip">
+                {cells.map((d, i) => (
+                  <span key={i} className="dh-cell" style={{ opacity: d > 0 ? 0.25 + 0.75 * (d / maxD) : 0 }} />
+                ))}
+              </div>
+              <div className="death-heat-label">☠️ 今日全服已陣亡 {total} 人次・紅越深越多人摔在那</div>
+            </div>
+          );
+        })()}
 
         <div className="daily-info">
           <span className="daily-label">{track.label}</span>

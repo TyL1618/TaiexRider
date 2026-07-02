@@ -46,6 +46,30 @@
 .daily-name { font-size: 1.05rem; color: var(--text); }
 .daily-period { font-size: 0.74rem; letter-spacing: 0.08em; color: var(--text-dim); }
 
+/* 全服死亡熱點：走勢圖正下方 20 等分熱度條（水平對齊圖表 = 死在賽道哪段） */
+.death-heat {
+  width: 320px;
+  margin-top: -0.2rem;
+}
+.death-heat-strip {
+  display: flex;
+  gap: 1px;
+  height: 8px;
+}
+.death-heat-strip .dh-cell {
+  flex: 1;
+  background: #ff2244;
+  border-radius: 2px;
+  box-shadow: 0 0 6px rgba(255, 34, 68, 0.5);
+}
+.death-heat-label {
+  margin-top: 0.3rem;
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  color: var(--text-dim);
+  text-align: center;
+}
+
 /* 連續參賽 streak（🔥）：本期已參賽 = 實心亮；未參賽 = 提示句催玩 */
 .daily-streak {
   margin-top: 0.4rem;
