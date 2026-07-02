@@ -1,0 +1,87 @@
+# TaiexRider 反作弊機制設計（2026-07-02 定案，待排實作）
+
+> 目標：在「純前端 + Supabase」架構限制內，把「偽造分數上榜」的成本拉高到不值得做。
+> 原則：**伺服器端能驗的都在 RPC 驗**；接受「無法 100% 防」的現實（客戶端永遠可被逆向），
+> 重點是擋掉 99% 的低成本作弊（改 JS 變數、直接打 API、重放請求）。
+> 狀態：純設計，尚未實作。實作時分三階段上（見文末 Rollout）。
+
+---
+
+## 威脅模型
+
+| 攻擊 | 成本 | 現況防禦 |
+|------|------|----------|
+| A. 開 DevTools 改分數變數再完賽 | 極低 | 無 |
+| B. 拿 anon key + 自己 JWT 直接打 `submit_daily_score` RPC | 低 | 只有欄位獨立範圍驗證（0~50000 等） |
+| C. 重放/高頻狂打 RPC 洗榜 | 低 | 無速率限制 |
+| D. 清 localStorage 繞過每日 5 次上限 | 極低 | 無（上限純前端） |
+| E. 修改物理參數（改重力/速度）跑出真實但超人的成績 | 中 | 無 |
+| F. 多帳號協同 | 中高 | 無（暫不處理，量大再說） |
+
+身分偽造（player_id）已由 `auth.uid()` 根治，不在此列。
+
+---
+
+## 第一層：RPC 物理一致性驗證（Phase A，最高 CP 值）
+
+單欄位範圍驗證升級為**欄位間關係驗證**，全部在 `submit_daily_score` / `submit_classic_record` 內做，純 SQL 改動、不動客戶端：
+
+1. **分數上限公式**（對照 `constants.ts` 計分規則推導）：
+   - 行進分 ≤ 1000（固定制度）
+   - 翻轉分 = Σ(100 + (k−1)×150)，k=1..flips → `flip_score(f) = 100f + 75f(f−1)`
+   - 完美落地分 ≤ 每次 100 × 該次圈數；保守上界用 `100 × p_flips + 100 × p_perfect`（單圈完美也給 100）
+   - **檢核**：`p_score ≤ 1000 + (100*p_flips + 75*p_flips*(p_flips-1)) + 100*p_flips + 100*p_perfect`，超過即拒。
+2. **時間下限**：車速恆定 `cruiseSpeed=6.912px/step`（60step/s ≈ 415px/s）。當日地圖長度伺服器可算：`(len(prices)+7) × 80 px`（daily_map 的 prices 就在 DB 裡，RPC 直接查）。
+   - **檢核**：`p_time ≥ 地圖長度 / 415 × 1000 × 0.9`（0.9 容忍係數，防資料點浮動）。時間太短 = 不可能跑完 = 拒。
+   - 經典模式同理，12 關長度可寫成 SQL CASE 或小表。
+3. **翻轉/時間比**：後空翻最大角速度 0.192 rad/step → 一圈最快 ≈ 0.55s，且翻轉需先騰空。
+   - **檢核**：`p_flips ≤ ceil(p_time / 1000) × 1.5`（每秒 1.5 圈上界，寬鬆但擋得住 flips=50/time=15s 這種）。
+4. **perfect ≤ flips 相關**：完美落地需 ≥0.85 圈旋轉 → `p_perfect ≤ p_flips + 3`（+3 容忍單圈完美落地被 floor 成 0 圈的邊角）。
+
+> 這層擋掉攻擊 B 的大部分（亂填數字），A 也部分被擋（改分數變數但 flips/time 對不上）。
+> 攻擊 E（改物理參數跑真成績）擋不住——它產生的數字自洽。靠第三層。
+
+## 第二層：速率限制 + 伺服器端次數上限（Phase B）
+
+1. **提交冷卻**：`daily_scores` 已有 `created_at`。RPC 開頭加：同 uid 距上次提交 < 30 秒 → 靜默拒絕（正常一局至少 30s+，重放/腳本狂打直接失效）。零新表。
+2. **每日次數上限搬進 DB**（根治攻擊 D）：新表 `daily_attempts (challenge_date, player_id, attempts int)`，遊戲開局呼叫新 RPC `consume_attempt()`：`attempts ≥ 5 → 回傳 false`，前端以回傳值放行。localStorage 保留當 UI 快取（未登入者仍用舊制，反正未登入不能上榜）。
+   - ⚠️ 代價：開局多一次 round-trip；離線/失敗 fallback 允許遊玩但不能提交。實作時注意。
+3. **提交次數側限**：同一 uid 同一天提交 > 12 次（5 局 + 復活 + 容忍）→ 靜默拒絕並標記（見第三層）。
+
+## 第三層：離群偵測 + 隔離（Phase B~C，對付「自洽的假成績」）
+
+1. `daily_scores` 加欄位 `suspect boolean default false`。
+2. **夜間掃描**（掛在既有每日 GitHub Actions，service key 跑 SQL）：
+   - 分數 z-score > 4（相對當日榜分布）
+   - 時間逼近理論下限（< 理論最短 × 1.05）且分數同時逼近上限公式
+   - 觸發第二層 3. 的高頻提交者
+   → `suspect = true`。
+3. **不刪除、不擠榜首**：`daily_scores_ranked` VIEW 加 `where not suspect`（或 suspect 顯示但沉底）。誤判可人工在 Dashboard 改回，玩家無感。
+4. 經典模式永久榜同制，且因為是單一保持者，**建議加人工確認**：suspect 的經典紀錄不覆蓋現任保持者。
+
+## 第四層：操作事件序列（Phase C，與 Ghost 回放共用一份工）
+
+錄一份輕量「關鍵事件時間軸」隨成績提交，一魚兩吃：
+
+- **格式**（設計目標 < 4KB/局）：`[[t, type], ...]`，type ∈ press/release/land/flip/perfect/finish，t = 相對開始 ms。壓縮：delta encoding + 整數陣列。
+- **反作弊用**：RPC 做粗一致性（事件數 vs flips/perfect 對得上、press/release 交錯合法、最後 finish 時間 ≈ p_time）。偽造者要生成自洽事件流，成本大幅上升。
+- **Ghost 用**（留存規劃的「跟保持者鬼影賽跑」）：同一份資料 + 車輛位置取樣（每 0.5s 一個 x），回放端用簡化插值重現，不需完整物理 replay。
+- 存放：`daily_scores` 加 `replay jsonb`（或獨立表，僅榜上前 100 保留完整 replay，其餘丟棄省空間）。
+
+## 刻意不做
+
+- **完整伺服器端物理重放**：要在 Postgres/Edge Function 跑 Matter.js 重演，工程與成本不成比例。第四層的粗一致性已足夠拉高成本。
+- **前端混淆/加密**：假安全，逆向者眼裡是透明的，還增加維護成本。
+- **裝置指紋**：隱私成本高，封測規模用不上。
+
+## Rollout 順序
+
+| 階段 | 內容 | 改動面 | 時機 |
+|------|------|--------|------|
+| A | 物理一致性驗證 + 30s 冷卻 | 純 SQL（一份 migration，手動跑） | 隨時可上，**建議正式上架前** |
+| B | DB 端每日次數 + 高頻標記 + suspect 欄位/VIEW + 夜間掃描 | SQL + 前端開局 RPC + CI | 正式上架後第一波 |
+| C | 操作事件序列 + Ghost 資料 | 前端錄製 + schema + RPC | 與 Ghost 回放功能一起做（見 RETENTION_PLAN.md） |
+
+> ⚠️ 所有 RPC 修改都要在 Supabase SQL Editor 手動跑，push 不生效（老規矩）。
+> ⚠️ Phase A 上線前先拿近期真實成績跑一遍驗證公式（避免把正常玩家的極限成績誤殺）——
+> events/daily_scores 現有資料就夠回測。
