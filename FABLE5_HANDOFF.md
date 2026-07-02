@@ -6,6 +6,19 @@
 
 ---
 
+## 🕐 如果只有 1 小時（誠實提醒）
+
+使用者這次給的時段是**中午吃飯的 1 小時**，但本檔累積下來的項目（debug 兩項＋headless 模擬工具＋監控系統設計＋反作弊設計＋內容改善＋原生體驗 6 項＋拉霸音效＋SEO/分享＋文件重整）**實際工作量是好幾個 session，不是 1 小時做得完的**。與其每項都碰一點、全部半成品，不如這一小時**只挑真正能在時間內做完、且不需要使用者在場確認的項目**收斂完成：
+
+1. **原生體驗優化中「純 PWA 端」的 3 項**（見下方新增段落標記 ✅ 的部分）——震動回饋、`overscroll-behavior`、Matter.js 延遲載入。這 3 項不用碰 `android/` 原生專案，改完 push 就生效，不需要使用者操作 Android Studio。
+2. **拉霸機音效**——獨立、範圍明確、不依賴其他任務。
+3. **SEO meta tags（OG/Twitter Card）**——純 `index.html` 補標籤，範圍小。
+4. **文件重整**（拆 History.md）——機械性工作，不需要判斷力，但要細心別漏內容。
+
+其餘項目（debug 假說驗證、headless 模擬工具、監控系統、反作弊、內容改善、原生體驗中需要碰 `android/` 的項目）**這次先不要動**，留給下次有較長時段、且使用者能在場配合測試的 session。寧可少做幾項但做完整、typecheck/build 都過、有 push，也不要每項都動一點但都是半成品——那樣下次接手反而更難搞清楚現在是什麼狀態。
+
+---
+
 ## 🐛 Debug
 
 ### 1. 完美落地判定有時不觸發（使用者實測回報，優先）
@@ -91,6 +104,48 @@
 
 ---
 
+## 📱 原生體驗優化（讓玩家感覺不到這是 PWA/TWA）
+
+目標：讓遊戲盡量像原生 Android app，不要露出「這其實是網頁包出來的」痕跡。已查過現況：assetlinks 驗證、全螢幕沉浸式、TWA splash 背景色+淡出、`user-select:none`/`touch-action:none`、`safe-area-inset` 都已到位。以下是具體缺口，**每項都要標明是否需要碰 `android/` 原生專案**——這點很關鍵：
+
+> ⚠️ **部署差異提醒**：這個專案是 PWA 包 TWA，`src/`、`index.html`、`public/` 底下的改動 push 到 main 就會透過 GitHub Actions 自動部署到 `taiexrider.pages.dev`，TWA 跑的就是這個網址，**改完立刻生效，不需要使用者做任何事**。但 `android/` 資料夾內的原生專案改動（AndroidManifest.xml、themes.xml、drawable 資源等）**push 不會有任何效果**——這些改動要生效，使用者必須手動在 Android Studio 重新 build signed AAB、`versionCode +1`、上傳到 Play Console，這是本專案過去每次動 `android/` 都會發生的固定流程（見 History.md 多次記錄）。**標記 ❌ 的項目做完 code 後，一定要在交接紀錄裡明確提醒使用者「這項需要重新包 AAB 才會生效」，不要讓使用者以為 push 完就結束了。**
+
+1. ✅ **震動回饋（`navigator.vibrate`）—— 純 PWA 端，push 即生效**
+   目前全專案沒有任何震動呼叫。加在：撞車瞬間（短促強震）、完美落地（一組節奏感的雙震）、按鈕點擊（極短單震）。可以放進 `src/game/audio.ts` 旁邊或新建 `haptics.ts`，跟現有 `playCrash()`/`playPerfectLanding()` 等呼叫點綁在一起（`GameCanvas.tsx` 內對應位置）。注意部分瀏覽器/裝置不支援 `navigator.vibrate`，要做 feature detection，不能讓不支援的裝置噴錯誤。
+
+2. ✅ **`overscroll-behavior: none` —— 純 PWA 端，push 即生效**
+   全站 CSS 目前完全沒有這個屬性。選單頁面（賽道清單、排行榜）過度捲動時會出現瀏覽器原生的橡皮筋回彈/下拉刷新手勢，是最容易穿幫的地方。建議加在 `src/index.css` 的 `html, body` 全域規則。
+
+3. ✅ **Matter.js 延遲載入，改善冷啟動 —— 純 PWA 端，push 即生效**
+   目前 bundle 偏大、首次繪製慢（已知痛點，History.md 有記錄）。評估把 `matter-js` 改成動態 `import()`，只在進入遊戲畫面（`GameCanvas` mount）才載入，首頁/選單畫面能更快進入可互動狀態，不用等整包物理引擎載完。**做完務必跑一次 `npm run build` 確認 bundle 有正確拆分、typecheck 過、且遊戲本身不受影響（有真的測試進出遊戲畫面）。**
+
+4. ❌ **App 捷徑（長按主畫面圖示跳快速選單）—— 需確認是否要碰 `android/`**
+   原生 app 常見的長按圖示快速選單（例如「每日排名賽」「隨機拉霸」）。先查證這個專案的 TWA 建置方式（`androidbrowserhelper`，非 Bubblewrap）是否能直接讀取 PWA `manifest.webmanifest` 的 `shortcuts` 欄位動態生效，還是需要在 `android/` 內另外設定並重新包 AAB 才會出現。**這項如果查證起來會花超過 10-15 分鐘，直接跳過、留給下次 session，不要卡在查證上耗掉寶貴的 1 小時。**
+
+5. ❌ **Splash 加品牌 icon（目前只有純色背景）—— 需要碰 `android/`，需要重新包 AAB**
+   現有 `SPLASH_SCREEN_BACKGROUND_COLOR`/`SPLASH_SCREEN_FADE_OUT_DURATION` 已設定（`android/app/src/main/AndroidManifest.xml`），但沒有 `SPLASH_SCREEN_ICON_DRAWABLE` 之類的品牌圖資源。這項一定要重新包 AAB 才生效，且需要一張適合的 icon/logo 圖片素材（目前有沒有現成的裁切好的版本要先確認，沒有的話這項也先跳過）。
+
+6. ❌ **Android 13+ 預測性返回手勢支援（`enableOnBackInvokedCallback`）—— 需要碰 `android/`，需要重新包 AAB**
+   `AndroidManifest.xml` 的 `<application>` 標籤加 `android:enableOnBackInvokedCallback="true"`，並確認 `targetSdkVersion` ≥ 33。加了之後系統手勢會有預覽動畫，但要注意這跟現有自訂返回鍵確認彈窗（popstate 攔截邏輯）會不會互相打架，**這項改動後強烈建議真機測試，不要只憑 typecheck 過就當作完成**。
+
+**次要／有餘力再做**：Web Push 通知（每日挑戰提醒）——網頁結構上做得到但一般網站少做，能進一步強化「這是 app」的錯覺，也對留存有幫助，工程量較大，排在最後面。
+
+---
+
+## 🎰 拉霸機轉動音效（新增，使用者具體要求）
+
+**需求**：`src/screens/RandomSlot.tsx` 的拉霸機轉動時目前完全靜音，使用者要求加上「咖咖咖」的機械滾輪音效，**越接近真實吃角子老虎機越好**。
+
+**現況程式碼**：`spin()` 函式（`RandomSlot.tsx` 55 行起）用 `requestAnimationFrame` 驅動捲軸位移，`targetIndex`/`D`/`v` 算出總位移與初速，有明確的加速/減速兩階段（`T1`、`T2`，先等速捲動再減速停到 `winner`）、`ITEM_H` 是每個項目的高度。
+
+**建議做法**：
+- 沿用專案既有的音效模式——`src/game/audio.ts` 全部是 Web Audio API **純程式合成**，沒有外部音檔（`playFlip`/`playCrash`/`playFinish` 皆是範例），這個「咖」聲也建議用程式合成（短促的方波/噪音 click，接近機械棘輪聲），不要另外引入音檔資源增加 bundle 大小。
+- 在 `spin()` 的 rAF 迴圈裡，每當捲動位移跨過一個 `ITEM_H` 整數倍（即「換下一格」的瞬間）就觸發一次 tick 音效，而不是固定時間間隔——這樣音效節奏會自然跟著現有的 T1（等速）快、T2（減速）慢的曲線走，聽起來才會像真的老虎機「唰唰唰...咖...咖.....咖」逐漸變慢停下，而不是機械式等間隔的嗶嗶聲。
+- 最後停止時（`winner` 落定瞬間）可以加一個比 tick 更明顯的「哐」收尾音效，強化「停止」的手感。
+- 記得接進現有音量控制系統（`getVolume()`/`setVolume()`），不要獨立於現有音量開關之外。
+
+---
+
 ## 📣 曝光度 / 觸及率技術準備
 
 **現況**：`index.html` 只有 `<title>TaiexRider</title>`，完全沒有 `<meta description>`、Open Graph、Twitter Card 標籤；程式碼裡也沒有任何分享功能（`navigator.share` 未使用過）。這兩項是實打實的技術缺口，直接影響上架後的觸及率。
@@ -120,16 +175,20 @@
 
 ---
 
-## 建議優先順序（本禮拜）
+## 建議優先順序（本禮拜整體，時段充裕時適用）
+
+> 如果這次 session 時間有限（例如只有 1 小時），改看最上面「🕐 如果只有 1 小時」段落，不要硬套下面這份全週順序。
 
 1. Debug #2（卡地形，先做重現＋量化，不急著下手改）
 2. Debug #1（完美落地判定，先加 log 驗證假說）
 3. 監控/資料回饋迴路（雛形即可，上線前要有）
 4. 內容改善高優先兩項（BETA_FEEDBACK #3 #1）
-5. 曝光度技術準備（OG tags + 分享成績按鈕，上架時就該就緒，別等上架後才補）
-6. 反作弊設計（先定案，實作可以晚一點）
-7. 文件重整（隨時可穿插做，不佔額外整塊時間）
-8. 上架前置檢查（順手確認，不用整塊時間）
-9. ASO 文案草稿（跟上架前置檢查一起順手做）
+5. 原生體驗優化中「純 PWA 端」3 項（震動/overscroll/延遲載入）+ 拉霸機音效
+6. 曝光度技術準備（OG tags + 分享成績按鈕，上架時就該就緒，別等上架後才補）
+7. 反作弊設計（先定案，實作可以晚一點）
+8. 原生體驗優化中「需碰 android/」3 項（App 捷徑/splash icon/預測性返回）——集中一次做，做完提醒使用者要重新包 AAB
+9. 文件重整（隨時可穿插做，不佔額外整塊時間）
+10. 上架前置檢查（順手確認，不用整塊時間）
+11. ASO 文案草稿（跟上架前置檢查一起順手做）
 
 新點子/創意沒有時間壓力，隨時可以穿插發想，不佔用上面順序。
