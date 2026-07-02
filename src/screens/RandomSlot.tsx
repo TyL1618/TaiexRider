@@ -3,6 +3,7 @@ import Sparkline from "../components/Sparkline";
 import { fetchDailyMapList, fetchStockDailyMap, type DailyMapMeta } from "../lib/dailyMap";
 import { STOCK_POOL, dailyKey } from "../data/pick";
 import { trackDifficulty, type TrackData } from "../data/tracks";
+import { playSlotTick, playSlotStop } from "../game/audio";
 import "./RandomSlot.css";
 
 const ITEM_H = 72;
@@ -77,6 +78,12 @@ export default function RandomSlot({
     const v = D / (T1 + T2 / 2);
     const start = performance.now();
 
+    // 「咖」聲節奏：跨過一格（ITEM_H 整數倍）就 tick 一次，音效節奏自然跟著
+    // T1 等速快、T2 減速慢的位移曲線走（唰唰唰…咖…咖……咖）。
+    // 等速段每秒跨 ~69 格太密，tick 率上限 ~35/s → 快段變密集機械聲、慢段逐格清晰。
+    let lastItemIdx = -1;
+    let lastTickAt = 0;
+
     const tick = (now: number) => {
       const e = (now - start) / 1000;
       let off: number;
@@ -89,10 +96,19 @@ export default function RandomSlot({
         off = D;
       }
       if (stripRef.current) stripRef.current.style.transform = `translateY(${-off}px)`;
+      const itemIdx = Math.floor(off / ITEM_H);
+      if (itemIdx !== lastItemIdx) {
+        lastItemIdx = itemIdx;
+        if (now - lastTickAt > 28) {
+          lastTickAt = now;
+          playSlotTick();
+        }
+      }
       if (e < T1 + T2) {
         rafRef.current = requestAnimationFrame(tick);
       } else {
         if (stripRef.current) stripRef.current.style.transform = `translateY(${-D}px)`;
+        playSlotStop();
         setPhase("loading");
         // 停住後抓 prices（通常 <200ms，幾乎無感）
         timerRef.current = setTimeout(async () => {

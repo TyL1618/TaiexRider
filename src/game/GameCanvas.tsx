@@ -7,6 +7,7 @@ import { BIKE, CAMERA, COLOR, DRIVE, RULES } from "./constants";
 import { APP_VERSION } from "../version";
 import { playFlip, playPerfectLanding, playCrash, playFinish, startEngine, updateEngine, stopEngine, getVolume, setVolume } from "./audio";
 import { logEvent } from "../lib/analytics";
+import { haptics } from "../lib/haptics";
 
 export interface GameOverStats {
   score: number;
@@ -569,6 +570,7 @@ let crashTimer = 0;
             perfectLandings++;
             showToast(`完美落地 ${perfectFlips}圈 +${perfectBonus}`);
             playPerfectLanding();
+            haptics.perfect();
             perfectFxFrames = 30;
             perfectFxPts = [
               { x: bike.rearWheel.position.x, y: bike.rearWheel.position.y },
@@ -625,7 +627,7 @@ let crashTimer = 0;
         overRef.current = true;
         dyingRef.current = true;
         setDying(true);
-        playCrash(); stopEngine();
+        playCrash(); stopEngine(); haptics.crash();
         crashTimer = 0;
         logEvent("death", analyticsMode, {
           cause: "topHit", label,
@@ -649,7 +651,7 @@ let crashTimer = 0;
           overRef.current = true;
           dyingRef.current = true;
           setDying(true);
-          playCrash(); stopEngine();
+          playCrash(); stopEngine(); haptics.crash();
         }
       } else {
         crashTimer = 0;

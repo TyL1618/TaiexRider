@@ -1,6 +1,10 @@
-import { useState, useCallback, useEffect, useRef } from "react";
-import GameCanvas from "./game/GameCanvas";
+import { useState, useCallback, useEffect, useRef, lazy, Suspense } from "react";
 import type { GameOverStats } from "./game/GameCanvas";
+
+// GameCanvas（含 Matter.js 物理引擎，bundle 最大宗）拆成獨立 chunk 延遲載入：
+// 首頁/選單不用等物理引擎就能互動，改善冷啟動首次可互動時間。
+// App 掛載 2.5s 後背景預熱該 chunk（且 SW precache 會快取），實際進遊戲幾乎無感。
+const GameCanvas = lazy(() => import("./game/GameCanvas"));
 import TrackSelect from "./TrackSelect";
 import Home, { type Screen } from "./screens/Home";
 import RandomSlot from "./screens/RandomSlot";
@@ -45,6 +49,12 @@ export default function App() {
   useEffect(() => {
     getUser().then(setUser);
     return onAuthStateChange(setUser);
+  }, []);
+
+  // 背景預熱 GameCanvas chunk（Matter.js），讓首次進遊戲不用現場下載
+  useEffect(() => {
+    const t = setTimeout(() => { void import("./game/GameCanvas"); }, 2500);
+    return () => clearTimeout(t);
   }, []);
 
   // App 啟動時預熱每日資料，進 DailyChallenge 時直接從快取拿，不需等待
@@ -159,18 +169,20 @@ export default function App() {
 
   if (track) {
     return (
-      <GameCanvas
-        key={gameKeyRef.current}
-        prices={track.prices}
-        label={track.label}
-        name={track.name}
-        subtitle={track.subtitle}
-        onExit={handleExitTrack}
-        onGameOver={handleGameOver}
-        hideMinimap={track.mode === "long"}
-        revivalEnabled={isDailyRun}
-        analyticsMode={analyticsModeRef.current}
-      />
+      <Suspense fallback={<div className="lazy-game-loading">賽道載入中…</div>}>
+        <GameCanvas
+          key={gameKeyRef.current}
+          prices={track.prices}
+          label={track.label}
+          name={track.name}
+          subtitle={track.subtitle}
+          onExit={handleExitTrack}
+          onGameOver={handleGameOver}
+          hideMinimap={track.mode === "long"}
+          revivalEnabled={isDailyRun}
+          analyticsMode={analyticsModeRef.current}
+        />
+      </Suspense>
     );
   }
 

@@ -4,9 +4,11 @@ import App from "./App.tsx";
 import "./index.css";
 import "./pwa"; // 註冊 Service Worker + 自動更新
 import { initAds } from "./lib/ads"; // 廣告雙軌偵測（第一階段：只偵測不載入）
+import { initButtonHaptics } from "./lib/haptics"; // 全域按鈕震動（不支援裝置自動 no-op）
 
 // 廣告初始化：偵測 TWA/網頁環境。第一階段 pub ID 留空 → 不顯示任何廣告。
 initAds();
+initButtonHaptics();
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

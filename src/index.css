@@ -28,6 +28,8 @@ body,
   width: 100%;
   height: 100%;
   overflow: hidden;
+  /* 原生體驗：消除選單頁過度捲動的橡皮筋回彈 / 下拉刷新手勢（最容易穿幫像網頁的地方） */
+  overscroll-behavior: none;
 }
 
 body {
@@ -41,6 +43,19 @@ body {
   user-select: none;
   -webkit-user-select: none;
   touch-action: none;
+}
+
+/* GameCanvas lazy chunk 載入中的全螢幕佔位（深色，避免閃白） */
+.lazy-game-loading {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+  color: var(--neon-cyan);
+  font-size: 0.9rem;
+  letter-spacing: 0.2em;
 }
 
 /* ============================================================

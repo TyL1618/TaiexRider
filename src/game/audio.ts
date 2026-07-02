@@ -112,6 +112,61 @@ export function playFinish() {
   }
 }
 
+// ---- 拉霸機音效（RandomSlot）----
+
+// 「咖」：短促高頻方波 click，模擬機械棘輪滾過一格。
+// 頻率帶一點隨機讓連續 tick 不死板；音量低（連發時不吵）。
+export function playSlotTick() {
+  const c = ctx();
+  const now = c.currentTime;
+  const osc = c.createOscillator();
+  const gain = c.createGain();
+  osc.connect(gain);
+  gain.connect(masterGain());
+  osc.type = "square";
+  osc.frequency.value = 1500 + Math.random() * 500;
+  gain.gain.setValueAtTime(0.07, now);
+  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.03);
+  osc.start(now);
+  osc.stop(now + 0.035);
+}
+
+// 「哐」：winner 落定收尾——低頻 thunk + 一點噪音，強化「停止」手感
+export function playSlotStop() {
+  const c = ctx();
+  const now = c.currentTime;
+  // 低頻 thunk
+  const osc = c.createOscillator();
+  const og = c.createGain();
+  osc.connect(og);
+  og.connect(masterGain());
+  osc.type = "square";
+  osc.frequency.setValueAtTime(240, now);
+  osc.frequency.exponentialRampToValueAtTime(110, now + 0.1);
+  og.gain.setValueAtTime(0.3, now);
+  og.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+  osc.start(now);
+  osc.stop(now + 0.2);
+  // 金屬感短噪音
+  const rate = c.sampleRate;
+  const buf = c.createBuffer(1, Math.floor(rate * 0.08), rate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+  const src = c.createBufferSource();
+  src.buffer = buf;
+  const filt = c.createBiquadFilter();
+  filt.type = "highpass";
+  filt.frequency.value = 2500;
+  const ng = c.createGain();
+  src.connect(filt);
+  filt.connect(ng);
+  ng.connect(masterGain());
+  ng.gain.setValueAtTime(0.12, now);
+  ng.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+  src.start(now);
+  src.stop(now + 0.09);
+}
+
 // ---- 引擎持續音 ----
 
 let engOsc: OscillatorNode | null = null;

@@ -405,6 +405,12 @@ AndroidManifest 的 activity name 改為 `.MainActivity`。
 
 v0.9.3 加入 master gain node（`masterGain()`），所有音效都接到同一個 GainNode → `destination`，音量設定存 localStorage key `taiexVolume`（預設 0.8）。`setVolume(v)` / `getVolume()` 供 UI 控制。
 
+**拉霸機音效（v0.12.4）**：`playSlotTick()`（短促 1.5~2kHz 方波 click ≈ 機械棘輪「咖」）+ `playSlotStop()`（240→110Hz thunk + 高通噪音「哐」收尾）。`RandomSlot.tsx` 的 rAF 迴圈在捲動位移每跨過一個 `ITEM_H` 觸發 tick——節奏自然跟著 T1 等速快、T2 減速慢的位移曲線；等速段 ~69 格/秒太密，tick 率上限 ~35/s。皆接 masterGain 受音量控制。
+
+**震動回饋（v0.12.4，`src/lib/haptics.ts`）**：`navigator.vibrate` + feature detection（iOS Safari 不支援自動 no-op）。`haptics.crash()`（120ms）接兩個死亡分支、`haptics.perfect()`（[28,45,55] 雙震）接完美落地；按鈕點擊用 `initButtonHaptics()` 全域 pointerdown 事件委派（`closest("button")` 命中就 8ms 短震），`main.tsx` 初始化，之後新增按鈕自動生效。
+
+**GameCanvas 延遲載入（v0.12.4）**：`App.tsx` 用 `React.lazy(() => import("./game/GameCanvas"))` 把 GameCanvas + Matter.js + terrain/bike 拆成獨立 chunk（110KB / gzip 36KB），主 bundle 452KB（原 ~560KB）。App 掛載 2.5s 後背景 `import()` 預熱；Suspense fallback `.lazy-game-loading`（深色全螢幕）。SW precache 涵蓋該 chunk，安裝後進遊戲零延遲。
+
 ---
 
 ## 12. 監控 / 事件打點（v0.12.2）

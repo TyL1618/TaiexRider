@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.12.3";
+export const APP_VERSION = "0.12.4";
 
 export interface ChangelogEntry {
   date: string;
@@ -6,6 +6,15 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    date: "2026-07-02 (v0.12.4)",
+    notes: [
+      "拉霸機轉動加入機械滾輪音效：等速時密集「咖咖咖」、減速時逐格放慢、停止有「哐」收尾",
+      "震動回饋：按鈕點擊極短震、撞車強震、完美落地節奏雙震（不支援的裝置自動略過）",
+      "消除選單過度捲動的橡皮筋回彈／下拉刷新（更像原生 App）",
+      "物理引擎改為延遲載入：首頁開啟更快，進賽道前於背景預先載入",
+    ],
+  },
   {
     date: "2026-07-02 (v0.12.3)",
     notes: [
