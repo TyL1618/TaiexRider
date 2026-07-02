@@ -90,11 +90,13 @@ export async function signOut(): Promise<void> {
 }
 
 // 將暱稱同步到 user_profiles，讓舊成績排行榜也顯示新名稱
+// 長度硬上限 32：DB 端另有 CHECK constraint（migration_hardening），
+// 這裡先擋一層避免正常路徑就被 DB 拒絕。
 export async function updateProfileName(name: string): Promise<void> {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) return;
   await supabase.from("user_profiles").upsert(
-    { player_id: session.user.id, player_name: name },
+    { player_id: session.user.id, player_name: name.slice(0, 32) },
     { onConflict: "player_id" },
   );
 }

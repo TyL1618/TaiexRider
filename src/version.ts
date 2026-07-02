@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.12.1";
+export const APP_VERSION = "0.12.2";
 
 export interface ChangelogEntry {
   date: string;
@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    date: "2026-07-02 (v0.12.2)",
+    notes: [
+      "加入匿名遊玩統計（模式/死亡/完賽事件），用於平衡調整與關卡改善；不含任何個資，詳見隱私權政策",
+      "資安補強：暱稱長度伺服器端上限、相依套件漏洞修補",
+    ],
+  },
   {
     date: "2026-07-02 (v0.12.1)",
     notes: [

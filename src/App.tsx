@@ -14,6 +14,7 @@ import { onAuthStateChange, getUser, type User } from "./lib/auth";
 import { getPlayerName } from "./lib/playerId";
 import { dailyKey } from "./data/pick";
 import { setPlaying } from "./pwa";
+import { logEvent, type AnalyticsMode } from "./lib/analytics";
 
 export default function App() {
   const [screen, setScreen]         = useState<Screen>("home");
@@ -131,9 +132,21 @@ export default function App() {
     }
   }, [isDailyRun, user]);
 
+  // 分析用模式標籤：依「從哪個畫面開局」判斷（screenRef 在 pick 當下仍是子頁）
+  const analyticsModeRef = useRef<AnalyticsMode>("custom");
+  const deriveAnalyticsMode = (t: TrackData): AnalyticsMode => {
+    if (screenRef.current === "daily") return "daily";
+    if (screenRef.current === "random") return "slot";
+    if (t.classicId) return "classic";
+    if (t.mode === "long") return "long";
+    return "custom";
+  };
+
   const handleStartTrack = (t: TrackData) => {
     gameKeyRef.current++;
     trackRef.current = t;
+    analyticsModeRef.current = deriveAnalyticsMode(t);
+    logEvent("run_start", analyticsModeRef.current, { label: t.label });
     setTrack(t);
     setPlaying(true); // 遊玩中：暫緩 SW 自動更新 reload
   };
@@ -156,6 +169,7 @@ export default function App() {
         onGameOver={handleGameOver}
         hideMinimap={track.mode === "long"}
         revivalEnabled={isDailyRun}
+        analyticsMode={analyticsModeRef.current}
       />
     );
   }

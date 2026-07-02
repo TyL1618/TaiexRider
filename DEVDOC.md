@@ -402,7 +402,29 @@ v0.9.3 加入 master gain node（`masterGain()`），所有音效都接到同一
 
 ---
 
-## 12. 測試提醒
+## 12. 監控 / 事件打點（v0.12.2）
+
+**架構**：zero-SDK。前端 `src/lib/analytics.ts` 的 `logEvent(event, mode, props)` fire-and-forget 打 Supabase RPC `log_event`（`keepalive: true`，任何失敗靜默吞掉、絕不影響遊戲）。事件存 `public.events` 表。
+
+| 事件 | 觸發點 | props |
+|------|--------|-------|
+| `run_start` | `App.tsx handleStartTrack`（模式由開局畫面推導：daily/slot/custom/long/classic） | `label` |
+| `death` | `GameCanvas` 死亡兩分支 | `cause`（topHit/stuckMidAir）、`xr`（死亡位置/全長 0~1）、`label` |
+| `finish` | `GameCanvas` 完賽 | `score`、`timeMs`、`flips`、`perfect`、`label` |
+| `revive` | `doRevive()` | `label` |
+| `share` | （保留，分享功能用） | — |
+
+**安全**：寫入只能走 RPC（事件白名單 + props ≤2KB + device ≤48 字）；`player_id` 由 `auth.uid()` 綁定；events 表**無任何 select policy**（只有 Dashboard/service_role 可讀）。`device_id` = localStorage 匿名 UUID（`taiex_player_id`），未登入也能算留存。
+
+**保留策略**：原始事件留 90 天，每日 16:00 CI（`fetchDailyMap.ts`）以 service key 呼叫 `cleanup_old_events()` 清理。
+
+**查看數據**：Supabase Dashboard → SQL Editor 跑 `supabase/analytics_queries.sql`（9 段：DAU/模式分佈/死亡原因/完賽率/死亡熱點/次日留存/成績概況/復活率/表大小）。建議把常用段存成 Saved queries。未來規劃：遊戲內隱藏統計頁（連點版本號 5 下 + admin uid 後端驗證）。
+
+**⚠️ 佈署依賴**：`supabase/migration_20260702.sql` 要在 SQL Editor 手動跑過一次，events 表與 RPC 才存在；沒跑之前前端打點靜默失敗（不影響遊戲）。
+
+---
+
+## 13. 測試提醒
 
 preview / 隱藏分頁 `document.hidden=true` → `requestAnimationFrame` 暫停 → 主迴圈停住（看起來車不動）。
 

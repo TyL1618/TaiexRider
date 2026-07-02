@@ -6,6 +6,7 @@ import { createBike, resetBike, type Bike } from "./bike";
 import { BIKE, CAMERA, COLOR, DRIVE, RULES } from "./constants";
 import { APP_VERSION } from "../version";
 import { playFlip, playPerfectLanding, playCrash, playFinish, startEngine, updateEngine, stopEngine, getVolume, setVolume } from "./audio";
+import { logEvent } from "../lib/analytics";
 
 export interface GameOverStats {
   score: number;
@@ -24,6 +25,7 @@ interface GameCanvasProps {
   onGameOver?: (stats: GameOverStats) => void;
   hideMinimap?: boolean;
   revivalEnabled?: boolean; // 每日排名賽：死亡後可「看廣告復活」（每局一次）
+  analyticsMode?: string;   // 打點用模式標籤（daily/slot/custom/long/classic）
 }
 
 interface Hud {
@@ -132,7 +134,7 @@ let _bikeImgReady = false;
 _bikeImg.onload = () => { _bikeImgReady = true; };
 _bikeImg.src = `${import.meta.env.BASE_URL}bike.png`;
 
-export default function GameCanvas({ prices, label, name, subtitle, onExit, onGameOver, hideMinimap = false, revivalEnabled = false }: GameCanvasProps) {
+export default function GameCanvas({ prices, label, name, subtitle, onExit, onGameOver, hideMinimap = false, revivalEnabled = false, analyticsMode }: GameCanvasProps) {
   const stars = difficultyStars(calcDifficulty(prices));
   const cityBuildings = generateCity(prices.length * 31 + Math.round((prices[0] || 0) * 100));
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -399,6 +401,7 @@ let crashTimer = 0;
 
     // 復活：在死亡位置上方懸空，保留分數/時間，重置碰撞與特效狀態
     const doRevive = () => {
+      logEvent("revive", analyticsMode, { label });
       const deathX = bike.chassis.position.x;
       const terrainY = terrainYAt(track, deathX);
       const reviveY = terrainY - BIKE.wheelDropY - BIKE.wheelRadius - 1 - HOVER_HEIGHT;
@@ -624,6 +627,10 @@ let crashTimer = 0;
         setDying(true);
         playCrash(); stopEngine();
         crashTimer = 0;
+        logEvent("death", analyticsMode, {
+          cause: "topHit", label,
+          xr: Math.round(Math.max(0, Math.min(1, (c.position.x - track.startX) / (track.finishX - track.startX))) * 1000) / 1000,
+        });
       } else if (stuckMidAir && !overRef.current) {
         // stuckMidAir 仍需計時確認（瞬間速度<0.5 可能是正常落地）
         crashTimer += dtMs / 1000;
@@ -632,6 +639,10 @@ let crashTimer = 0;
           Body.setStatic(bike.rearWheel, true);
           Body.setStatic(bike.frontWheel, true);
           spawnDeathParticles(bike.chassis.position.x, bike.chassis.position.y);
+          logEvent("death", analyticsMode, {
+            cause: "stuckMidAir", label,
+            xr: Math.round(Math.max(0, Math.min(1, (c.position.x - track.startX) / (track.finishX - track.startX))) * 1000) / 1000,
+          });
           deathFlashAlpha = 1.0;
           deathShakeAmp = 8;
           deathElapsed = 0;
@@ -651,6 +662,9 @@ let crashTimer = 0;
         Body.setStatic(bike.frontWheel, true);
         setFinished(true);
         playFinish(); stopEngine();
+        logEvent("finish", analyticsMode, {
+          label, score: points, timeMs: Math.round(raceTimeMs), flips: totalFlips, perfect: perfectLandings,
+        });
         onGameOverRef.current?.({ score: points, timeMs: raceTimeMs, flips: totalFlips, perfect: perfectLandings, finished: true });
       }
       return { grounded: groundedNow, upright };

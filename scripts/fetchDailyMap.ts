@@ -255,6 +255,15 @@ async function main() {
   });
   if (del.ok) console.log(`舊資料（${cutoff} 前）已清理`);
 
+  // 監控 events 保留策略：刪 90 天前原始事件（RPC 僅 service_role 可呼叫）。
+  // migration_20260702.sql 未跑之前此呼叫會 404，無妨。
+  const evDel = await fetch(`${SUPABASE_URL}/rest/v1/rpc/cleanup_old_events`, {
+    method: "POST",
+    headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, "Content-Type": "application/json" },
+    body: "{}",
+  });
+  console.log(evDel.ok ? "events 90 天前舊事件已清理" : "events 清理跳過（RPC 尚未建立）");
+
   console.log("✅ 完成");
 }
 
