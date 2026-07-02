@@ -1,4 +1,9 @@
 <resources>
     <string name="app_name">TaiexRider</string>
     <string name="twa_url">https://taiexrider.pages.dev</string>
+    <string name="provider_authority">com.tylapp.taiexrider.fileprovider</string>
+    <string name="shortcut_daily_short">排名賽</string>
+    <string name="shortcut_daily_long">每日排名賽</string>
+    <string name="shortcut_random_short">拉霸</string>
+    <string name="shortcut_random_long">隨機拉霸</string>
 </resources>

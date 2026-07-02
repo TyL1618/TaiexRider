@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.12.5";
+export const APP_VERSION = "0.12.6";
 
 export interface ChangelogEntry {
   date: string;
@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    date: "2026-07-02 (v0.12.6)",
+    notes: [
+      "長按 App 圖示可直接跳「每日排名賽」「隨機拉霸」快速捷徑（Android 需更新版 App；安裝版 PWA 即刻生效）",
+      "App 啟動畫面加入品牌圖示（需更新版 App）",
+    ],
+  },
   {
     date: "2026-07-02 (v0.12.5)",
     notes: [

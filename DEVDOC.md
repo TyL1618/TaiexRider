@@ -307,6 +307,14 @@ src/
 
 > ⚠️ `android/` 與 Android Studio 專案**不會自動同步**。改了 `android/` 內的檔案必須手動複製到 Android Studio 路徑，再重新 Generate Signed Bundle。
 
+### 9.1.1 原生體驗三項（v0.12.6，⚠️ 待重包 AAB 才生效）
+
+repo `android/` 已改好以下三項，**需複製到 Android Studio 專案 → versionCode +1 → Generate Signed Bundle → 上傳 Play Console** 才會在真機出現：
+
+1. **App 捷徑（長按圖示）**：`res/xml/shortcuts.xml`（每日排名賽/隨機拉霸）+ manifest `android.app.shortcuts` meta + `strings.xml` 標籤。androidbrowserhelper 手動專案**不會**自動讀 PWA manifest 的 shortcuts，必須原生宣告；捷徑用 `https://taiexrider.pages.dev/?goto=daily|random` 深連結，前端 `App.tsx` 讀 `?goto=` 導頁（此部分 push 即生效，PWA manifest shortcuts 也同步加了）。
+2. **Splash 品牌圖**：manifest 加 `SPLASH_IMAGE_DRAWABLE=@drawable/splash_icon`（= icon-512 複製）+ `FILE_PROVIDER_AUTHORITY` + `androidx.core.content.FileProvider` provider 宣告 + `res/xml/filepaths.xml`（androidbrowserhelper 靠 FileProvider 把圖交給 Chrome）。這是 History.md「splash A 方案」的主體，可蓋住啟動網址列空窗。
+3. **Android 13+ 預測性返回**：`<application android:enableOnBackInvokedCallback="true">`（targetSdk 36 ≥ 33 OK）。⚠️ **重包後真機必測返回鍵流程**（子頁返回/遊戲中返回/首頁雙按離開），與既有 popstate 攔截可能互動，出問題就先拿掉這個屬性再重包。
+
 ### 9.2 關鍵設定
 
 | 項目 | 值 |

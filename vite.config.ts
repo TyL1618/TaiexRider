@@ -39,6 +39,22 @@ export default defineConfig({
             purpose: "any maskable",
           },
         ],
+        // 安裝版 PWA 長按圖示捷徑（TWA 走原生 android/res/xml/shortcuts.xml，
+        // 兩者都用 ?goto= 深連結，由 App.tsx 接應導頁）
+        shortcuts: [
+          {
+            name: "每日排名賽",
+            short_name: "排名賽",
+            url: "/?goto=daily",
+            icons: [{ src: "icon-192.png", sizes: "192x192", type: "image/png" }],
+          },
+          {
+            name: "隨機拉霸",
+            short_name: "拉霸",
+            url: "/?goto=random",
+            icons: [{ src: "icon-192.png", sizes: "192x192", type: "image/png" }],
+          },
+        ],
       },
       workbox: {
         globPatterns: ["**/*.{js,css,html,svg,png,woff2}"],

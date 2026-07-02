@@ -126,6 +126,21 @@ export default function App() {
     };
   }, []); // 只在 App 掛載時執行一次，永遠不移除
 
+  // App 捷徑 / 深連結：?goto=daily|random|custom|classic 直接跳到子頁。
+  // 來源：Android App Shortcuts（長按圖示）、PWA manifest shortcuts、分享連結。
+  // 清掉參數（replaceState）避免重整重複觸發；補一層 pushState 讓返回鍵行為
+  // 與 handleNav 正常導航一致（返回 = 回首頁）。放在 history effect 之後執行，
+  // 疊在哨兵 entry 之上。
+  useEffect(() => {
+    const goto = new URLSearchParams(window.location.search).get("goto");
+    if (goto === "daily" || goto === "random" || goto === "custom" || goto === "classic") {
+      window.history.replaceState(null, "", window.location.pathname);
+      window.history.pushState({ taiex: true }, "");
+      screenRef.current = goto;
+      setScreen(goto);
+    }
+  }, []);
+
   const handleGameOver = useCallback((stats: GameOverStats) => {
     if (isDailyRun && user) {
       submitDailyScore(getPlayerName(), {

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 長按主畫面圖示的 App 捷徑（App Shortcuts）。
+     androidbrowserhelper（手動專案）不會自動讀 PWA manifest 的 shortcuts，
+     需要這份原生 shortcuts.xml；網頁端 App.tsx 以 ?goto= 參數接應導頁。 -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="daily"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_daily_short"
+        android:shortcutLongLabel="@string/shortcut_daily_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.tylapp.taiexrider"
+            android:targetClass="com.tylapp.taiexrider.MainActivity"
+            android:data="https://taiexrider.pages.dev/?goto=daily" />
+    </shortcut>
+    <shortcut
+        android:shortcutId="random"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_random_short"
+        android:shortcutLongLabel="@string/shortcut_random_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.tylapp.taiexrider"
+            android:targetClass="com.tylapp.taiexrider.MainActivity"
+            android:data="https://taiexrider.pages.dev/?goto=random" />
+    </shortcut>
+</shortcuts>
