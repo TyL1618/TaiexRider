@@ -196,6 +196,7 @@ export default function App() {
           hideMinimap={track.mode === "long"}
           revivalEnabled={isDailyRun}
           analyticsMode={analyticsModeRef.current}
+          pbKey={track.classicId ? `classic_${track.classicId}` : `${analyticsModeRef.current}_${track.label}`}
         />
       </Suspense>
     );

@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.12.7";
+export const APP_VERSION = "0.12.8";
 
 export interface ChangelogEntry {
   date: string;
@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    date: "2026-07-02 (v0.12.8)",
+    notes: [
+      "結算畫面新增「🎉 新個人紀錄！」：每條賽道／每個經典關卡都記住你的最佳分數，打破就亮徽章",
+      "每日排名賽新增「🔥 連續參賽」天數：連續每天參賽累積紀錄，今天還沒玩會提醒你保持",
+    ],
+  },
   {
     date: "2026-07-02 (v0.12.7)",
     notes: [

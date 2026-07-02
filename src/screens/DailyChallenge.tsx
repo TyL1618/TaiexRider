@@ -6,6 +6,7 @@ import { fetchHardestDailyMap, resolveSessionDate, resolveSessionDisplayDate } f
 import { signInWithGoogle, type User } from "../lib/auth";
 import { getPlayerName } from "../lib/playerId";
 import { getAttempts, incrementAttempts, MAX_ATTEMPTS, FREE_ATTEMPTS } from "../lib/challengeAttempts";
+import { recordStreak, getStreak, playedThisSession } from "../lib/streak";
 import type { TrackData } from "../data/tracks";
 import "./DailyChallenge.css";
 
@@ -38,6 +39,8 @@ export default function DailyChallenge({
   // 非日曆日 dailyKey()，避免連假第二天起換到空榜。handleRefresh 也讀它。
   const sessionKeyRef = useRef<string>(dailyKey());
   const [attempts, setAttempts] = useState(() => getAttempts(dailyKey()));
+  const [streak, setStreak] = useState(0);
+  const [streakLive, setStreakLive] = useState(false); // 本期已參賽（🔥 實心）或待延續（提示）
 
   useEffect(() => {
     let alive = true;
@@ -55,7 +58,11 @@ export default function DailyChallenge({
     let alive = true;
     resolveSessionDate(dailyKey()).then((key) => {
       sessionKeyRef.current = key;
-      if (alive) setAttempts(getAttempts(key)); // 用正確的 session key 重新讀取次數
+      if (alive) {
+        setAttempts(getAttempts(key)); // 用正確的 session key 重新讀取次數
+        setStreak(getStreak(key));
+        setStreakLive(playedThisSession(key));
+      }
       return fetchDailyTop(key);
     }).then((r) => {
       if (alive) { setRows(r); setLoaded(true); }
@@ -101,6 +108,12 @@ export default function DailyChallenge({
         </div>
         <div className="daily-period">{isLive ? "前次盤勢 ・ 今日地圖" : "近月日線 ・ 今日地圖"}</div>
 
+        {streak > 0 && (
+          <div className={`daily-streak${streakLive ? " live" : ""}`}>
+            🔥 連續參賽 {streak} 天{streakLive ? "" : "・今天玩一場保持紀錄！"}
+          </div>
+        )}
+
         {user ? (
           <div className="auth-row">
             <span className="auth-as-text">以 <strong>{getPlayerName()}</strong> 參賽</span>
@@ -121,6 +134,8 @@ export default function DailyChallenge({
           const handleStart = () => {
             incrementAttempts(sessionKeyRef.current);
             setAttempts(prev => prev + 1);
+            setStreak(recordStreak(sessionKeyRef.current)); // 連續參賽：進遊戲即算本期參賽
+            setStreakLive(true);
             onPlay(track);
           };
           return (

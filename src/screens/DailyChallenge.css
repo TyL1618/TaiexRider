@@ -46,6 +46,18 @@
 .daily-name { font-size: 1.05rem; color: var(--text); }
 .daily-period { font-size: 0.74rem; letter-spacing: 0.08em; color: var(--text-dim); }
 
+/* 連續參賽 streak（🔥）：本期已參賽 = 實心亮；未參賽 = 提示句催玩 */
+.daily-streak {
+  margin-top: 0.4rem;
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+}
+.daily-streak.live {
+  color: var(--neon-amber);
+  text-shadow: 0 0 8px rgba(255, 179, 0, 0.4);
+}
+
 .nickname-row {
   display: flex;
   align-items: center;

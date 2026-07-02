@@ -27,6 +27,7 @@ interface GameCanvasProps {
   hideMinimap?: boolean;
   revivalEnabled?: boolean; // 每日排名賽：死亡後可「看廣告復活」（每局一次）
   analyticsMode?: string;   // 打點用模式標籤（daily/slot/custom/long/classic）
+  pbKey?: string;           // 個人最佳紀錄的 localStorage key 尾碼（模式+標的）
 }
 
 interface Hud {
@@ -135,7 +136,7 @@ let _bikeImgReady = false;
 _bikeImg.onload = () => { _bikeImgReady = true; };
 _bikeImg.src = `${import.meta.env.BASE_URL}bike.png`;
 
-export default function GameCanvas({ prices, label, name, subtitle, onExit, onGameOver, hideMinimap = false, revivalEnabled = false, analyticsMode }: GameCanvasProps) {
+export default function GameCanvas({ prices, label, name, subtitle, onExit, onGameOver, hideMinimap = false, revivalEnabled = false, analyticsMode, pbKey }: GameCanvasProps) {
   const stars = difficultyStars(calcDifficulty(prices));
   const cityBuildings = generateCity(prices.length * 31 + Math.round((prices[0] || 0) * 100));
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -160,6 +161,7 @@ export default function GameCanvas({ prices, label, name, subtitle, onExit, onGa
   const [confirmExit, setConfirmExit] = useState(false); // 返回主選單確認
   const [showStartPrompt, setShowStartPrompt] = useState(true); // 觸碰才開始計時
   const [revivalUsed, setRevivalUsed] = useState(false); // 每局限復活一次
+  const [newPb, setNewPb] = useState(false); // 本局打破個人最佳（結算徽章）
   // 讓事件處理可讀到最新的結束狀態
   const overRef = useRef(false);
   const dyingRef = useRef(false); // 死亡動畫進行中（在 useEffect 閉包內設定）
@@ -334,6 +336,20 @@ let crashTimer = 0;
     let toastId = 0;
     const showToast = (text: string) => setToast({ text, id: ++toastId });
 
+    // 個人最佳（PB）：分數 > 既有紀錄即更新 localStorage；
+    // 只有「打破舊紀錄」（舊值 > 0，非首次遊玩）才亮結算徽章
+    const checkPb = (score: number) => {
+      if (!pbKey) return;
+      try {
+        const k = `tr_pb_${pbKey}`;
+        const old = parseInt(localStorage.getItem(k) ?? "0", 10);
+        if (score > old) {
+          localStorage.setItem(k, String(score));
+          if (old > 0) setNewPb(true);
+        }
+      } catch { /* localStorage 不可用時略過 */ }
+    };
+
     // ---- 死亡動畫狀態 ----
     type DeathParticle = { x: number; y: number; vx: number; vy: number; life: number; color: string; size: number };
     let deathParticles: DeathParticle[] = [];
@@ -419,6 +435,7 @@ let crashTimer = 0;
       setDying(false);
       setShowChart(false);
       setToast(null);
+      setNewPb(false);
     };
 
     // 復活：在死亡位置上方懸空，保留分數/時間，重置碰撞與特效狀態
@@ -468,6 +485,7 @@ let crashTimer = 0;
       setDying(false);
       setShowChart(false);
       setToast(null);
+      setNewPb(false);
     };
 
     // ---- 物理步進 ----
@@ -693,6 +711,7 @@ let crashTimer = 0;
         logEvent("finish", analyticsMode, {
           label, score: points, timeMs: Math.round(raceTimeMs), flips: totalFlips, perfect: perfectLandings,
         });
+        checkPb(points);
         onGameOverRef.current?.({ score: points, timeMs: raceTimeMs, flips: totalFlips, perfect: perfectLandings, finished: true });
       }
       return { grounded: groundedNow, upright };
@@ -1199,6 +1218,7 @@ let crashTimer = 0;
           dyingRef.current = false;
           setDying(false);
           setCrashed(true);
+          checkPb(points);
           onGameOverRef.current?.({ score: points, timeMs: raceTimeMs, flips: totalFlips, perfect: perfectLandings, finished: false });
         }
       }
@@ -1376,6 +1396,7 @@ let crashTimer = 0;
             <div className="overlay-track-name">{label} {name}</div>
             {subtitle && <div className="overlay-track-sub">{subtitle}</div>}
             <div className="overlay-score">{hud.points} 分</div>
+            {newPb && <div className="overlay-pb">🎉 新個人紀錄！</div>}
             <div className="overlay-time">{hud.timer}</div>
             <div className="overlay-stats">
               翻轉 {hud.totalFlips} 圈 ・ 完美落地 {hud.perfectLandings} 次

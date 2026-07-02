@@ -279,6 +279,21 @@
   box-shadow: 0 0 12px rgba(255, 179, 0, 0.2);
 }
 
+/* 新個人紀錄徽章（結算畫面，分數下方） */
+.overlay-pb {
+  margin-top: 0.15rem;
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--neon-amber);
+  text-shadow: 0 0 10px rgba(255, 179, 0, 0.55);
+  animation: pbPulse 1.1s ease-in-out infinite;
+}
+@keyframes pbPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
 /* 分享成績（品紅鏤空，比 ghost 顯眼、不搶主行動鈕） */
 .overlay-btn.share-btn {
   background: transparent;
