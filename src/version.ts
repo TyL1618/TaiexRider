@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.12.8";
+export const APP_VERSION = "0.12.9";
 
 export interface ChangelogEntry {
   date: string;
@@ -6,6 +6,12 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    date: "2026-07-02 (v0.12.9)",
+    notes: [
+      "經典模式新增獎牌制：每關依你的最佳分數授 🥉1000／🥈1500／🥇2200，卡片顯示獎牌與下一個目標——不用打贏紀錄保持者也有目標可拚",
+    ],
+  },
   {
     date: "2026-07-02 (v0.12.8)",
     notes: [

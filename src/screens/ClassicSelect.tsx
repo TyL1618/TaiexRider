@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import Sparkline from "../components/Sparkline";
 import { CLASSICS, classicToTrack } from "../data/classics";
 import { fetchClassicRecords, type ClassicRecord } from "../lib/classicRecords";
+import { classicPb, medalFor, nextMedalTarget, MEDAL_ICON } from "../lib/medals";
 import { signInWithGoogle, type User } from "../lib/auth";
 import type { TrackData } from "../data/tracks";
 import "../TrackSelect.css";
@@ -47,14 +48,25 @@ export default function ClassicSelect({
       <div className="track-list">
         {CLASSICS.map((c) => {
           const rec = records.get(c.id);
+          const pb = classicPb(c.id);
+          const medal = medalFor(pb);
+          const next = nextMedalTarget(pb);
           return (
             <button key={c.id} className="track-card classic-card" onClick={() => onPick(classicToTrack(c))}>
               <div className="classic-card-head">
-                <span className="classic-title">{c.title}</span>
+                <span className="classic-title">
+                  {medal && <span className="classic-medal">{MEDAL_ICON[medal]}</span>}
+                  {c.title}
+                </span>
                 <span className="classic-period">{c.period}・{c.index}</span>
               </div>
               <Sparkline prices={c.prices} width={300} height={66} />
               <p className="classic-blurb">{c.blurb}</p>
+              <div className="classic-medal-row">
+                {pb > 0 ? <>我的最佳 {pb} 分</> : <>尚未通關</>}
+                {next && <span className="cm-next">・目標 {MEDAL_ICON[next.medal]} {next.score}</span>}
+                {!next && <span className="cm-next gold">・全獎牌達成！</span>}
+              </div>
               <div className="classic-record">
                 {rec ? (
                   <>🏆 <span className="cr-name">{rec.player_name}</span>・{rec.score} 分・{fmtMs(rec.time_ms)}</>

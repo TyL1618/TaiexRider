@@ -61,6 +61,21 @@
 .classic-record .cr-name { font-weight: 700; }
 .classic-record .cr-empty { color: var(--text-dim); }
 
+/* 獎牌（標題前）與個人最佳/下一目標列 */
+.classic-medal { margin-right: 0.3rem; }
+.classic-medal-row {
+  align-self: stretch;
+  margin-top: 0.25rem;
+  font-size: 0.74rem;
+  text-align: right;
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.classic-medal-row .cm-next { color: var(--text); opacity: 0.8; }
+.classic-medal-row .cm-next.gold { color: var(--neon-amber); opacity: 1; }
+
 .classic-login {
   display: flex;
   flex-direction: column;
