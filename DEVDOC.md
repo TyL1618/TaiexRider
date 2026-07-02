@@ -318,6 +318,7 @@ repo `android/` 已改好以下三項，**需複製到 Android Studio 專案 →
 
 1. **App 捷徑（長按圖示）**：`res/xml/shortcuts.xml`（每日排名賽/隨機拉霸）+ manifest `android.app.shortcuts` meta + `strings.xml` 標籤。androidbrowserhelper 手動專案**不會**自動讀 PWA manifest 的 shortcuts，必須原生宣告；捷徑用 `https://taiexrider.pages.dev/?goto=daily|random` 深連結，前端 `App.tsx` 讀 `?goto=` 導頁（此部分 push 即生效，PWA manifest shortcuts 也同步加了）。
 2. **Splash 品牌圖**：manifest 加 `SPLASH_IMAGE_DRAWABLE=@drawable/splash_icon`（= icon-512 複製）+ `FILE_PROVIDER_AUTHORITY` + `androidx.core.content.FileProvider` provider 宣告 + `res/xml/filepaths.xml`（androidbrowserhelper 靠 FileProvider 把圖交給 Chrome）。這是 History.md「splash A 方案」的主體，可蓋住啟動網址列空窗。
+   ⚠️ **vc9 事故（2026-07-02）**：`SPLASH_SCREEN_BACKGROUND_COLOR` 這個 meta-data **必須用 `android:resource="@color/..."`，不能用 `android:value="#05080f"` 塞色碼字面值**——androidbrowserhelper 的 `LauncherActivity` 會把讀到的 int 當「資源 ID」查表，字面值 → `Resources$NotFoundException` → 點開秒崩。此錯誤 6/22 就寫進 manifest，但函式庫只在「有設 SPLASH_IMAGE_DRAWABLE」時才讀背景色，所以 vc7/8 沉睡、vc9 加品牌圖後引爆。vc10 已修。`FADE_OUT_DURATION` 要的是毫秒 int，用 `android:value` 是對的。
 3. **Android 13+ 預測性返回**：`<application android:enableOnBackInvokedCallback="true">`（targetSdk 36 ≥ 33 OK）。⚠️ **重包後真機必測返回鍵流程**（子頁返回/遊戲中返回/首頁雙按離開），與既有 popstate 攔截可能互動，出問題就先拿掉這個屬性再重包。
 
 ### 9.2 關鍵設定

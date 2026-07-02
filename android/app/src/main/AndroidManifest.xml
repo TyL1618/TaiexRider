@@ -25,9 +25,12 @@
                 android:name="android.support.customtabs.trusted.DISPLAY_MODE"
                 android:value="sticky-immersive" />
 
+                <!-- ⚠️ 必須用 android:resource 引用 @color，不能用 android:value 塞色碼字面值：
+                 androidbrowserhelper 會把讀到的 int 當資源 ID 查表，
+                 字面值 → Resources$NotFoundException 啟動即崩（vc9 事故根因） -->
             <meta-data
                 android:name="android.support.customtabs.trusted.SPLASH_SCREEN_BACKGROUND_COLOR"
-                android:value="#05080f" />
+                android:resource="@color/color_splash_bg" />
 
             <meta-data
                 android:name="android.support.customtabs.trusted.SPLASH_SCREEN_FADE_OUT_DURATION"
