@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.12.4";
+export const APP_VERSION = "0.12.5";
 
 export interface ChangelogEntry {
   date: string;
@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    date: "2026-07-02 (v0.12.5)",
+    notes: [
+      "結算畫面新增「分享成績」：一鍵分享今天騎的走勢與成績給朋友（手機開原生分享面板，桌機自動複製文字）",
+      "連結貼到社群（FB/LINE/Threads）現在會顯示霓虹預覽圖與遊戲介紹，不再是空白連結",
+    ],
+  },
   {
     date: "2026-07-02 (v0.12.4)",
     notes: [

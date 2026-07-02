@@ -179,6 +179,27 @@ export default function GameCanvas({ prices, label, name, subtitle, onExit, onGa
   const reviveSignal = useRef(0);
   const requestRevive = () => { reviveSignal.current++; };
 
+  // 分享成績：文案連動股票/當日走勢（本遊戲的天然哏）。
+  // navigator.share 優先（手機原生分享面板），不支援則複製到剪貼簿。
+  const shareScore = async () => {
+    const trackDesc = subtitle ? `${name}（${subtitle}）` : `${label} ${name}`;
+    const text = finished
+      ? `我把 ${trackDesc} 的真實走勢騎好騎滿！🏁 ${hud.points} 分・翻轉 ${hud.totalFlips} 圈・完美落地 ${hud.perfectLandings} 次\n你也來挑戰 TAIEX RIDER：把股市走勢騎成霓虹賽道`
+      : `${trackDesc} 的走勢把我摔飛了 🏍️💥 ${hud.points} 分陣亡（翻轉 ${hud.totalFlips} 圈）\n不服來騎 TAIEX RIDER：把股市走勢騎成霓虹賽道`;
+    const url = "https://taiexrider.pages.dev";
+    logEvent("share", analyticsMode, { label, finished });
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: "TAIEX RIDER", text, url });
+        return;
+      }
+    } catch { /* 使用者取消分享面板：不 fallback、不報錯 */ return; }
+    try {
+      await navigator.clipboard.writeText(`${text}\n${url}`);
+      setToast({ text: "成績已複製，貼給朋友吧！", id: Date.now() });
+    } catch { /* 剪貼簿也失敗：靜默 */ }
+  };
+
   useEffect(() => {
     const canvas = canvasRef.current!;
     const ctx = canvas.getContext("2d")!;
@@ -1376,6 +1397,7 @@ let crashTimer = 0;
                     看廣告復活
                   </button>
                 )}
+                <button className="overlay-btn share-btn" onClick={shareScore}>📤 分享成績</button>
                 <button className="overlay-btn ghost" onClick={onExit}>
                   返回排名賽
                 </button>
@@ -1383,6 +1405,7 @@ let crashTimer = 0;
             ) : (
               <>
                 <button className="overlay-btn" onClick={requestReset}>再玩一次</button>
+                <button className="overlay-btn share-btn" onClick={shareScore}>📤 分享成績</button>
                 <button className="overlay-btn ghost" onClick={onExit}>返回主選單</button>
               </>
             )}

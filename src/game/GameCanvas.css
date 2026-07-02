@@ -279,6 +279,14 @@
   box-shadow: 0 0 12px rgba(255, 179, 0, 0.2);
 }
 
+/* 分享成績（品紅鏤空，比 ghost 顯眼、不搶主行動鈕） */
+.overlay-btn.share-btn {
+  background: transparent;
+  color: #ff4dff;
+  border: 1px solid rgba(255, 77, 255, 0.7);
+  box-shadow: 0 0 12px rgba(255, 77, 255, 0.18);
+}
+
 .ctrl-hint {
   position: absolute;
   bottom: calc(1.1rem + env(safe-area-inset-bottom, 0px));
