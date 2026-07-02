@@ -442,7 +442,11 @@ v0.9.3 加入 master gain node（`masterGain()`），所有音效都接到同一
 
 **保留策略**：原始事件留 90 天，每日 16:00 CI（`fetchDailyMap.ts`）以 service key 呼叫 `cleanup_old_events()` 清理。
 
-**查看數據**：Supabase Dashboard → SQL Editor 跑 `supabase/analytics_queries.sql`（9 段：DAU/模式分佈/死亡原因/完賽率/死亡熱點/次日留存/成績概況/復活率/表大小）。建議把常用段存成 Saved queries。未來規劃：遊戲內隱藏統計頁（連點版本號 5 下 + admin uid 後端驗證）。
+**查看數據**：兩條路——
+① Supabase Dashboard → SQL Editor 跑 `supabase/analytics_queries.sql`（9 段：DAU/模式分佈/死亡原因/完賽率/死亡熱點/次日留存/成績概況/復活率/表大小），常用段存 Saved queries。
+② **遊戲內隱藏統計頁（v0.12.12）**：設定視窗 → 3 秒內連點版本號 5 下 → `StatsScreen`（每日總覽/模式分佈/死因/次日留存）。資料走 `admin_stats` RPC（`migration_20260702b.sql`），**權限綁 JWT email = 開發者帳號**，其他人開頁面只會看到無權限訊息——連點只是入口糖衣不是門鎖。需以 Google 登入開發者帳號才有數據。
+
+**全服死亡熱點（v0.12.11）**：`daily_death_heatmap` RPC（同 migration b，anon 可查的匿名 20 等分彙總）→ `src/lib/deathHeatmap.ts` → DailyChallenge 熱度條 + GameCanvas top3 ☠️ 標記。監控 death.xr 打點一份工投三用（監控/遊戲內容/社群哏）。
 
 **⚠️ 佈署依賴**：`supabase/migration_20260702.sql` 要在 SQL Editor 手動跑過一次，events 表與 RPC 才存在；沒跑之前前端打點靜默失敗（不影響遊戲）。
 

@@ -1,9 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { APP_VERSION, CHANGELOG } from "../version";
 import { signInWithGoogle, signOut, updateProfileName, type User } from "../lib/auth";
 import { getPlayerName, setPlayerName, clampNameWidth } from "../lib/playerId";
 import { setVolume, getVolume } from "../game/audio";
 import { detectEnv } from "../lib/ads";
+import StatsScreen from "./StatsScreen";
 import "./Home.css";
 
 export type Screen = "home" | "custom" | "random" | "daily" | "classic";
@@ -16,6 +17,18 @@ export default function Home({ user, onNav }: { user: User | null; onNav: (s: Sc
   const [savedName, setSavedName]       = useState(() => getPlayerName());
   const [logoutConfirm, setLogoutConfirm] = useState(false);
   const [volume, setVolumeState]        = useState(() => Math.round(getVolume() * 100));
+  const [showStats, setShowStats]       = useState(false);
+  // 隱藏統計頁入口：3 秒內連點版本號 5 下（權限門鎖在後端 admin RPC，這只是入口）。
+  // 用 ref 同步計數（state 在快速連點時會讀到舊值）。
+  const tapRef = useRef({ n: 0, t: 0 });
+  const handleVersionTap = () => {
+    const now = Date.now();
+    tapRef.current = { n: now - tapRef.current.t < 3000 ? tapRef.current.n + 1 : 1, t: now };
+    if (tapRef.current.n >= 5) {
+      tapRef.current = { n: 0, t: 0 };
+      setShowStats(true);
+    }
+  };
 
   useEffect(() => {
     const n = getPlayerName();
@@ -134,7 +147,7 @@ export default function Home({ user, onNav }: { user: User | null; onNav: (s: Sc
             </div>
 
             <div className="settings-meta-row">
-              <span className="settings-version-text">版本 v{APP_VERSION}・{detectEnv() === "twa" ? "App" : "網頁"}</span>
+              <span className="settings-version-text" onClick={handleVersionTap}>版本 v{APP_VERSION}・{detectEnv() === "twa" ? "App" : "網頁"}</span>
               <button
                 className="settings-changelog-btn"
                 onClick={() => { setShowSettings(false); setShowHelp(true); }}
@@ -236,6 +249,8 @@ export default function Home({ user, onNav }: { user: User | null; onNav: (s: Sc
           </div>
         </div>
       )}
+
+      {showStats && <StatsScreen onClose={() => setShowStats(false)} />}
 
     </div>
   );
