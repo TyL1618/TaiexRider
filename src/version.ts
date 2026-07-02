@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.12.6";
+export const APP_VERSION = "0.12.7";
 
 export interface ChangelogEntry {
   date: string;
@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    date: "2026-07-02 (v0.12.7)",
+    notes: [
+      "完美落地計分整理：翻轉分＋完美分合併為單一提示（1圈+200／2圈+450／3圈+750），不再跳兩筆分數看不懂",
+      "圈數判定更貼近體感：轉到差一點點滿圈（85% 以上）就算完整一圈",
+    ],
+  },
   {
     date: "2026-07-02 (v0.12.6)",
     notes: [

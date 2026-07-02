@@ -570,26 +570,25 @@ let crashTimer = 0;
           landingSnap = { rot: airRotation, air: airTime, angle: c.angle, x: c.position.x };
         }
         if (!landingSettled && groundedRun >= RULES.landingSettleSteps && landingSnap) {
-          const flips = Math.floor(Math.abs(landingSnap.rot) / (2 * Math.PI));
+          // 圈數判定（v0.12.7）：差 0.3π 內進位（轉 1.85 圈算 2 圈），與玩家體感一致；
+          // 翻轉分／完美分／totalFlips 全部用同一套圈數，不再出現兩個 toast 圈數不同
+          const flips = Math.floor((Math.abs(landingSnap.rot) + 0.3 * Math.PI) / (2 * Math.PI));
           const realAir = landingSnap.air > RULES.minAirSec;
           const uprightAtLand = Math.cos(landingSnap.angle) > RULES.uprightCosThreshold;
-          if (uprightAtLand && flips > 0) {
-            const gained = flipScore(flips);
-            bonusPoints += gained;
-            totalFlips += flips;
-            showToast(`${flips} 圈 +${gained}`);
-            playFlip();
-          }
           // 完美落地：用「觸地瞬間快照」的車身角 vs 坡面角（玩家看到的那一刻），
           // 觸發：真實跳躍 + rot > 1.7π（85% 一圈，消除整數截斷漏觸發）+ 平行坡面
           const landSlope = slopeAt(track, landingSnap.x);
           const levelOk = Math.abs(angleDelta(landingSnap.angle, landSlope)) < RULES.perfectLevelRad;
-          const perfectFlips = Math.max(1, flips);
-          const perfectBonus = perfectFlips * 100;
-          if (realAir && Math.abs(landingSnap.rot) > Math.PI * 1.7 && levelOk) {
-            bonusPoints += perfectBonus;
+          const isPerfect = realAir && Math.abs(landingSnap.rot) > Math.PI * 1.7 && levelOk;
+          if (isPerfect) {
+            // 完美落地：翻轉分＋完美分（圈數×100）合併成單一 toast，規則透明
+            // （1圈 100+100=200／2圈 250+200=450／3圈 450+300=750）
+            const perfectFlips = Math.max(1, flips);
+            const gained = flipScore(perfectFlips) + perfectFlips * 100;
+            bonusPoints += gained;
+            totalFlips += perfectFlips;
             perfectLandings++;
-            showToast(`完美落地 ${perfectFlips}圈 +${perfectBonus}`);
+            showToast(`完美落地 ${perfectFlips} 圈 +${gained}`);
             playPerfectLanding();
             haptics.perfect();
             perfectFxFrames = 30;
@@ -597,6 +596,12 @@ let crashTimer = 0;
               { x: bike.rearWheel.position.x, y: bike.rearWheel.position.y },
               { x: bike.frontWheel.position.x, y: bike.frontWheel.position.y },
             ];
+          } else if (uprightAtLand && flips > 0) {
+            const gained = flipScore(flips);
+            bonusPoints += gained;
+            totalFlips += flips;
+            showToast(`${flips} 圈 +${gained}`);
+            playFlip();
           }
           landingSettled = true;
           landingSnap = null;
