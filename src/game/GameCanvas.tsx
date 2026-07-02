@@ -181,8 +181,8 @@ export default function GameCanvas({ prices, label, name, subtitle, onExit, onGa
   const reviveSignal = useRef(0);
   const requestRevive = () => { reviveSignal.current++; };
 
-  // 分享成績：文案連動股票/當日走勢（本遊戲的天然哏）。
-  // navigator.share 優先（手機原生分享面板），不支援則複製到剪貼簿。
+  // 分享成績：優先產生「成績圖卡」走 navigator.share files（手機原生面板，圖+文轉發效果最好）；
+  // 不支援 files → 純文字 share；再不支援 → 複製到剪貼簿。文案連動股票/當日走勢（本遊戲的天然哏）。
   const shareScore = async () => {
     const trackDesc = subtitle ? `${name}（${subtitle}）` : `${label} ${name}`;
     const text = finished
@@ -190,16 +190,43 @@ export default function GameCanvas({ prices, label, name, subtitle, onExit, onGa
       : `${trackDesc} 的走勢把我摔飛了 🏍️💥 ${hud.points} 分陣亡（翻轉 ${hud.totalFlips} 圈）\n不服來騎 TAIEX RIDER：把股市走勢騎成霓虹賽道`;
     const url = "https://taiexrider.pages.dev";
     logEvent("share", analyticsMode, { label, finished });
+
+    // ① 圖卡 + 檔案分享
+    try {
+      const { renderShareCard } = await import("../lib/shareCard");
+      const blob = await renderShareCard({
+        label, name, subtitle,
+        prices,
+        score: hud.points,
+        timer: hud.timer,
+        flips: hud.totalFlips,
+        perfect: hud.perfectLandings,
+        finished,
+      });
+      if (blob) {
+        const file = new File([blob], "taiexrider-score.png", { type: "image/png" });
+        if (navigator.canShare?.({ files: [file] })) {
+          await navigator.share({ files: [file], title: "TAIEX RIDER", text: `${text}\n${url}` });
+          return;
+        }
+      }
+    } catch (e) {
+      // AbortError = 使用者取消分享面板：結束、不 fallback
+      if (e instanceof DOMException && e.name === "AbortError") return;
+      /* 其他失敗 → 往下走純文字 */
+    }
+    // ② 純文字 share
     try {
       if (navigator.share) {
         await navigator.share({ title: "TAIEX RIDER", text, url });
         return;
       }
-    } catch { /* 使用者取消分享面板：不 fallback、不報錯 */ return; }
+    } catch { return; }
+    // ③ 剪貼簿
     try {
       await navigator.clipboard.writeText(`${text}\n${url}`);
       setToast({ text: "成績已複製，貼給朋友吧！", id: Date.now() });
-    } catch { /* 剪貼簿也失敗：靜默 */ }
+    } catch { /* 靜默 */ }
   };
 
   useEffect(() => {

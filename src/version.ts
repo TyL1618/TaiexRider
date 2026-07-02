@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.12.9";
+export const APP_VERSION = "0.12.10";
 
 export interface ChangelogEntry {
   date: string;
@@ -6,6 +6,12 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    date: "2026-07-02 (v0.12.10)",
+    notes: [
+      "分享成績升級成「霓虹成績圖卡」：含當日走勢圖、分數與統計，一鍵分享圖片給朋友（不支援圖片分享的裝置自動改用文字）",
+    ],
+  },
   {
     date: "2026-07-02 (v0.12.9)",
     notes: [
