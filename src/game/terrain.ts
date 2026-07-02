@@ -17,7 +17,7 @@ export interface Track {
 
 // 價格陣列 → 賽道頂點（DEVDOC 第 4 節）
 export function pricesToTrack(prices: number[]): Track {
-  const { segmentWidth, heightRange, heightMin, heightMax, refPct, baselineY, startFlat, endFlat, maxDownSlopeDeg, maxUpSlopeDeg, flatBottomW } =
+  const { segmentWidth, heightRange, heightMin, heightMax, refPct, baselineY, startFlat, endFlat, maxDownSlopeDeg, maxUpSlopeDeg, flatBottomW, sharpFlatW, sharpIncludedMaxDeg } =
     TRACK;
 
   // 1. 正規化高度（依波動度動態縮放：越狂野的股票地形越高）
@@ -63,6 +63,9 @@ export function pricesToTrack(prices: number[]): Track {
 
   // 後處理：上坡 h2 > segmentWidth（>45°）時插入平底，確保車有地方起跑爬坡
   // 原條件 h1*h2 > segW² 在「緩下坡接陡上坡」時 h1 很小導致條件失敗，改為只看上坡高度。
+  // v0.12.1 追加：「淺尖谷」（h2 ≤ segmentWidth 且兩壁夾角 < sharpIncludedMaxDeg）插小平底。
+  // headless 模擬（scripts/simStuck.ts）證實輪子卡縫 97% 發生在這類淺尖谷（舊規則只顧深谷），
+  // 插 40px 小平底後 safe-bot 卡住率 7.4% → 0.6%。
   const finalVerts: Vec2[] = [];
   let xOff = 0;
   for (let i = 0; i < vertices.length; i++) {
@@ -74,9 +77,20 @@ export function pricesToTrack(prices: number[]): Track {
       vertices[i].y > vertices[i + 1].y;    // going up
     const h2 = isValley ? vertices[i].y - vertices[i + 1].y : 0;
     if (isValley && h2 > segmentWidth) {
-      // 插入平底段：同高度、往右延伸 flatBottomW
+      // 深谷：插入平底段（同高度、往右延伸 flatBottomW），讓車有地方起跑爬坡
       xOff += flatBottomW;
       finalVerts.push({ x: vertices[i].x + xOff, y: vertices[i].y });
+    } else if (isValley && h2 > 4) {
+      // 淺谷：夾角夠尖（兩壁向量夾角 < sharpIncludedMaxDeg）才插小平底，消除輪子楔入的 V 口袋
+      const p = vertices[i - 1], q = vertices[i], r = vertices[i + 1];
+      const l1 = Math.hypot(p.x - q.x, p.y - q.y);
+      const l2 = Math.hypot(r.x - q.x, r.y - q.y);
+      const cosInc = ((p.x - q.x) * (r.x - q.x) + (p.y - q.y) * (r.y - q.y)) / (l1 * l2);
+      const includedDeg = (Math.acos(Math.max(-1, Math.min(1, cosInc))) * 180) / Math.PI;
+      if (includedDeg < sharpIncludedMaxDeg) {
+        xOff += sharpFlatW;
+        finalVerts.push({ x: vertices[i].x + xOff, y: vertices[i].y });
+      }
     }
   }
 

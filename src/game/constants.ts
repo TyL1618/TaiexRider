@@ -16,6 +16,11 @@ export const TRACK = {
   maxDownSlopeDeg: 75,
   maxUpSlopeDeg: 55,
   flatBottomW: 80,  // V 谷夾角 < 90° 時插入的平底寬度 (px)，約一個車身長
+  // 淺尖 V 谷（h2 ≤ segmentWidth、夾角 < 120°）插入的小平底寬度 (px)。
+  // headless 模擬（scripts/simStuck.ts，6000 局）證實這類淺尖谷是「輪子卡縫」主因：
+  // 卡住事件 97% 發生在 h2<80 的尖谷，插 40px 小平底後發生率 7.4% → 0.6%。
+  sharpFlatW: 40,
+  sharpIncludedMaxDeg: 120, // 淺谷兩壁夾角 < 此值才算「尖」谷需插平底
 } as const;
 
 // 車輛＝摩托車（chassis = 車架物理體；drawBike 貼 public/bike.png，缺檔則畫向量備援）
@@ -79,6 +84,10 @@ export const RULES = {
   minAirSec: 0.3, // 騰空超過幾秒才算「真實跳躍」（過濾微跳）
   perfectBonus: 200, // 完美落地獎勵
   perfectLevelRad: 0.55, // 落地時車身與坡面夾角 < 此值(≈31°)算完美
+  // 落地「延遲結算」步數：連續著地滿 N 步才結算翻轉/完美落地（≈67ms，玩家無感）。
+  // 微彈跳/擦地（< N 步又離地）不清空累積旋轉、不煞停翻轉 →
+  // 修「明明雙輪同時落地卻沒觸發完美落地」（headless 模擬：漏判 85% → 5%）。
+  landingSettleSteps: 4,
 } as const;
 
 export const CAMERA = {

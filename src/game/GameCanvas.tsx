@@ -297,6 +297,11 @@ let crashTimer = 0;
     let totalFlips = 0; // 全程累計後空翻圈數（結算顯示，discussion 第 9 點）
     let perfectLandings = 0; // 全程完美落地次數
     let wasGrounded = false;
+    // 落地延遲結算（v0.12.1）：首次觸地只快照，連續 landingSettleSteps 步著地才結算。
+    // 微彈跳/擦地（< N 步又離地）不清 airRotation、不煞停翻轉。
+    let groundedRun = 0;          // 連續著地步數
+    let landingSettled = true;    // 本次落地是否已結算（開局站地上視為已結算）
+    let landingSnap: { rot: number; air: number; angle: number; x: number } | null = null;
     let hudTick = 0;
     let raceTimeMs = 0;
     // 完美落地雙輪特效（剩餘幀數 + 觸發時兩輪世界座標）
@@ -364,6 +369,9 @@ let crashTimer = 0;
       perfectLandings = 0;
       raceTimeMs = 0;
       wasGrounded = false;
+      groundedRun = 0;
+      landingSettled = true;
+      landingSnap = null;
       perfectFxFrames = 0;
       perfectFxPts = [];
       deathParticles = [];
@@ -419,6 +427,7 @@ let crashTimer = 0;
       airRotation = 0; airTime = 0; airborneSteps = 0;
       crashTimer = 0;
       wasGrounded = false;
+      groundedRun = 0; landingSettled = true; landingSnap = null;
       perfectFxFrames = 0; perfectFxPts = [];
       deathParticles = []; deathFlashAlpha = 0; deathShakeAmp = 0; deathElapsed = 0;
       dyingRef.current = false;
@@ -524,42 +533,59 @@ let crashTimer = 0;
       // 正立判定：車身上向量 = (sin a, -cos a)，朝上 ⇔ cos a > threshold
       const upright = Math.cos(c.angle) > RULES.uprightCosThreshold;
 
-      // 落地瞬間結算後空翻 + 完美落地
-      if (groundedNow && !wasGrounded) {
-        const flips = Math.floor(Math.abs(airRotation) / (2 * Math.PI));
-        const realAir = airTime > RULES.minAirSec;
-        if (upright && flips > 0) {
-          const gained = flipScore(flips);
-          bonusPoints += gained;
-          totalFlips += flips;
-          showToast(`${flips} 圈 +${gained}`);
-          playFlip();
+      // 落地結算（v0.12.1 改「延遲結算」settle-after-N）：
+      // 舊邏輯單 step 邊緣觸發 + 任何 grounded step 清空 airRotation → 落地微彈跳/
+      // 翻轉途中輪子擦過山頂一幀就把累積旋轉歸零 → 真正落地時量到 ≈0，過不了 1.7π
+      //（headless 模擬 scripts/simPerfect.ts 證實漏判 85%）。
+      // 新邏輯：首次觸地快照（rot/air/角度/位置＝玩家看到的落地瞬間），連續
+      // landingSettleSteps 步著地才結算給分；擦地（<N 步又離地）不清旋轉、不煞停翻轉。
+      if (groundedNow) {
+        groundedRun++;
+        if (groundedRun === 1 && !landingSettled) {
+          landingSnap = { rot: airRotation, air: airTime, angle: c.angle, x: c.position.x };
         }
-        // 完美落地：用車身中心下方坡面角，比兩輪插值更穩（不受前後輪跨 segment 影響）
-        const landSlope = slopeAt(track, c.position.x);
-        const levelOk = Math.abs(angleDelta(c.angle, landSlope)) < RULES.perfectLevelRad;
-        // 觸發：真實跳躍 + airRotation > 1.7π（85% 一圈，消除整數截斷漏觸發）+ 平行坡面
-        // 計分：依整數圈數，最少 1 圈 × 100
-        const perfectFlips = Math.max(1, flips);
-        const perfectBonus = perfectFlips * 100;
-        if (realAir && Math.abs(airRotation) > Math.PI * 1.7 && levelOk) {
-          bonusPoints += perfectBonus;
-          perfectLandings++;
-          showToast(`完美落地 ${perfectFlips}圈 +${perfectBonus}`);
-          playPerfectLanding();
-          perfectFxFrames = 30;
-          perfectFxPts = [
-            { x: bike.rearWheel.position.x, y: bike.rearWheel.position.y },
-            { x: bike.frontWheel.position.x, y: bike.frontWheel.position.y },
-          ];
+        if (!landingSettled && groundedRun >= RULES.landingSettleSteps && landingSnap) {
+          const flips = Math.floor(Math.abs(landingSnap.rot) / (2 * Math.PI));
+          const realAir = landingSnap.air > RULES.minAirSec;
+          const uprightAtLand = Math.cos(landingSnap.angle) > RULES.uprightCosThreshold;
+          if (uprightAtLand && flips > 0) {
+            const gained = flipScore(flips);
+            bonusPoints += gained;
+            totalFlips += flips;
+            showToast(`${flips} 圈 +${gained}`);
+            playFlip();
+          }
+          // 完美落地：用「觸地瞬間快照」的車身角 vs 坡面角（玩家看到的那一刻），
+          // 觸發：真實跳躍 + rot > 1.7π（85% 一圈，消除整數截斷漏觸發）+ 平行坡面
+          const landSlope = slopeAt(track, landingSnap.x);
+          const levelOk = Math.abs(angleDelta(landingSnap.angle, landSlope)) < RULES.perfectLevelRad;
+          const perfectFlips = Math.max(1, flips);
+          const perfectBonus = perfectFlips * 100;
+          if (realAir && Math.abs(landingSnap.rot) > Math.PI * 1.7 && levelOk) {
+            bonusPoints += perfectBonus;
+            perfectLandings++;
+            showToast(`完美落地 ${perfectFlips}圈 +${perfectBonus}`);
+            playPerfectLanding();
+            perfectFxFrames = 30;
+            perfectFxPts = [
+              { x: bike.rearWheel.position.x, y: bike.rearWheel.position.y },
+              { x: bike.frontWheel.position.x, y: bike.frontWheel.position.y },
+            ];
+          }
+          landingSettled = true;
+          landingSnap = null;
+          airRotation = 0;
+          airTime = 0;
         }
-        airRotation = 0;
-        airTime = 0;
-      } else if (!groundedNow && wasGrounded) {
-        // 離地瞬間：歸零殘留角速度（消除爬坡貼坡帶上來的「莫名往後翻」）
-        Body.setAngularVelocity(c, 0);
+      } else {
+        if (wasGrounded && landingSettled) {
+          // 只有「真落地後再起跳」才歸零殘留角速度（消除爬坡貼坡帶上來的「莫名往後翻」）；
+          // 擦地後回到空中不歸零 → 不打斷正在進行的翻轉
+          Body.setAngularVelocity(c, 0);
+        }
+        groundedRun = 0;
+        landingSettled = false;
       }
-      if (groundedNow) airRotation = 0;
       wasGrounded = groundedNow;
 
       // 行進分：到終點剛好 1000，即時疊加在特技分上。

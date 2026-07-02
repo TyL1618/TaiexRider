@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.12.0";
+export const APP_VERSION = "0.12.1";
 
 export interface ChangelogEntry {
   date: string;
@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    date: "2026-07-02 (v0.12.1)",
+    notes: [
+      "修正「明明雙輪同時落地卻沒觸發完美落地」：落地改為延遲結算（連續著地約 67ms 才計分），微彈跳與翻轉途中輪子擦過山頂不再吃掉累積旋轉",
+      "修正機車偶發卡進地形夾縫：淺而尖的 V 谷（舊規則沒涵蓋）也會插入小平底，headless 模擬 6000 局驗證卡住率由 7.4% 降至 0.6%",
+    ],
+  },
   {
     date: "2026-06-23 (v0.12.0)",
     notes: [

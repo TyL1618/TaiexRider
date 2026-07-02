@@ -164,6 +164,8 @@ y[i] = baselineY - (price[i] - min) / (max - min) × scaledHeight
 
 每段一個 `Bodies.fromVertices` 凸梯形：上緣 = 折線、下緣拉到 `maxY+800`、下緣兩角各往外擴 `segmentWidth`（v0.4.1），梯形頂面兩端各 +3px（`topExtra=3`，v0.7.0）。相鄰段重疊，零縫零凸角。
 
+**V 谷平底（v0.12.1 擴充）**：深谷（爬出高度 h2 > `segmentWidth`）插 `flatBottomW=80px` 平底（舊規則）；**淺尖谷**（4 < h2 ≤ 80 且兩壁夾角 < `sharpIncludedMaxDeg=120°`）插 `sharpFlatW=40px` 小平底。淺尖谷是輪子卡縫主因——headless 批次模擬（`scripts/simStuck.ts`，6000 局）顯示卡住事件 97% 集中在這類谷，加小平底後 safe-bot 卡住率 7.4% → 0.6%。
+
 ### 4.4 霓虹著色
 
 - 漲（坡向上）→ 紅 `#ff2244`
@@ -184,6 +186,8 @@ y[i] = baselineY - (price[i] - min) / (max - min) × scaledHeight
 - **後空翻**：每轉滿 360° 計分，分數遞增；沒轉正落地即摔
 - **完美落地**：滯空 + 落地角度 < ~31° → 依圈數 × 100 加分 + cyan 光環特效
 - **時間**：每日排名賽同分比時間（越短越前）
+
+**落地延遲結算（v0.12.1）**：翻轉/完美落地不再於「觸地第一步」邊緣觸發結算。首次觸地只快照（累積旋轉、滯空時間、車身角、位置），連續 `landingSettleSteps=4` 步著地（≈67ms）才用快照結算給分；「擦地」（<4 步又離地，如微彈跳、翻轉中輪子掠過山頂）**不清空 airRotation、不歸零角速度**。舊邏輯任何 grounded step 都清零旋轉，導致微彈跳後真正落地量到 ≈0 而漏判（`scripts/simPerfect.ts` 模擬：漏判 85% → 5%）。完美落地角度判定用「觸地瞬間」快照（玩家看到的那一刻），非結算時角度。
 
 ### 5.3 摔車判定
 

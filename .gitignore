@@ -30,3 +30,6 @@ Thumbs.db
 
 # pwa generated
 dev-dist
+
+# headless 模擬產物
+sim-build/
