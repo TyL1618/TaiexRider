@@ -166,6 +166,11 @@ y[i] = baselineY - (price[i] - min) / (max - min) × scaledHeight
 
 **V 谷平底（v0.12.1 擴充）**：深谷（爬出高度 h2 > `segmentWidth`）插 `flatBottomW=80px` 平底（舊規則）；**淺尖谷**（4 < h2 ≤ 80 且兩壁夾角 < `sharpIncludedMaxDeg=120°`）插 `sharpFlatW=40px` 小平底。淺尖谷是輪子卡縫主因——headless 批次模擬（`scripts/simStuck.ts`，6000 局）顯示卡住事件 97% 集中在這類谷，加小平底後 safe-bot 卡住率 7.4% → 0.6%。
 
+### 4.3.1 高度縮放（v0.12.3，BETA #1）
+
+`scaledHeight = clamp(heightRange × max(maxStepPct/refPct, amplitudePct/ampRefPct), heightMin, heightMax)`。
+單步分量（`refPct=1.5%`）照顧日線/月線；**振幅分量**（`ampRefPct=3.5%`，全日 (高-低)/起點）照顧盤中 5 分 K——舊版只看單步，盤中資料單步極小 → 幾乎全部被壓在 `heightMin=350` → 封測回饋「太平緩」。振幅 3.5% = 420px 基準、10% 漲跌停級 ≈ 1200px；TAIEX 等平緩盤（振幅 <1%）仍落在 heightMin 不變。改完有跑 simStuck 回歸（safe bot 0.7%，維持低水位）。
+
 ### 4.4 霓虹著色
 
 - 漲（坡向上）→ 紅 `#ff2244`

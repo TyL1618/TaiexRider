@@ -222,8 +222,11 @@ async function main() {
     const raw = await fetchYahooIntraday(`${code}.TW`, session.date, stockRange);
     if (raw.length >= 10) {
       const prices = downsample(raw, DOWNSAMPLE);
+      // 資料點過少（一字漲跌停鎖死、極冷門股）：地形極短且單調，難度打 1 折
+      // → 仍可在自選模式選到，但實質失去「今日最難＝每日排名賽地圖」資格（BETA #3）
+      const lenPenalty = raw.length < 50 ? 0.1 : 1;
       rows.push({ map_date: mapDate, stock_code: code, stock_name: name,
-        prices, difficulty: calcDifficulty(prices) });
+        prices, difficulty: calcDifficulty(prices) * lenPenalty });
       ok++;
     } else {
       fail++;

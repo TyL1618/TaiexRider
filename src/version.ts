@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.12.2";
+export const APP_VERSION = "0.12.3";
 
 export interface ChangelogEntry {
   date: string;
@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    date: "2026-07-02 (v0.12.3)",
+    notes: [
+      "地形高度改依「全日震盪幅度」放大：盤中震盪大的股票賽道明顯更高更刺激，平緩大盤維持溫和（回應封測回饋「賽道太平緩」）",
+      "每日排名賽地圖選取排除一字漲跌停／成交過少的單調賽道（隔日生效）",
+    ],
+  },
   {
     date: "2026-07-02 (v0.12.2)",
     notes: [

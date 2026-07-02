@@ -9,6 +9,10 @@ export const TRACK = {
   heightMin: 350,    // 最平穩賽道的最小高度（不讓 TAIEX 完全變水平）
   heightMax: 1400,   // 最狂野賽道的高度上限
   refPct: 0.015,     // 對應 heightRange 的「基準單步漲幅」，越小越放大地形起伏
+  // 全日振幅（(高-低)/起點）對應 heightRange 的基準（BETA_FEEDBACK #1，v0.12.3）：
+  // 盤中 5 分 K 單步漲跌極小，僅靠 refPct 幾乎所有盤中賽道都被壓在 heightMin → 太平緩。
+  // 振幅 3.5% = 基準 420px，10% 漲跌停級 ≈ 1200px。與單步分量取大者驅動高度。
+  ampRefPct: 0.035,
   baselineY: 560, // 賽道基準線 (世界座標 y，越大越下面)
   startFlat: 4, // 起點平台補幾個平坦點
   endFlat: 3, // 終點平台補幾個平坦點

@@ -17,7 +17,7 @@ export interface Track {
 
 // 價格陣列 → 賽道頂點（DEVDOC 第 4 節）
 export function pricesToTrack(prices: number[]): Track {
-  const { segmentWidth, heightRange, heightMin, heightMax, refPct, baselineY, startFlat, endFlat, maxDownSlopeDeg, maxUpSlopeDeg, flatBottomW, sharpFlatW, sharpIncludedMaxDeg } =
+  const { segmentWidth, heightRange, heightMin, heightMax, refPct, ampRefPct, baselineY, startFlat, endFlat, maxDownSlopeDeg, maxUpSlopeDeg, flatBottomW, sharpFlatW, sharpIncludedMaxDeg } =
     TRACK;
 
   // 1. 正規化高度（依波動度動態縮放：越狂野的股票地形越高）
@@ -25,14 +25,18 @@ export function pricesToTrack(prices: number[]): Track {
   const max = Math.max(...prices);
   const span = max - min || 1;
 
-  // 以最大單步漲跌幅決定 scaledHeight（3% 基準=340px，9.8% 漲停≈600px）
+  // 高度驅動 = max(最大單步漲跌幅/refPct, 全日振幅/ampRefPct)（v0.12.3，BETA #1）：
+  // 單步分量照顧日線/月線資料（單步可達 ±10%）；振幅分量照顧盤中 5 分 K
+  // （單步極小但全日可能震盪 5~10%，舊版全被壓在 heightMin → 封測回饋「太平緩」）。
   let maxStepPct = 0;
   for (let i = 1; i < prices.length; i++) {
     const pct = Math.abs(prices[i] / prices[i - 1] - 1);
     if (pct > maxStepPct) maxStepPct = pct;
   }
-  const scaledHeight = maxStepPct > 0
-    ? Math.max(heightMin, Math.min(heightMax, heightRange * (maxStepPct / refPct)))
+  const amplitudePct = prices[0] > 0 ? (max - min) / prices[0] : 0;
+  const drive = Math.max(maxStepPct / refPct, amplitudePct / ampRefPct);
+  const scaledHeight = drive > 0
+    ? Math.max(heightMin, Math.min(heightMax, heightRange * drive))
     : heightRange;
 
   const toY = (p: number) => baselineY - ((p - min) / span) * scaledHeight;
