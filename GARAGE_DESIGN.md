@@ -84,8 +84,10 @@ mounted foot pegs, wide flat handlebars, chunky low seat.
 STYLE: An aggressive "bull market" muscle cruiser. Deep crimson and
 scarlet tank shaped with sharp forward-charging lines, twin horn-like
 winglets on the front fender evoking bull horns, glowing red candlestick-
-chart motif on the side panel, rising-arrow decal. Wheel rims glow fiery
-red-orange. Embodiment of a raging bull market.
+chart motif on the side panel, rising-arrow decal. Wheel rims glow bright
+GOLD, clearly a different color from the crimson body so the glowing rim
+reads as a distinct bright ring against the dark red bodywork (not another
+shade of red/orange). Embodiment of a raging, prosperous bull market.
 ```
 
 **Q2 空頭獵手**（建議解鎖條件：大盤大跌日完賽累計 10 次）
