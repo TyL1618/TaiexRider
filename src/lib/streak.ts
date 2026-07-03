@@ -60,3 +60,8 @@ export function getStreak(sessionKey: string): number {
 export function playedThisSession(sessionKey: string): boolean {
   return load()?.last === sessionKey;
 }
+
+// 開發者測試帳號專用：直接寫死 streak 數字，繞過真的連續參賽 N 天（見 App.tsx dev 帳號效果）
+export function devForceStreak(sessionKey: string, count: number): void {
+  save(sessionKey, count);
+}

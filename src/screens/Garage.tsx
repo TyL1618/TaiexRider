@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { BIKE_SKINS, getCoins, isOwned, getActiveSkinId, purchaseSkin, setActiveSkin, addCoins } from "../lib/garage";
 import { requestRewardedCoins } from "../lib/ads";
+import { AD_COIN_REWARD, MAX_AD_COIN_CLAIMS_PER_DAY, getAdCoinClaims, incrementAdCoinClaims } from "../lib/adRewards";
 import { getAchievementBikes, type AchvBikeView } from "../lib/achievements";
 import { getStreak } from "../lib/streak";
 import { resolveSessionDate } from "../lib/dailyMap";
@@ -8,8 +9,6 @@ import { dailyKey } from "../data/pick";
 import CoinIcon from "../components/CoinIcon";
 import "../TrackSelect.css";
 import "./Garage.css";
-
-const AD_COIN_REWARD = 40; // 看廣告拿金幣（第一階段 stub，見 ads.ts requestRewardedCoins）
 
 // 付費車款（P 系列）：真錢 IAP（Google Play Billing），非金幣購買，設計見 GARAGE_DESIGN.md。
 // 美術＋定價都還沒定案，先做 UI 殼＋「敬請期待」佔位，Billing 串接前按鈕一律 disabled。
@@ -25,6 +24,7 @@ export default function Garage({ onBack }: { onBack: () => void }) {
   const [coins, setCoins] = useState(() => getCoins());
   const [active, setActive] = useState(() => getActiveSkinId());
   const [watchingAd, setWatchingAd] = useState(false);
+  const [adClaims, setAdClaims] = useState(() => getAdCoinClaims(dailyKey()));
   const [achvBikes, setAchvBikes] = useState<AchvBikeView[]>(() => getAchievementBikes(0));
   const [, forceRender] = useState(0);
 
@@ -45,11 +45,15 @@ export default function Garage({ onBack }: { onBack: () => void }) {
   };
 
   const handleWatchAd = () => {
-    if (watchingAd) return;
+    if (watchingAd || adClaims >= MAX_AD_COIN_CLAIMS_PER_DAY) return;
     setWatchingAd(true);
     requestRewardedCoins().then((ok) => {
       setWatchingAd(false);
-      if (ok) setCoins(addCoins(AD_COIN_REWARD));
+      if (ok) {
+        incrementAdCoinClaims(dailyKey());
+        setAdClaims(getAdCoinClaims(dailyKey()));
+        setCoins(addCoins(AD_COIN_REWARD));
+      }
     });
   };
 
@@ -63,8 +67,16 @@ export default function Garage({ onBack }: { onBack: () => void }) {
       <h1 className="select-title">車庫</h1>
       <p className="garage-coins"><CoinIcon size={22} /> 金幣 {coins}</p>
       <p className="garage-intro">完賽/摔車與每日任務都能賺金幣，解鎖車皮換上場</p>
-      <button className="garage-ad-btn" disabled={watchingAd} onClick={handleWatchAd}>
-        {watchingAd ? "廣告播放中…" : `📺 看廣告 +${AD_COIN_REWARD} 金幣`}
+      <button
+        className="garage-ad-btn"
+        disabled={watchingAd || adClaims >= MAX_AD_COIN_CLAIMS_PER_DAY}
+        onClick={handleWatchAd}
+      >
+        {watchingAd
+          ? "廣告播放中…"
+          : adClaims >= MAX_AD_COIN_CLAIMS_PER_DAY
+            ? "今日已達上限"
+            : `📺 看廣告 +${AD_COIN_REWARD} 金幣 (${adClaims}/${MAX_AD_COIN_CLAIMS_PER_DAY})`}
       </button>
 
       <div className="garage-list">

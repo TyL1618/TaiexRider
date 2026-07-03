@@ -37,6 +37,11 @@ export function recordFinish(mood: "up" | "down" | "flat" | null): MarketAchv {
   return d;
 }
 
+// 開發者測試帳號專用：直接寫死次數，繞過真的要打 10 場大漲/大跌日（見 App.tsx dev 帳號效果）
+export function devSetProgress(bullFinishes: number, bearFinishes: number): void {
+  save({ bullFinishes, bearFinishes });
+}
+
 export const Q1_BULL_TARGET = 10;
 export const Q2_BEAR_TARGET = 10;
 export const Q3_STREAK_TARGET = 30;

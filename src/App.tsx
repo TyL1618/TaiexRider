@@ -23,7 +23,8 @@ import { logEvent, type AnalyticsMode } from "./lib/analytics";
 import { addCoins, getCoins } from "./lib/garage";
 import { recordRun } from "./lib/quests";
 import { resolveMarketMood, type MarketMood } from "./lib/marketMood";
-import { recordFinish } from "./lib/achievements";
+import { recordFinish, devSetProgress, Q1_BULL_TARGET, Q2_BEAR_TARGET, Q3_STREAK_TARGET } from "./lib/achievements";
+import { devForceStreak } from "./lib/streak";
 
 export default function App() {
   const [screen, setScreen]         = useState<Screen>("home");
@@ -57,12 +58,14 @@ export default function App() {
     return onAuthStateChange(setUser);
   }, []);
 
-  // 開發者測試帳號：登入即補滿金幣，方便真機測車庫購買/裝備流程不用真的刷任務。
-  // 純前端 email 比對，不是安全機制（金幣沒有排行榜/競技意義，不影響公平性）。
+  // 開發者測試帳號：登入即補滿金幣＋直接解鎖 Q 系列成就進度，方便真機測車庫購買/裝備/
+  // 解鎖 UI 不用真的刷任務、真的等大漲大跌日、真的連續玩 30 天。
+  // 純前端 email 比對，不是安全機制（金幣/成就沒有排行榜/競技意義，不影響公平性）。
   useEffect(() => {
-    if (user?.email === "tyl161803@gmail.com" && getCoins() < 99999) {
-      addCoins(99999 - getCoins());
-    }
+    if (user?.email !== "tyl161803@gmail.com") return;
+    if (getCoins() < 99999) addCoins(99999 - getCoins());
+    devSetProgress(Q1_BULL_TARGET, Q2_BEAR_TARGET);
+    resolveSessionDate(dailyKey()).then((key) => devForceStreak(key, Q3_STREAK_TARGET));
   }, [user]);
 
   // 全站盤勢主題氛圍：解析當期大盤漲跌 → 背景色調 CSS 變數 + 首頁說明文字

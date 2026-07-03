@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.12.21";
+export const APP_VERSION = "0.12.22";
 
 export interface ChangelogEntry {
   date: string;
@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    date: "2026-07-03 (v0.12.22)",
+    notes: [
+      "看廣告拿金幣：獎勵 40→20、每日上限 2 次（車庫頁+結算畫面合計共用同一組計數，防狂點）",
+      "開發者測試帳號登入自動解鎖 Q 系列成就進度（大漲/大跌完賽次數、streak 直接拉滿），免真的刷條件",
+    ],
+  },
   {
     date: "2026-07-03 (v0.12.21)",
     notes: [
