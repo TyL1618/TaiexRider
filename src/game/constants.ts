@@ -83,10 +83,10 @@ export const RULES = {
   // 與 uprightCosThreshold 分離 → 爬陡坡前傾(<90°)不再被誤判死亡（discussion 第 1 點）
   crashTipCos: 0,
   crashUpsideDownSec: 0.1, // 車頂碰地判死緩衝（消除單幀誤判；100ms ≈ 6 步）
-  flipBaseScore: 100, // 第1圈分數
-  flipScoreStep: 150, // 每多一圈遞增量 (1圈100/2圈250/3圈450...)
+  // 翻轉計分（v0.12.14 改線性）：每圈固定 flipBaseScore，不隨圈數遞增（1圈100/2圈200/3圈300...）；
+  // 完美落地＝剛才那趟翻轉分 ×2（不論落地面平或斜，只看落地角是否貼合坡面）
+  flipBaseScore: 100,
   minAirSec: 0.3, // 騰空超過幾秒才算「真實跳躍」（過濾微跳）
-  perfectBonus: 200, // 完美落地獎勵
   perfectLevelRad: 0.55, // 落地時車身與坡面夾角 < 此值(≈31°)算完美
   // 落地「延遲結算」步數：連續著地滿 N 步才結算翻轉/完美落地（≈67ms，玩家無感）。
   // 微彈跳/擦地（< N 步又離地）不清空累積旋轉、不煞停翻轉 →

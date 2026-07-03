@@ -122,13 +122,9 @@ function generateCity(seed: number): CityBuilding[] {
 }
 
 
-// 累積 flips 的遞增總分：1圈100 / 2圈250 / 3圈450 ...
+// 翻轉總分：每圈固定 flipBaseScore（線性，不遞增）
 function flipScore(flips: number): number {
-  let total = 0;
-  for (let k = 1; k <= flips; k++) {
-    total += RULES.flipBaseScore + (k - 1) * RULES.flipScoreStep;
-  }
-  return total;
+  return flips * RULES.flipBaseScore;
 }
 
 // 模組載入時就開始抓圖，避免每次進遊戲重新請求造成前幾秒顯示向量備援
@@ -163,6 +159,9 @@ export default function GameCanvas({ prices, label, name, subtitle, onExit, onGa
   const [showStartPrompt, setShowStartPrompt] = useState(true); // 觸碰才開始計時
   const [revivalUsed, setRevivalUsed] = useState(false); // 每局限復活一次
   const [newPb, setNewPb] = useState(false); // 本局打破個人最佳（結算徽章）
+  // 結算面板剛彈出時短暫吃掉點擊（防止摔車/完賽瞬間手指還按著油門，畫面切換後
+  // 抬指剛好落在新出現的「分享成績」等按鈕上被誤判成一次點擊）
+  const [resultReady, setResultReady] = useState(false);
   // 讓事件處理可讀到最新的結束狀態
   const overRef = useRef(false);
   const dyingRef = useRef(false); // 死亡動畫進行中（在 useEffect 閉包內設定）
@@ -181,6 +180,14 @@ export default function GameCanvas({ prices, label, name, subtitle, onExit, onGa
   // 外部觸發復活（死亡位置上方懸空，保留分數/時間）
   const reviveSignal = useRef(0);
   const requestRevive = () => { reviveSignal.current++; };
+
+  // 結算面板出現後 350ms 才接受點擊（見上方 resultReady 註解）
+  useEffect(() => {
+    if (!crashed && !finished) { setResultReady(false); return; }
+    setResultReady(false);
+    const t = setTimeout(() => setResultReady(true), 350);
+    return () => clearTimeout(t);
+  }, [crashed, finished]);
 
   // 分享成績：優先產生「成績圖卡」走 navigator.share files（手機原生面板，圖+文轉發效果最好）；
   // 不支援 files → 純文字 share；再不支援 → 複製到剪貼簿。文案連動股票/當日走勢（本遊戲的天然哏）。
@@ -603,6 +610,40 @@ let crashTimer = 0;
       }
     };
 
+    // 結算一趟翻轉（落地當下 or 飛越終點線時強制結算，見下方兩處呼叫）：
+    // 給分／toast／音效／震動／特效全部集中在這裡，避免兩處呼叫各寫一份分岔。
+    const settleFlip = (rot: number, air: number, angle: number, x: number) => {
+      // 圈數：差 0.3π（85%+）內進位，貼近體感
+      const flips = Math.floor((Math.abs(rot) + 0.3 * Math.PI) / (2 * Math.PI));
+      const realAir = air > RULES.minAirSec;
+      const uprightAtLand = Math.cos(angle) > RULES.uprightCosThreshold;
+      const landSlope = slopeAt(track, Math.min(x, track.finishX));
+      const levelOk = Math.abs(angleDelta(angle, landSlope)) < RULES.perfectLevelRad;
+      const isPerfect = realAir && Math.abs(rot) > Math.PI * 1.7 && levelOk;
+      if (isPerfect) {
+        // 完美落地：剛才那趟翻轉分 ×2（v0.12.14 定案，不論落地面平或斜）
+        const perfectFlips = Math.max(1, flips);
+        const gained = flipScore(perfectFlips) * 2;
+        bonusPoints += gained;
+        totalFlips += perfectFlips;
+        perfectLandings++;
+        showToast(`完美落地 ${perfectFlips} 圈 +${gained}`);
+        playPerfectLanding();
+        haptics.perfect();
+        perfectFxFrames = 30;
+        perfectFxPts = [
+          { x: bike.rearWheel.position.x, y: bike.rearWheel.position.y },
+          { x: bike.frontWheel.position.x, y: bike.frontWheel.position.y },
+        ];
+      } else if (uprightAtLand && flips > 0) {
+        const gained = flipScore(flips);
+        bonusPoints += gained;
+        totalFlips += flips;
+        showToast(`${flips} 圈 +${gained}`);
+        playFlip();
+      }
+    };
+
     const step = (dtMs: number) => {
       const rearGrounded = rearContacts > 0;
       const frontGrounded = frontContacts > 0;
@@ -660,39 +701,8 @@ let crashTimer = 0;
           landingSnap = { rot: airRotation, air: airTime, angle: c.angle, x: c.position.x };
         }
         if (!landingSettled && groundedRun >= RULES.landingSettleSteps && landingSnap) {
-          // 圈數判定（v0.12.7）：差 0.3π 內進位（轉 1.85 圈算 2 圈），與玩家體感一致；
-          // 翻轉分／完美分／totalFlips 全部用同一套圈數，不再出現兩個 toast 圈數不同
-          const flips = Math.floor((Math.abs(landingSnap.rot) + 0.3 * Math.PI) / (2 * Math.PI));
-          const realAir = landingSnap.air > RULES.minAirSec;
-          const uprightAtLand = Math.cos(landingSnap.angle) > RULES.uprightCosThreshold;
-          // 完美落地：用「觸地瞬間快照」的車身角 vs 坡面角（玩家看到的那一刻），
-          // 觸發：真實跳躍 + rot > 1.7π（85% 一圈，消除整數截斷漏觸發）+ 平行坡面
-          const landSlope = slopeAt(track, landingSnap.x);
-          const levelOk = Math.abs(angleDelta(landingSnap.angle, landSlope)) < RULES.perfectLevelRad;
-          const isPerfect = realAir && Math.abs(landingSnap.rot) > Math.PI * 1.7 && levelOk;
-          if (isPerfect) {
-            // 完美落地：翻轉分＋完美分（圈數×100）合併成單一 toast，規則透明
-            // （1圈 100+100=200／2圈 250+200=450／3圈 450+300=750）
-            const perfectFlips = Math.max(1, flips);
-            const gained = flipScore(perfectFlips) + perfectFlips * 100;
-            bonusPoints += gained;
-            totalFlips += perfectFlips;
-            perfectLandings++;
-            showToast(`完美落地 ${perfectFlips} 圈 +${gained}`);
-            playPerfectLanding();
-            haptics.perfect();
-            perfectFxFrames = 30;
-            perfectFxPts = [
-              { x: bike.rearWheel.position.x, y: bike.rearWheel.position.y },
-              { x: bike.frontWheel.position.x, y: bike.frontWheel.position.y },
-            ];
-          } else if (uprightAtLand && flips > 0) {
-            const gained = flipScore(flips);
-            bonusPoints += gained;
-            totalFlips += flips;
-            showToast(`${flips} 圈 +${gained}`);
-            playFlip();
-          }
+          // 用「觸地瞬間快照」（玩家看到的那一刻）結算，而非本刻（可能已滾動數步）
+          settleFlip(landingSnap.rot, landingSnap.air, landingSnap.angle, landingSnap.x);
           landingSettled = true;
           landingSnap = null;
           airRotation = 0;
@@ -775,6 +785,13 @@ let crashTimer = 0;
 
       // 完賽：凍住車身讓縮放全覽時車不掉下去
       if (c.position.x >= track.finishX && !overRef.current) {
+        // 飛越終點線時人還在空中（尾段把你彈飛、平坦終點台沒機會真正落地）：
+        // 用「當下」狀態強制結算這趟翻轉，不讓完賽提早凍結車身把分數吃掉
+        if (!landingSettled) {
+          settleFlip(airRotation, airTime, c.angle, c.position.x);
+          landingSettled = true;
+          points = bonusPoints + maxDistScore;
+        }
         Body.setStatic(bike.chassis, true);
         Body.setStatic(bike.rearWheel, true);
         Body.setStatic(bike.frontWheel, true);
@@ -811,6 +828,11 @@ let crashTimer = 0;
           fc: frontContacts,
           points,
           perfectFx: perfectFxFrames,
+          totalFlips,
+          perfectLandings,
+          over: overRef.current,
+          finishX: track.finishX,
+          airRotation,
         }),
       };
     }
@@ -1480,7 +1502,7 @@ let crashTimer = 0;
       )}
 
       {(crashed || finished) && (
-        <div className="overlay-result">
+        <div className="overlay-result" style={resultReady ? undefined : { pointerEvents: "none" }}>
           <div className="overlay-top">
             <div className="overlay-title">{finished ? "完賽！" : "摔車"}</div>
             <div className="overlay-track-name">{label} {name}</div>

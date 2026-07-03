@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.12.13";
+export const APP_VERSION = "0.12.14";
 
 export interface ChangelogEntry {
   date: string;
@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    date: "2026-07-03 (v0.12.14)",
+    notes: [
+      "翻轉計分改直覺：每圈固定 +100（不再遞增），完美落地＝翻轉分 ×2（2圈普通+200／完美+400）",
+      "修正最後一段被彈飛、飛越終點線時人還在空中會漏算那趟翻轉分數",
+      "修正摔車/完賽瞬間手指還按著畫面，結算面板按鈕有機會被誤觸（分享成績等）",
+    ],
+  },
   {
     date: "2026-07-03 (v0.12.13)",
     notes: [
