@@ -114,21 +114,45 @@ export function playFinish() {
 
 // ---- 拉霸機音效（RandomSlot）----
 
-// 「咖」：短促高頻方波 click，模擬機械棘輪滾過一格。
+// 「喀」：低沉短促 click，模擬機械棘輪撥片撞擊聲（v0.12.15 降頻，原 1500-2000Hz 太尖）。
+// 低頻方波過 lowpass 去掉刺耳泛音當本體，疊一點極短 bandpass 噪音給咬合顆粒感；
 // 頻率帶一點隨機讓連續 tick 不死板；音量低（連發時不吵）。
 export function playSlotTick() {
   const c = ctx();
   const now = c.currentTime;
   const osc = c.createOscillator();
+  const filt = c.createBiquadFilter();
   const gain = c.createGain();
-  osc.connect(gain);
+  osc.connect(filt);
+  filt.connect(gain);
   gain.connect(masterGain());
   osc.type = "square";
-  osc.frequency.value = 1500 + Math.random() * 500;
-  gain.gain.setValueAtTime(0.07, now);
-  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.03);
+  osc.frequency.value = 150 + Math.random() * 90;
+  filt.type = "lowpass";
+  filt.frequency.value = 700;
+  gain.gain.setValueAtTime(0.09, now);
+  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.045);
   osc.start(now);
-  osc.stop(now + 0.035);
+  osc.stop(now + 0.05);
+
+  const rate = c.sampleRate;
+  const buf = c.createBuffer(1, Math.floor(rate * 0.02), rate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+  const src = c.createBufferSource();
+  src.buffer = buf;
+  const nf = c.createBiquadFilter();
+  nf.type = "bandpass";
+  nf.frequency.value = 900;
+  nf.Q.value = 0.7;
+  const ng = c.createGain();
+  src.connect(nf);
+  nf.connect(ng);
+  ng.connect(masterGain());
+  ng.gain.setValueAtTime(0.05, now);
+  ng.gain.exponentialRampToValueAtTime(0.001, now + 0.02);
+  src.start(now);
+  src.stop(now + 0.025);
 }
 
 // 「哐」：winner 落定收尾——低頻 thunk + 一點噪音，強化「停止」手感

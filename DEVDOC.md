@@ -404,6 +404,16 @@ AndroidManifest 的 activity name 改為 `.MainActivity`。
 3. Build → Generate Signed Bundle/APK → Android App Bundle → 選 keystore → 產 AAB
 4. Play Console → 測試及發布 → 內部測試 → 建立新版本 → 上傳 AAB → 發布
 
+### 9.5b 殼版本更新提示（2026-07-03 設計，暫緩實作——理由見下）
+
+**問題**：`android/` 原生殼改動（splash/捷徑/返回手勢等）重包 AAB 上傳後，玩家不會自動被提示更新（PWA 內容端有 Service Worker 自動偵測，但殼本身沒有）。使用者曾因此手動跑去 Play Console 確認有沒有更新按鈕。
+
+**方案 A（採用，但暫緩到公開上架後才做）**：`android/app/src/main/AndroidManifest.xml` 的 `DEFAULT_URL` 加查詢參數標示殼版本，如 `?shell=11`。前端讀這個參數，跟 Supabase 一張 `app_config(key, value)` 表裡的 `latest_shell` 比對，版本落後就彈窗提示更新，按鈕深連結 `market://details?id=com.tylapp.taiexrider` 直接開 Play 商店頁；`app_config.latest_shell` 手動更新一個數字即可控制全服提示，不用重新部署前端。可設「建議更新」（可關閉）或「強制更新」（擋住遊戲）兩種等級。
+
+**方案 B（正式做法，長期）**：接 Google Play In-App Updates API（Play Core），原生對話框，甚至可原地下載不用離開 app。要動 `android/` 原生 code，工程量較大，適合日後有大改殼版本時再做。
+
+**為何現在不做**：封測期間 app 的 `DEFAULT_URL` 只有封測名單看得到（未公開宣傳），殼版本更新頻率低、影響範圍小，優先度排在其他項目後面。**正式上架後**若殼版本更新頻率提高，優先做方案 A（成本低、Supabase 一個表就搞定）。
+
 ### 9.6 Google Play 帳號
 
 - 開發者帳號：Harold_Yun（tyl161803@gmail.com）

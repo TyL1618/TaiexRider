@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.12.14";
+export const APP_VERSION = "0.12.15";
 
 export interface ChangelogEntry {
   date: string;
@@ -6,6 +6,12 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    date: "2026-07-03 (v0.12.15)",
+    notes: [
+      "隨機拉霸轉動音效降頻：原本偏尖的高音「咖」改成低沉喀聲",
+    ],
+  },
   {
     date: "2026-07-03 (v0.12.14)",
     notes: [
