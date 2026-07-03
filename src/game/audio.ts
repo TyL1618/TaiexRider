@@ -114,27 +114,29 @@ export function playFinish() {
 
 // ---- 拉霸機音效（RandomSlot）----
 
-// 「喀」：低沉短促 click，模擬機械棘輪撥片撞擊聲（v0.12.15 降頻，原 1500-2000Hz 太尖）。
-// 低頻方波過 lowpass 去掉刺耳泛音當本體，疊一點極短 bandpass 噪音給咬合顆粒感；
-// 頻率帶一點隨機讓連續 tick 不死板；音量低（連發時不吵）。
+// 「喀」：木頭響板/木屐敲擊聲（v0.12.21 改木頭質感，原低頻方波太像悶電子聲）。
+// 木頭聲的物理特徵＝短促共振體：能量集中在一兩個共振峰、衰減極快、幾乎沒有低頻底。
+// 配方＝白噪音脈衝打進高 Q bandpass 共振器（模擬木頭腔體共振）＋一個快速降頻+
+// 衰減的正弦當「木頭本體」敲擊感；頻率帶隨機讓連續 tick 不死板；音量低（連發不吵）。
 export function playSlotTick() {
   const c = ctx();
   const now = c.currentTime;
-  const osc = c.createOscillator();
-  const filt = c.createBiquadFilter();
-  const gain = c.createGain();
-  osc.connect(filt);
-  filt.connect(gain);
-  gain.connect(masterGain());
-  osc.type = "square";
-  osc.frequency.value = 150 + Math.random() * 90;
-  filt.type = "lowpass";
-  filt.frequency.value = 700;
-  gain.gain.setValueAtTime(0.09, now);
-  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.045);
-  osc.start(now);
-  osc.stop(now + 0.05);
+  const f0 = 950 + Math.random() * 200;
 
+  // 木頭本體：短促降頻正弦，<25ms 衰減乾淨
+  const osc = c.createOscillator();
+  const gain = c.createGain();
+  osc.connect(gain);
+  gain.connect(masterGain());
+  osc.type = "sine";
+  osc.frequency.setValueAtTime(f0, now);
+  osc.frequency.exponentialRampToValueAtTime(f0 * 0.75, now + 0.02);
+  gain.gain.setValueAtTime(0.12, now);
+  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.022);
+  osc.start(now);
+  osc.stop(now + 0.025);
+
+  // 共振腔體：白噪音打高 Q bandpass，模擬木頭撞擊的顆粒共振
   const rate = c.sampleRate;
   const buf = c.createBuffer(1, Math.floor(rate * 0.02), rate);
   const data = buf.getChannelData(0);
@@ -143,16 +145,16 @@ export function playSlotTick() {
   src.buffer = buf;
   const nf = c.createBiquadFilter();
   nf.type = "bandpass";
-  nf.frequency.value = 900;
-  nf.Q.value = 0.7;
+  nf.frequency.value = f0 * 1.1;
+  nf.Q.value = 7;
   const ng = c.createGain();
   src.connect(nf);
   nf.connect(ng);
   ng.connect(masterGain());
-  ng.gain.setValueAtTime(0.05, now);
-  ng.gain.exponentialRampToValueAtTime(0.001, now + 0.02);
+  ng.gain.setValueAtTime(0.1, now);
+  ng.gain.exponentialRampToValueAtTime(0.001, now + 0.018);
   src.start(now);
-  src.stop(now + 0.025);
+  src.stop(now + 0.02);
 }
 
 // 「哐」：winner 落定收尾——低頻 thunk + 一點噪音，強化「停止」手感

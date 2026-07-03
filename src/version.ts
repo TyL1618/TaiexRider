@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.12.20";
+export const APP_VERSION = "0.12.21";
 
 export interface ChangelogEntry {
   date: string;
@@ -6,6 +6,17 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    date: "2026-07-03 (v0.12.21)",
+    notes: [
+      "b1/b2 車皮輪胎陷地板微調（offsetY 上移，未真機驗證手感）",
+      "死亡熱點改連續漸層線（青→綠→紅→紫，取代離散色塊，抗玩家數擁擠）",
+      "拉霸喀聲改木頭響板音色（未實際試聽確認）",
+      "新增「看廣告拿金幣」按鈕（結算畫面/車庫，第一階段 stub 直接發幣）",
+      "車庫新增 Q 系列任務解鎖進度卡（多頭鬥牛/空頭獵手/不死鳥，美術未到位先上計數）",
+      "車庫新增 P 系列付費車款佔位卡（敬請期待，等 Billing 串接）",
+    ],
+  },
   {
     date: "2026-07-03 (v0.12.20)",
     notes: [

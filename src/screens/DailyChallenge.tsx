@@ -13,6 +13,18 @@ import CoinIcon from "../components/CoinIcon";
 import type { TrackData } from "../data/tracks";
 import "./DailyChallenge.css";
 
+// 死亡熱點顏色：0=賽道基準青、(0,0.5]=綠→紅、(0.5,1]=紅→紫，v 為死亡數/當日最大值正規化。
+// 用 HSL 色相插值（不是 RGB 直線插值）：RGB 從綠(0,255,136)直接補間到紅(255,34,68)
+// 中間會經過一段濁褐色（兩色同時升降沒有共同亮點），色相插值改沿黃橙路徑過渡，
+// 顏色乾淨鮮明，符合霓虹賽道的視覺風格。
+function heatColor(v: number): string {
+  if (v <= 0) return "rgba(45, 226, 230, 0.35)";
+  const hue = v <= 0.5
+    ? 152 - 162 * (v / 0.5)             // 152°綠 → -10°(≡350°紅)，途經黃橙
+    : 350 - 65 * ((v - 0.5) / 0.5);     // 350°紅 → 285°紫
+  return `hsl(${((hue % 360) + 360) % 360}, 88%, 54%)`;
+}
+
 const fmtMs = (ms: number) => {
   const s = ms / 1000;
   return `${Math.floor(s / 60)}:${(s % 60).toFixed(3).padStart(6, "0")}`;
@@ -118,14 +130,16 @@ export default function DailyChallenge({
           if (total === 0) return null;
           const maxD = Math.max(...heat.map((h) => h.deaths));
           const cells = Array.from({ length: 20 }, (_, i) => heat.find((h) => h.bucket === i + 1)?.deaths ?? 0);
+          // 死亡數對「當日最大值」正規化成 0~1，再依比例走色：0=賽道基準青（融入走勢圖）
+          // →綠(少)→紅(中)→紫(死最多)。同一條線用顏色深淺表達密度，人多人少視覺都不擠。
+          const stops = cells.map((d, i) => {
+            const v = maxD > 0 ? d / maxD : 0;
+            return `${heatColor(v)} ${(i / 19) * 100}%`;
+          });
           return (
             <div className="death-heat">
-              <div className="death-heat-strip">
-                {cells.map((d, i) => (
-                  <span key={i} className="dh-cell" style={{ opacity: d > 0 ? 0.25 + 0.75 * (d / maxD) : 0 }} />
-                ))}
-              </div>
-              <div className="death-heat-label">☠️ 今日全服已陣亡 {total} 人次・紅越深越多人摔在那</div>
+              <div className="death-heat-line" style={{ backgroundImage: `linear-gradient(to right, ${stops.join(", ")})` }} />
+              <div className="death-heat-label">☠️ 今日全服已陣亡 {total} 人次・顏色越深越多人摔在那</div>
             </div>
           );
         })()}

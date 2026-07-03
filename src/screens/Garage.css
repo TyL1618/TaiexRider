@@ -13,8 +13,23 @@
   font-size: 0.78rem;
   color: var(--text-dim);
   letter-spacing: 0.04em;
-  margin-bottom: 1.2rem;
+  margin-bottom: 0.7rem;
 }
+
+.garage-ad-btn {
+  margin-bottom: 1.2rem;
+  padding: 0.45rem 1rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: var(--text);
+  background: rgba(45, 226, 230, 0.08);
+  border: 1px solid rgba(45, 226, 230, 0.35);
+  border-radius: 8px;
+  cursor: pointer;
+}
+.garage-ad-btn:disabled { opacity: 0.5; cursor: default; }
+.garage-ad-btn:not(:disabled):active { transform: scale(0.96); }
 
 .garage-list {
   display: flex;
@@ -110,4 +125,51 @@
   color: var(--text-dim);
   letter-spacing: 0.04em;
   padding-bottom: 1rem;
+}
+
+.garage-section-title {
+  align-self: flex-start;
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto 0.6rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: 0.04em;
+}
+
+.garage-card.locked {
+  opacity: 0.75;
+  border-color: rgba(255, 255, 255, 0.12);
+}
+.garage-card.locked.achv-done {
+  opacity: 1;
+  border-color: var(--neon-amber);
+  box-shadow: 0 0 16px rgba(255, 179, 0, 0.2);
+}
+
+.garage-preview-locked {
+  font-size: 1.8rem;
+}
+
+.achv-progress-track {
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+  margin-top: 0.25rem;
+}
+.achv-progress-fill {
+  height: 100%;
+  background: var(--neon-cyan);
+  border-radius: 3px;
+}
+.achv-done .achv-progress-fill { background: var(--neon-amber); }
+
+.achv-progress-text {
+  margin-top: 0.2rem;
+  font-size: 0.68rem;
+  color: var(--text-dim);
+  letter-spacing: 0.03em;
 }

@@ -403,6 +403,21 @@
   animation: overlayPop 300ms 190ms ease-out backwards;
 }
 
+.overlay-ad-coins-btn {
+  margin-top: 0.4rem;
+  padding: 0.3rem 0.8rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: var(--text);
+  background: rgba(45, 226, 230, 0.1);
+  border: 1px solid rgba(45, 226, 230, 0.35);
+  border-radius: 7px;
+  animation: overlayPop 300ms 220ms ease-out backwards;
+}
+.overlay-ad-coins-btn:disabled { opacity: 0.5; }
+.overlay-ad-coins-btn:not(:disabled):active { transform: scale(0.96); }
+
 .overlay-btn {
   margin-top: 0.5rem;
   padding: 0.7rem 1.6rem;

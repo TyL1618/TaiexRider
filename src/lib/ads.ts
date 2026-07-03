@@ -89,3 +89,12 @@ function loadAdSense(pubId: string): void {
   s.setAttribute("data-adsense", "1");
   document.head.appendChild(s);
 }
+
+// ── 看廣告拿金幣（第一階段 stub）───────────────────────────────
+// TODO 正式串接時：TWA → AdMob Rewarded intent bridge；網頁 → AdSense/其他 rewarded
+// SDK，等「使用者看完整支影片」的 callback 再 resolve(true)；中途關閉/失敗 resolve(false)。
+// 現在還沒有任何廣告 SDK 串接，直接 resolve(true) 讓呼叫端立刻發幣，
+// 純粹先把「按鈕位置 + 呼叫時機」卡好，之後只需替換這個函式本體。
+export function requestRewardedCoins(): Promise<boolean> {
+  return Promise.resolve(true);
+}

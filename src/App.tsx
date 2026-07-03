@@ -23,6 +23,7 @@ import { logEvent, type AnalyticsMode } from "./lib/analytics";
 import { addCoins, getCoins } from "./lib/garage";
 import { recordRun } from "./lib/quests";
 import { resolveMarketMood, type MarketMood } from "./lib/marketMood";
+import { recordFinish } from "./lib/achievements";
 
 export default function App() {
   const [screen, setScreen]         = useState<Screen>("home");
@@ -186,7 +187,9 @@ export default function App() {
       score: stats.score, flips: stats.flips, perfect: stats.perfect, timeMs: stats.timeMs,
     });
     for (const q of newlyDone) addCoins(q.reward);
-  }, [isDailyRun, user]);
+    // Q 系列成就：完賽才算，依當期大盤漲跌累計（見 lib/achievements.ts）
+    if (stats.finished) recordFinish(marketMood?.mood ?? null);
+  }, [isDailyRun, user, marketMood]);
 
   // 分析用模式標籤：依「從哪個畫面開局」判斷（screenRef 在 pick 當下仍是子頁）
   const analyticsModeRef = useRef<AnalyticsMode>("custom");

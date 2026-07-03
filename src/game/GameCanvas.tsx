@@ -10,7 +10,10 @@ import { logEvent } from "../lib/analytics";
 import { haptics } from "../lib/haptics";
 import { fetchDeathHeatmap } from "../lib/deathHeatmap";
 import { startWakeLock } from "../lib/wakeLock";
-import { getActiveBikeSkin } from "../lib/garage";
+import { getActiveBikeSkin, addCoins } from "../lib/garage";
+import { requestRewardedCoins } from "../lib/ads";
+
+const AD_COIN_REWARD = 20; // 結算畫面看廣告拿金幣（第一階段 stub，見 ads.ts requestRewardedCoins）
 
 export interface GameOverStats {
   score: number;
@@ -175,6 +178,15 @@ export default function GameCanvas({ prices, label, name, subtitle, onExit, onGa
   const [showStartPrompt, setShowStartPrompt] = useState(true); // 觸碰才開始計時
   const [revivalUsed, setRevivalUsed] = useState(false); // 每局限復活一次
   const [newPb, setNewPb] = useState(false); // 本局打破個人最佳（結算徽章）
+  const [adCoinsState, setAdCoinsState] = useState<"idle" | "watching" | "claimed">("idle"); // 結算畫面看廣告拿金幣，每局限一次
+  const handleWatchAdCoins = () => {
+    if (adCoinsState !== "idle") return;
+    setAdCoinsState("watching");
+    requestRewardedCoins().then((ok) => {
+      setAdCoinsState(ok ? "claimed" : "idle");
+      if (ok) addCoins(AD_COIN_REWARD);
+    });
+  };
   // 結算面板剛彈出時短暫吃掉點擊（防止摔車/完賽瞬間手指還按著油門，畫面切換後
   // 抬指剛好落在新出現的「分享成績」等按鈕上被誤判成一次點擊）
   const [resultReady, setResultReady] = useState(false);
@@ -1562,6 +1574,15 @@ let crashTimer = 0;
             <div className="overlay-stats">
               翻轉 {hud.totalFlips} 圈 ・ 完美落地 {hud.perfectLandings} 次
             </div>
+            {adCoinsState !== "claimed" && (
+              <button
+                className="overlay-ad-coins-btn"
+                disabled={adCoinsState === "watching"}
+                onClick={handleWatchAdCoins}
+              >
+                {adCoinsState === "watching" ? "廣告播放中…" : `📺 看廣告 +${AD_COIN_REWARD} 金幣`}
+              </button>
+            )}
           </div>
           {/* 中段透明點擊區：切換賽道 / 走勢圖（長征模式無單一走勢圖，隱藏切換） */}
           {!hideMinimap ? (

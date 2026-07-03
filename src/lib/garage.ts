@@ -29,16 +29,19 @@ export const BIKE_SKINS: BikeSkin[] = [
   { id: "default", name: "原廠霓虹", desc: "出廠標準塗裝", price: 0, hueRotateDeg: 0 },
   // 輪圈位置由 rear/front 橘色光暈色塊中心點量測（1168×784 原圖 17.84%/79.86%w,
   // 71.8~73.9%h），換算成對齊物理輪子（wheelBaseHalf=22, wheelDropY=7）的 scale+offset。
+  // 2026-07-03：真機回報視覺輪胎陷入地板（AI 生圖的輪胎視覺半徑比物理輪子
+  // wheelRadius=6 大一圈，輪心對齊後輪胎底部仍會疊進地板線）。offsetY 在原量測值
+  // 上再往上補償一點地板線厚度（-2 上下，依 spriteW 等比放大），非重新量測。
   {
     id: "b2-cafe-racer", name: "復古咖啡騎士", desc: "橘棕配色 + 皮革坐墊，復古跑車魂",
     price: 0, hueRotateDeg: 0, src: "bikes/b2-cafe-racer.png",
-    spriteW: 71, spriteOffsetX: 0.8, spriteOffsetY: -3.9,
+    spriteW: 71, spriteOffsetX: 0.8, spriteOffsetY: -6.0,
   },
   // 輪圈位置由 rear/front 青色光暈色塊中心點量測（23.92%/77.81%w, 71.0~71.1%h）。
   {
     id: "b1-street-white", name: "街頭通勤「小白」", desc: "簡潔白色速克達，親民出廠首選",
     price: 0, hueRotateDeg: 0, src: "bikes/b1-street-white.png",
-    spriteW: 82, spriteOffsetX: -0.7, spriteOffsetY: -4.5,
+    spriteW: 82, spriteOffsetX: -0.7, spriteOffsetY: -6.7,
   },
 ];
 

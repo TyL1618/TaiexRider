@@ -35,9 +35,16 @@ motorcycle in the SAME framing:
 - Same flat-vector / cel-shaded sticker art style as the reference: bold
   clean shapes, crisp dark outlines, smooth gradients, glowing neon rim
   accents on both wheels.
-- Keep 2-3 horizontal neon speed-line streaks trailing behind the tail
-  (left side), and a thin dark ground shadow ellipse under the wheels,
-  same as reference.
+- The overall body silhouette / vehicle type must look CLEARLY DIFFERENT
+  from the reference and from other bikes in this set — only the wheel
+  positions and size are locked, everything else about the frame, tank,
+  seat, and proportions should follow that bike's own STYLE description
+  below.
+- STRICTLY EXCLUDE anything beyond the motorcycle itself: NO motion/speed
+  lines, NO exhaust flames or smoke, NO ground shadow or reflection, NO
+  particles, sparks, or glow trails floating off the bike. The motorcycle
+  silhouette is the only thing allowed to touch the canvas edges of
+  content — everything else stays pure white.
 - Plain pure-white background, nothing else in frame. No text, no logo,
   no watermark, no background scenery.
 ```
@@ -46,14 +53,18 @@ motorcycle in the SAME framing:
 
 **B1 街頭通勤「小白」**
 ```
-STYLE: A friendly entry-level street motorcycle. Clean matte white and
-light-gray fairing with subtle cyan pinstripes, simple round headlight,
-minimal design, approachable and slightly cute proportions. Wheel rims
-glow soft cyan. The "reliable first bike" — simple, tidy, unintimidating.
+VEHICLE TYPE: modern commuter scooter (step-through scooter frame, not a
+motorcycle) — the odd one out silhouette in this whole set.
+STYLE: A friendly entry-level scooter. Clean matte white and light-gray
+body with subtle cyan pinstripes, simple round headlight, minimal design,
+approachable and slightly cute proportions. Wheel rims glow soft cyan.
+The "reliable first bike" — simple, tidy, unintimidating.
 ```
 
 **B2 復古咖啡騎士**
 ```
+VEHICLE TYPE: classic cafe racer — flat low handlebars, exposed round fuel
+tank, no fairing/cowling.
 STYLE: A retro cafe racer. Cream and burnt-orange two-tone fuel tank with
 a thin gold stripe, brown leather single seat, round chrome headlight,
 exposed engine block in dark gunmetal. Wheel rims glow warm amber instead
@@ -64,17 +75,21 @@ of cyan. Vintage 1970s soul rendered in the same neon-vector style.
 
 **Q1 多頭鬥牛**（建議解鎖條件：大盤大漲日完賽累計 10 次）
 ```
-STYLE: An aggressive "bull market" muscle bike. Deep crimson and scarlet
-fairing shaped with sharp forward-charging lines, twin horn-like winglets
-on the front cowl evoking bull horns, glowing red candlestick-chart motif
-on the side panel, rising-arrow decal. Wheel rims glow fiery red-orange.
-Embodiment of a raging bull market.
+VEHICLE TYPE: American muscle cruiser — long low-slung wheelbase, forward-
+mounted foot pegs, wide flat handlebars, chunky low seat.
+STYLE: An aggressive "bull market" muscle cruiser. Deep crimson and
+scarlet tank shaped with sharp forward-charging lines, twin horn-like
+winglets on the front fender evoking bull horns, glowing red candlestick-
+chart motif on the side panel, rising-arrow decal. Wheel rims glow fiery
+red-orange. Embodiment of a raging bull market.
 ```
 
 **Q2 空頭獵手**（建議解鎖條件：大盤大跌日完賽累計 10 次）
 ```
+VEHICLE TYPE: supermoto / dirt bike — tall thin skeletal frame, high front
+fender, long travel suspension look, upright narrow silhouette.
 STYLE: A menacing "bear market" stealth hunter bike. Dark forest-green and
-black fairing with claw-scratch decals, falling-arrow and inverted
+black bodywork with claw-scratch decals, falling-arrow and inverted
 candlestick-chart motif in toxic neon green on the side, angular predatory
 silhouette. Wheel rims glow venom green. The bike that thrives when
 markets bleed.
@@ -82,18 +97,21 @@ markets bleed.
 
 **Q3 不死鳥**（建議解鎖條件：連續參賽 streak 30 天）
 ```
-STYLE: A mythical phoenix bike. Blazing orange-to-gold gradient fairing
-with stylized flame feathers sweeping back from the front cowl along the
-tail, ember particles, a phoenix-wing motif over the rear panel. Wheel
-rims glow molten gold. Reward for riders who never miss a day — reborn
-every morning.
+VEHICLE TYPE: neo-retro naked street bike — round headlight, rounded fuel
+tank, exposed engine, upright riding stance (no fairing).
+STYLE: A mythical phoenix bike. Blazing orange-to-gold gradient bodywork
+with stylized flame feathers sweeping back from the tank along the tail,
+a phoenix-wing motif over the rear fender. Wheel rims glow molten gold.
+Reward for riders who never miss a day — reborn every morning.
 ```
 
 ### 💎 付費車款（5 台）——要好看到值得掏錢
 
 **P1 赤紅暴走**（旗艦款）
 ```
-STYLE: A legendary crimson cyberpunk superbike inspired by classic anime
+VEHICLE TYPE: full-fairing sportbike — aggressive aerodynamic cowling,
+low clip-on handlebars, sharp angular fairing panels.
+STYLE: A legendary crimson cyberpunk sportbike inspired by classic anime
 aesthetics. Glossy candy-red full-fairing body with an elongated low-slung
 silhouette, white accent panels, subtle warning-label decals, layered
 aerodynamic cowling. Wheel rims glow intense red with a thin white inner
@@ -102,44 +120,58 @@ ring. Premium flagship presence — the coolest bike in the garage.
 
 **P2 銀河鍍鉻**
 ```
-STYLE: An iridescent chrome galaxy bike. Mirror-chrome fairing with a
-holographic oil-slick rainbow sheen, deep-space nebula texture (purple and
-blue with tiny stars) inside the body panels as if the bike contains a
-galaxy, prismatic highlights. Wheel rims glow shifting violet-to-cyan
-gradient. Ethereal, otherworldly, jewel-like.
+VEHICLE TYPE: futuristic concept tourer — smooth enclosed bodywork panels
+covering most of the frame, minimal visible mechanical parts, sleek pod-
+like silhouette.
+STYLE: An iridescent chrome galaxy concept bike. Mirror-chrome enclosed
+bodywork with a holographic oil-slick rainbow sheen, deep-space nebula
+texture (purple and blue with tiny stars) visible through translucent
+panels as if the bike contains a galaxy, prismatic highlights. Wheel rims
+glow shifting violet-to-cyan gradient. Ethereal, otherworldly, jewel-like.
 ```
 
 **P3 黃金大亨**
 ```
-STYLE: An opulent black-and-24k-gold luxury bike. Piano-black fairing with
-polished gold trim lines, gold-plated engine block and exhaust, subtle
-dollar/coin-pattern engraving on the side panel, diamond-stud headlight
-accent. Wheel rims glow rich champagne gold. Unapologetic wealth — the
-bike of someone who owns the leaderboard.
+VEHICLE TYPE: luxury touring bagger — long wheelbase, large front fairing
+with windscreen, saddle-bag humps over the rear wheel, plush wide seat.
+STYLE: An opulent black-and-24k-gold luxury tourer. Piano-black bodywork
+with polished gold trim lines, gold-plated engine block and exhaust,
+subtle dollar/coin-pattern engraving on the side panel, diamond-stud
+headlight accent. Wheel rims glow rich champagne gold. Unapologetic
+wealth — the bike of someone who owns the leaderboard.
 ```
 
 **P4 電馭武士**
 ```
+VEHICLE TYPE: naked streetfighter with armor-plated bodywork — angular
+layered plates over the tank and side panels, upright stance, exposed
+front forks.
 STYLE: A cyber-samurai bike fusing feudal Japanese armor with high tech.
-Layered fairing shaped like lacquered samurai plate armor in deep teal and
-off-white, a katana-blade line running along the body, red tassel detail
-at the tail, small rising-sun motif. Wheel rims glow icy teal with
+Layered bodywork shaped like lacquered samurai plate armor in deep teal
+and off-white, a katana-blade line running along the body, red tassel
+detail at the tail, small rising-sun motif. Wheel rims glow icy teal with
 kanji-style circuit etching. Disciplined, sharp, honorable.
 ```
 
 **P5 幽靈匿蹤**
 ```
-STYLE: A stealth phantom bike. Ultra-matte black angular faceted body like
-a stealth fighter jet, barely-visible dark-gray panel lines, aggressive
-low profile, thin blood-red underglow beneath the chassis and red
-accent slits like narrowed eyes. Wheel rims glow deep red, dimmer and more
-sinister than other bikes. Silent. Deadly. Almost invisible.
+VEHICLE TYPE: minimalist tracker/bobber — stripped-down frame, short
+fenderless tail, compact round-ish tank, low narrow profile.
+STYLE: A stealth phantom bobber. Ultra-matte black angular faceted
+bodywork, barely-visible dark-gray panel lines, aggressive low profile,
+thin blood-red underglow beneath the chassis and red accent slits like
+narrowed eyes. Wheel rims glow deep red, dimmer and more sinister than
+other bikes. Silent. Deadly. Almost invisible.
 ```
 
 ## 3. 生圖後驗收流程
 
 1. Grok 產出後先去背（若非純白底需另外去背，跟現有 bike.png 一樣走透明 PNG）。
 2. 疊回原圖，設 50% 透明度比對：輪心偏移應 ≤ 19px（原圖尺度，≈ 2 遊戲px），偏移過大要請 Grok 重生或手動微調 `spriteOffsetX/Y`。
+   **⚠️ 2026-07-03 追加**：AI 生圖的輪胎視覺半徑常比物理輪子（`wheelRadius=6`）大一圈，
+   輪心對齊後輪胎底部仍會視覺穿進地板線。量完輪心 offset 後，再依 spriteW 等比多補
+   `-2` 上下的 offsetY（往上）當地板間隙緩衝（b1/b2 已按此追加，未真機驗證手感，
+   之後量 Q/P 系列時比照辦理，真機試玩若還會陷或變成明顯懸空再微調）。
 3. 存放：`public/bikes/{id}.png`（例：`public/bikes/p1-crimson.png`），單檔壓到 150KB 內（跟現有 bike.png 251KB 同量級即可，用 tinypng 等工具壓）。
 4. 每台車在程式碼登記一筆設定（實作時再定資料結構，大致長這樣）：
    ```ts
