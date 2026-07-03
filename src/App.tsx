@@ -22,6 +22,7 @@ import { setPlaying } from "./pwa";
 import { logEvent, type AnalyticsMode } from "./lib/analytics";
 import { addCoins } from "./lib/garage";
 import { recordRun } from "./lib/quests";
+import { resolveMarketMood, type MarketMood } from "./lib/marketMood";
 
 export default function App() {
   const [screen, setScreen]         = useState<Screen>("home");
@@ -29,6 +30,7 @@ export default function App() {
   const [isDailyRun, setIsDailyRun] = useState(false);
   const [user, setUser]             = useState<User | null>(null);
   const [confirmLeave, setConfirmLeave] = useState(false);
+  const [marketMood, setMarketMood] = useState<MarketMood | null>(null);
   // 每次 app 啟動（新 session）顯示一次封測通知；同一 session 內返回首頁不再跳
   const [showBetaNotice, setShowBetaNotice] = useState(
     () => !sessionStorage.getItem("tr_beta_notice_shown")
@@ -52,6 +54,17 @@ export default function App() {
   useEffect(() => {
     getUser().then(setUser);
     return onAuthStateChange(setUser);
+  }, []);
+
+  // 全站盤勢主題氛圍：解析當期大盤漲跌 → 背景色調 CSS 變數 + 首頁說明文字
+  useEffect(() => {
+    let alive = true;
+    resolveMarketMood().then((m) => {
+      if (!alive || !m) return;
+      setMarketMood(m);
+      document.documentElement.dataset.marketMood = m.mood;
+    });
+    return () => { alive = false; };
   }, []);
 
   // 背景預熱 GameCanvas chunk（Matter.js），讓首次進遊戲不用現場下載
@@ -238,7 +251,7 @@ export default function App() {
 
   return (
     <>
-      <Home user={user} onNav={handleNav} />
+      <Home user={user} onNav={handleNav} marketMood={marketMood} />
       {confirmLeave && (
         <div className="modal-overlay" onClick={() => setConfirmLeave(false)}>
           <div className="modal-panel" onClick={(e) => e.stopPropagation()}>

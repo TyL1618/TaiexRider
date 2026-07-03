@@ -6,12 +6,27 @@ import { setVolume, getVolume } from "../game/audio";
 import { detectEnv } from "../lib/ads";
 import { getCoins } from "../lib/garage";
 import CoinIcon from "../components/CoinIcon";
+import type { MarketMood } from "../lib/marketMood";
 import StatsScreen from "./StatsScreen";
 import "./Home.css";
 
 export type Screen = "home" | "custom" | "random" | "daily" | "classic" | "garage";
 
-export default function Home({ user, onNav }: { user: User | null; onNav: (s: Screen) => void }) {
+const MOOD_LABEL: Record<MarketMood["mood"], string> = {
+  up: "收盤上漲",
+  down: "收盤下跌",
+  flat: "收盤持平",
+};
+
+export default function Home({
+  user,
+  onNav,
+  marketMood,
+}: {
+  user: User | null;
+  onNav: (s: Screen) => void;
+  marketMood?: MarketMood | null;
+}) {
   const [showSettings, setShowSettings] = useState(false);
   const [showLog, setShowLog]           = useState(false);
   const [showHelp, setShowHelp]         = useState(false);
@@ -74,6 +89,11 @@ export default function Home({ user, onNav }: { user: User | null; onNav: (s: Sc
         <span className="garage-entry-coins">{getCoins()}</span>
         <span className="garage-entry-label">收藏車庫</span>
       </button>
+      {marketMood && (
+        <p className="market-mood-caption">
+          今日盤勢為 {marketMood.dateStr} 之盤勢，{MOOD_LABEL[marketMood.mood]}
+        </p>
+      )}
 
       <div className="home-menu">
         <button className="home-btn daily" onClick={() => onNav("daily")}>

@@ -11,6 +11,18 @@
   font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
 }
 
+/* 全站盤勢主題氛圍（v0.12.18）：只疊背景色調+格線色，不動 --neon-cyan 等互動元件主色——
+   刻意不整套換色，避免跟賽道「紅=漲/綠=跌」既有配色語意衝突、拖累已調好對比度的 UI。
+   效果是「換了燈光色溫」而非「重新粉刷整面牆」。門檻與判定見 src/lib/marketMood.ts。 */
+:root[data-market-mood="up"] {
+  --bg: #120609;
+  --bg-grid: rgba(255, 34, 68, 0.07);
+}
+:root[data-market-mood="down"] {
+  --bg: #04100a;
+  --bg-grid: rgba(0, 255, 136, 0.06);
+}
+
 * {
   box-sizing: border-box;
   margin: 0;

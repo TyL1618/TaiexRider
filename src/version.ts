@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.12.17";
+export const APP_VERSION = "0.12.18";
 
 export interface ChangelogEntry {
   date: string;
@@ -6,6 +6,12 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    date: "2026-07-03 (v0.12.18)",
+    notes: [
+      "全站背景依前次大盤收盤狀態微調色調（大漲偏暖、大跌偏冷），首頁新增小字說明今天用哪天的盤勢資料",
+    ],
+  },
   {
     date: "2026-07-03 (v0.12.17)",
     notes: [

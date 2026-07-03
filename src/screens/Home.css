@@ -59,6 +59,15 @@
   border-left: 1px solid rgba(255, 179, 0, 0.35);
 }
 
+/* 全站盤勢主題氛圍說明文字：讓玩家知道今天用哪天的資料、背景色調為何改變 */
+.market-mood-caption {
+  margin-bottom: 1.6rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.05em;
+  color: var(--text-dim);
+  opacity: 0.85;
+}
+
 .home-menu {
   display: flex;
   flex-direction: column;
