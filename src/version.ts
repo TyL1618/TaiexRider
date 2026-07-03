@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.12.12";
+export const APP_VERSION = "0.12.13";
 
 export interface ChangelogEntry {
   date: string;
@@ -6,6 +6,12 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    date: "2026-07-03 (v0.12.13)",
+    notes: [
+      "修正輪子高速落地楔進地形縫隙卡住不動的 bug：卡死約 0.7 秒自動鬆脫（效果同你手動放開再按住，不用再自己發現這招）",
+    ],
+  },
   {
     date: "2026-07-02 (v0.12.12)",
     notes: [

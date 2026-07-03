@@ -372,6 +372,14 @@ let crashTimer = 0;
     let groundedRun = 0;          // 連續著地步數
     let landingSettled = true;    // 本次落地是否已結算（開局站地上視為已結算）
     let landingSnap: { rot: number; air: number; angle: number; x: number } | null = null;
+    // 卡縫自動脫困 watchdog（v0.12.13）：著地+油門下 40 步（0.67s）淨位移 < 3px
+    // ＝輪子楔死（平地接陡上坡的牆角縫等）→ 自動暫停驅動 60 步（≈1s，等效
+    // 「放開油門」讓碰撞回彈把輪子擠出——正是玩家手動脫困的操作）後恢復。
+    // headless 模擬驗證（scripts/simStuck.ts fix=assist，2000 局×3 bot）：
+    // 完賽/摔車率與現況相同（±0.3%，不影響難度與排行榜）、卡死全部自動脫困。
+    // 窗長 40 步是下限：15 步窗會誤傷正常騎乘的短暫減速（實測完賽率 +6% 難度跑掉）。
+    const jamHist: number[] = [];
+    let assistLeft = 0;
     let hudTick = 0;
     let raceTimeMs = 0;
     // 完美落地雙輪特效（剩餘幀數 + 觸發時兩輪世界座標）
@@ -441,6 +449,8 @@ let crashTimer = 0;
       frontContacts = 0;
       chassisContacts = 0;
       throttle = false;
+      jamHist.length = 0;
+      assistLeft = 0;
       prevAngle = bike.chassis.angle;
       airRotation = 0;
       airTime = 0;
@@ -509,6 +519,8 @@ let crashTimer = 0;
 
       rearContacts = 0; frontContacts = 0; chassisContacts = 0;
       throttle = false;
+      jamHist.length = 0;
+      assistLeft = 0;
       prevAngle = 0;
       airRotation = 0; airTime = 0; airborneSteps = 0;
       crashTimer = 0;
@@ -542,6 +554,8 @@ let crashTimer = 0;
     const applyControls = (grounded: boolean, _upright: boolean) => {
       if (overRef.current) return;
       const c = bike.chassis;
+      // 有效油門：自動脫困期間視同放開（只影響驅動/空中翻滾，吸地與貼坡對齊照常）
+      const thr = throttle && assistLeft <= 0;
 
       if (grounded) {
         // 後輪→前輪連線 = 坡面切線（tx 恆正 = 永遠朝前）
@@ -562,7 +576,7 @@ let crashTimer = 0;
           vn = bike.frontWheel.velocity.x * nx + bike.frontWheel.velocity.y * ny;
           if (vn > 0) Body.setVelocity(bike.frontWheel, { x: bike.frontWheel.velocity.x - vn * nx, y: bike.frontWheel.velocity.y - vn * ny });
           // ② 油門：切線鎖速到 cruiseSpeed
-          if (throttle) {
+          if (thr) {
             const vt = c.velocity.x * tx + c.velocity.y * ty;
             const delta = (DRIVE.cruiseSpeed - vt) * DRIVE.groundLockEase;
             Body.setVelocity(c, { x: c.velocity.x + delta * tx, y: c.velocity.y + delta * ty });
@@ -576,7 +590,7 @@ let crashTimer = 0;
         let av = da * DRIVE.groundAlignGain;
         if (Math.abs(av) > DRIVE.groundedAvMax) av = Math.sign(av) * DRIVE.groundedAvMax;
         Body.setAngularVelocity(c, av);
-      } else if (throttle && hasEverGrounded) {
+      } else if (thr && hasEverGrounded) {
         // 空中按住 → 後空翻（首次落地後才開放，避免懸空落下時誤觸翻滾）
         // 任意角度均可持續旋轉；移除 cos 條件，修「倒置區間停轉」bug
         const nv = Math.max(-DRIVE.airSpinMax, c.angularVelocity - DRIVE.airSpinAccel);
@@ -595,6 +609,20 @@ let crashTimer = 0;
       const grounded = rearGrounded || frontGrounded;
       const uprightNow = Math.cos(bike.chassis.angle) > RULES.uprightCosThreshold;
       airborneSteps = grounded ? 0 : airborneSteps + 1;
+      // 卡縫自動脫困 watchdog：偵測「按著油門+著地卻原地不動」→ 暫停驅動讓輪子回彈
+      if (assistLeft > 0) {
+        assistLeft--;
+        jamHist.length = 0;
+      } else if (grounded && throttle && !overRef.current) {
+        jamHist.push(bike.chassis.position.x);
+        if (jamHist.length > 40) jamHist.shift();
+        if (jamHist.length === 40 && Math.abs(bike.chassis.position.x - jamHist[0]) < 3) {
+          assistLeft = 60;
+          jamHist.length = 0;
+        }
+      } else {
+        jamHist.length = 0;
+      }
       applyControls(grounded, uprightNow);
       // 存下本步物理狀態，供渲染插值（frame 裡用 alpha=acc/STEP 取中間位置）
       prevChassisPos = { x: bike.chassis.position.x, y: bike.chassis.position.y };

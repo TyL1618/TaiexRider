@@ -17,7 +17,7 @@
 // 報告輸出：sim-build/sim-stuck-report.json（已 gitignore）
 // ============================================================
 
-import { Engine, Events, Composite, Body, Bodies, type IEventCollision } from "matter-js";
+import { Engine, Events, Composite, Body, Bodies, Vertices, type IEventCollision } from "matter-js";
 import { pricesToTrack, buildTerrainBodies, terrainYAt, type Track } from "../src/game/terrain";
 import { createBike, type Bike } from "../src/game/bike";
 import { BIKE, DRIVE, RULES } from "../src/game/constants";
@@ -40,7 +40,13 @@ const BOTS: BotKind[] = BOT_ARG === "all" ? ["safe", "hold", "random"] : [BOT_AR
 // 修法原型（arg4）：none=現況 / flat=淺尖谷插小平底(改地形) / circle=尖谷內切圓(不改視覺)
 // ⚠️ v0.12.1 起「flat 修法」已正式落地進 src/game/terrain.ts（pricesToTrack 內建），
 //    fix=none 即含修法後的現況；fix=flat 變成 no-op（terrain 已無淺尖谷）。保留供回歸驗證。
-type FixKind = "none" | "flat" | "circle";
+// v0.12.13 候選（平地縫隙卡輪 / 殘餘 stall 13 件：寬角凹角 + 峰頂）：
+//   lip    = 共線接縫 lip（凹角側延伸 12px 埋入鄰段，頂面零誤差）
+//   lipcap = lip + 尖凸角（轉折>20°）插 12px 平台（實測反而更糟，棄用）
+//   assist = 遊戲側自動脫困 watchdog（不改地形）：著地+油門+~0.33s 零前進 →
+//            內部暫停 ground-lock 驅動 30 步（等效「自動放開」，正是使用者手動脫困法），
+//            然後恢復。地形/難度/分數完全不變。
+type FixKind = "none" | "flat" | "circle" | "lip" | "lipcap" | "assist";
 const FIX = (args[3] || "none") as FixKind;
 // 尖谷判定（依 2000×3 baseline 統計）：爬出高度 4 < h2 ≤ 80（>80 既有平底已處理）、V 夾角 < 120°
 const SHARP_H2_MAX = 80;
@@ -103,6 +109,76 @@ function valleyCircleBodies(track: Track): Body[] {
     bodies.push(
       Bodies.circle(q.x + bx * d, q.y + by * d, rc, {
         isStatic: true, friction: 1, frictionStatic: 1, label: "terrain",
+      }),
+    );
+  }
+  return bodies;
+}
+
+// 轉折方向（y 向下為正）：cross < 0 = 凹角（往上折，如平地→上坡）；> 0 = 凸角（峰頂/下坡變陡）
+function crossAt(p: { x: number; y: number }, q: { x: number; y: number }, r: { x: number; y: number }): number {
+  return (q.x - p.x) * (r.y - q.y) - (q.y - p.y) * (r.x - q.x);
+}
+
+// 修法 C（lipcap 的 cap 部分）：「夠尖的凸角」（含峰頂、下坡變陡、上坡趨緩，
+// 轉折角 > turnMinDeg）插 capW 小平台，把裸凸角變成兩個可被 lip 覆蓋/無害的轉折。
+// v1 只削峰頂不夠——上坡趨緩凸角（如 -44°→-13°）一樣會卡（baseline 13 件中 3 件）。
+function applyConvexCap(track: Track, capW = 12, turnMinDeg = 20): Track {
+  const v = track.vertices;
+  const out: { x: number; y: number }[] = [];
+  let xOff = 0;
+  for (let i = 0; i < v.length; i++) {
+    let sharpConvex = false;
+    if (i > 0 && i < v.length - 1) {
+      const p = v[i - 1], q = v[i], r = v[i + 1];
+      if (crossAt(p, q, r) > 0) {
+        const a1 = Math.atan2(q.y - p.y, q.x - p.x);
+        const a2 = Math.atan2(r.y - q.y, r.x - q.x);
+        let turn = Math.abs(a2 - a1);
+        if (turn > Math.PI) turn = 2 * Math.PI - turn;
+        sharpConvex = (turn * 180) / Math.PI > turnMinDeg;
+      }
+    }
+    out.push({ x: v[i].x + xOff, y: v[i].y });
+    if (sharpConvex) {
+      xOff += capW;
+      out.push({ x: v[i].x + xOff, y: v[i].y });
+    }
+  }
+  return { ...track, vertices: out, finishX: out[out.length - 1].x };
+}
+
+// 修法 B v2（lip）：共線接縫 lip —— 頂緣端點「沿本段方向」延長 lip px（頂面直線不變！），
+// 只在凹角/平接（cross ≤ 0）側做：此時延長線位於鄰段坡面之下 → lip 完全埋進鄰段
+// 梯形內，蓋住內部垂直邊（internal edge ghost collision），表面零誤差。
+// ⚠️ v1 教訓：水平延伸（x±lip、y 不動）會「旋轉」斜坡段的頂邊直線（頂邊=兩端點連線），
+// 12px 時頂面偏離折線最多 ~10px → 2000 局 stall 26%。共線延伸才是不動頂面的做法。
+// 凸角側（cross > 0）任何直線延伸幾何上必凸出表面 → 不延伸，交給 applyConvexCap。
+function buildLipBodies(track: Track, lip = 12): Body[] {
+  const bodies: Body[] = [];
+  const v = track.vertices;
+  const baseY = track.maxY + 800;
+  const overlap = 80; // 同 terrain.ts：底部外擴 = segmentWidth
+  for (let i = 0; i < v.length - 1; i++) {
+    const a = v[i];
+    const b = v[i + 1];
+    const prev = i > 0 ? v[i - 1] : null;
+    const next = i < v.length - 2 ? v[i + 2] : null;
+    const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+    const ux = (b.x - a.x) / len, uy = (b.y - a.y) / len;
+    const extendL = !prev || crossAt(prev, a, b) <= 0;
+    const extendR = !next || crossAt(a, b, next) <= 0;
+    const verts = [
+      extendL ? { x: a.x - ux * lip, y: a.y - uy * lip } : { x: a.x, y: a.y },
+      extendR ? { x: b.x + ux * lip, y: b.y + uy * lip } : { x: b.x, y: b.y },
+      { x: b.x + overlap, y: baseY },
+      { x: a.x - overlap, y: baseY },
+    ];
+    const centre = Vertices.centre(verts);
+    bodies.push(
+      Bodies.fromVertices(centre.x, centre.y, [verts], {
+        isStatic: true, friction: 1, frictionStatic: 1, label: "terrain",
+        render: { visible: false },
       }),
     );
   }
@@ -229,8 +305,10 @@ function simulateRun(seed: number, bot: BotKind): RunResult {
   const engine = Engine.create();
   engine.gravity.y = 0.5;
   const world = engine.world;
-  const track = FIX === "flat" ? applyFixFlat(pricesToTrack(prices)) : pricesToTrack(prices);
-  Composite.add(world, buildTerrainBodies(track));
+  let track = pricesToTrack(prices);
+  if (FIX === "flat") track = applyFixFlat(track);
+  if (FIX === "lipcap") track = applyConvexCap(track);
+  Composite.add(world, FIX === "lip" || FIX === "lipcap" ? buildLipBodies(track) : buildTerrainBodies(track));
   if (FIX === "circle") Composite.add(world, valleyCircleBodies(track));
 
   const spawnX = track.startX;
@@ -282,6 +360,9 @@ function simulateRun(seed: number, bot: BotKind): RunResult {
   let probeEvent: StuckEvent | null = null;
   let probeStartX = 0;
   let probeDeadline = 0;
+  // assist watchdog（FIX === "assist"）：jam 偵測（滑動窗淨位移）/ 自動放開剩餘步數
+  const jamHist: number[] = [];
+  let assistLeft = 0;
 
   // applyControls — 逐行對照 GameCanvas.tsx（定速引擎 + 空中翻滾/制動）
   const applyControls = (grounded: boolean) => {
@@ -334,6 +415,22 @@ function simulateRun(seed: number, bot: BotKind): RunResult {
     const grounded = rearContacts > 0 || frontContacts > 0;
     throttle = decideThrottle(grounded);
     if (releaseProbeLeft > 0) { throttle = false; releaseProbeLeft--; } // 脫困探測：強制放開
+    // assist watchdog：著地+油門+40 步（0.67s）滑動窗「淨位移 < 3px」→ 判定 jam
+    //（逐步判會被牆角 ±1px 振盪重置，必須用窗內淨位移；窗太短（15 步）會誤傷
+    // 正常騎乘的短暫減速——實測 safe bot 完賽率 1711→1833 難度跑掉，40 步才安全），
+    // 暫停驅動 60 步＝1s（照抄「放開油門」效果——suction/貼坡對齊照常，只停驅動；
+    // 1s 接近使用者手動脫困的節奏，回彈距離才夠重新起步爬牆）
+    if (FIX === "assist") {
+      if (assistLeft > 0) { throttle = false; assistLeft--; jamHist.length = 0; }
+      else if (grounded && throttle) {
+        jamHist.push(bike.chassis.position.x);
+        if (jamHist.length > 40) jamHist.shift();
+        if (jamHist.length === 40 && Math.abs(bike.chassis.position.x - jamHist[0]) < 3) {
+          assistLeft = 60;
+          jamHist.length = 0;
+        }
+      } else jamHist.length = 0;
+    }
     applyControls(grounded);
     Engine.update(engine, STEP);
 
