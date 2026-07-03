@@ -29,6 +29,12 @@
 原因：Grok 生成的是「bagger 旅行車」造型（不是設定的美式肌肉巡航車）+ 車身跟輪圈同色系
 + 後輪被側箱擋住，導致量測輪圈位置不可靠（詳見文件開頭 2026-07-03 狀態更新）。
 
+**2026-07-03 再追一版**：重生第二次（浮水印問題排除後）依然是 bagger 造型、後輪還是被側箱
+擋住一半。推測根因＝prompt 裡「candlestick chart motif **on the side panel**」這句話，
+side panel 對 Grok 來說最自然的畫布就是側箱那塊平坦表面，等於在跟「不要側箱」互相打架。
+下面這版把 chart 圖案改畫到油箱上、明講禁止側箱/長軸距 bagger 造型、外加「兩輪必須完全
+露出不被遮擋」的硬性條件，取代上一版。
+
 **下面這整段可以直接複製貼給 Grok**（附上 `public/bike.png` 當範例圖一起送出）：
 
 ```
@@ -58,15 +64,22 @@ motorcycle in the SAME framing:
 - Plain pure-white background, nothing else in frame. No text, no logo,
   no watermark, no background scenery.
 
-VEHICLE TYPE: American muscle cruiser — long low-slung wheelbase, forward-
-mounted foot pegs, wide flat handlebars, chunky low seat.
+VEHICLE TYPE: American muscle cruiser — SHORT wheelbase (compact, not a
+touring bike), forward-mounted foot pegs, wide flat handlebars, chunky low
+seat. NO saddlebags, NO panniers, NO hard luggage cases, NO windshield/
+fairing, NO long touring bodywork of any kind over or beside the rear
+wheel. Both wheels must be FULLY exposed and unobstructed — no bodywork,
+fender, or accessory may cover any part of either wheel; a viewer must be
+able to see the complete circular rim and tire of both wheels with
+nothing overlapping them.
 STYLE: An aggressive "bull market" muscle cruiser. Deep crimson and
-scarlet tank shaped with sharp forward-charging lines, twin horn-like
-winglets on the front fender evoking bull horns, glowing red candlestick-
-chart motif on the side panel, rising-arrow decal. Wheel rims glow bright
-GOLD, clearly a different color from the crimson body so the glowing rim
-reads as a distinct bright ring against the dark red bodywork (not another
-shade of red/orange). Embodiment of a raging, prosperous bull market.
+scarlet fuel tank shaped with sharp forward-charging lines, twin horn-like
+winglets on the front fender evoking bull horns, a glowing red candlestick-
+chart motif with a rising-arrow painted directly ON THE FUEL TANK (not on
+any side panel or luggage). Wheel rims glow bright GOLD, clearly a
+different color from the crimson body so the glowing rim reads as a
+distinct bright ring against the dark red bodywork (not another shade of
+red/orange). Embodiment of a raging, prosperous bull market.
 ```
 
 生完一樣去背 → 放進 `public/bikes/raw/`（跟之前 B1/B2/Q2/Q3 同一個資料夾）→ 跟 Claude 說一聲即可重跑量測流程登記上線。
@@ -131,15 +144,22 @@ of cyan. Vintage 1970s soul rendered in the same neon-vector style.
 
 **Q1 多頭鬥牛**（建議解鎖條件：大盤大漲日完賽累計 10 次）
 ```
-VEHICLE TYPE: American muscle cruiser — long low-slung wheelbase, forward-
-mounted foot pegs, wide flat handlebars, chunky low seat.
+VEHICLE TYPE: American muscle cruiser — SHORT wheelbase (compact, not a
+touring bike), forward-mounted foot pegs, wide flat handlebars, chunky low
+seat. NO saddlebags, NO panniers, NO hard luggage cases, NO windshield/
+fairing, NO long touring bodywork of any kind over or beside the rear
+wheel. Both wheels must be FULLY exposed and unobstructed — no bodywork,
+fender, or accessory may cover any part of either wheel; a viewer must be
+able to see the complete circular rim and tire of both wheels with
+nothing overlapping them.
 STYLE: An aggressive "bull market" muscle cruiser. Deep crimson and
-scarlet tank shaped with sharp forward-charging lines, twin horn-like
-winglets on the front fender evoking bull horns, glowing red candlestick-
-chart motif on the side panel, rising-arrow decal. Wheel rims glow bright
-GOLD, clearly a different color from the crimson body so the glowing rim
-reads as a distinct bright ring against the dark red bodywork (not another
-shade of red/orange). Embodiment of a raging, prosperous bull market.
+scarlet fuel tank shaped with sharp forward-charging lines, twin horn-like
+winglets on the front fender evoking bull horns, a glowing red candlestick-
+chart motif with a rising-arrow painted directly ON THE FUEL TANK (not on
+any side panel or luggage). Wheel rims glow bright GOLD, clearly a
+different color from the crimson body so the glowing rim reads as a
+distinct bright ring against the dark red bodywork (not another shade of
+red/orange). Embodiment of a raging, prosperous bull market.
 ```
 
 **Q2 空頭獵手**（建議解鎖條件：大盤大跌日完賽累計 10 次）
