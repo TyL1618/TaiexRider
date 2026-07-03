@@ -35,9 +35,9 @@ export default function Garage({ onBack }: { onBack: () => void }) {
             <div key={s.id} className={`garage-card${equipped ? " equipped" : ""}`}>
               <div className="garage-preview">
                 <img
-                  src={`${import.meta.env.BASE_URL}bike.png`}
+                  src={`${import.meta.env.BASE_URL}${s.src ?? "bike.png"}`}
                   alt={s.name}
-                  style={{ filter: s.hueRotateDeg !== 0 ? `hue-rotate(${s.hueRotateDeg}deg)` : undefined }}
+                  style={{ filter: !s.src && s.hueRotateDeg !== 0 ? `hue-rotate(${s.hueRotateDeg}deg)` : undefined }}
                 />
               </div>
               <div className="garage-card-body">

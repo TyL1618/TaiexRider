@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.12.18";
+export const APP_VERSION = "0.12.19";
 
 export interface ChangelogEntry {
   date: string;
@@ -6,6 +6,12 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    date: "2026-07-03 (v0.12.19)",
+    notes: [
+      "車庫新增兩台正式車皮：復古咖啡騎士、街頭通勤「小白」，各 80 金幣解鎖",
+    ],
+  },
   {
     date: "2026-07-03 (v0.12.18)",
     notes: [

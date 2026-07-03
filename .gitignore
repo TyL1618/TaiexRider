@@ -33,3 +33,6 @@ dev-dist
 
 # headless 模擬產物
 sim-build/
+
+# 車皮生圖原始檔（未壓縮，處理完的成品在 public/bikes/ 才進版控）
+public/bikes/raw/

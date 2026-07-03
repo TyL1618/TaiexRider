@@ -1,7 +1,11 @@
 // 車庫系統：軟通貨（金幣）+ 車皮解鎖/選用。設計見 GARAGE_DESIGN.md。
-// 物理與貼圖完全分離，換皮不動手感/難度/排行榜公平性——車皮目前只是對預設
-// bike.png 做 canvas hue-rotate 濾鏡當「零成本過渡方案」，正式 AI 生圖到位後
-// 把 hueRotateDeg 換成真正的 src 圖檔路徑即可，不用動其他任何邏輯。
+// 物理與貼圖完全分離，換皮不動手感/難度/排行榜公平性。
+// 兩種車皮類型：
+//   - 無 src：套用預設 bike.png + hueRotateDeg 濾鏡（零成本色彩過渡方案）
+//   - 有 src：獨立圖檔，spriteW/spriteOffsetX/spriteOffsetY 覆蓋 constants.ts 的
+//     全域 BIKE.spriteW/spriteOffsetX/spriteOffsetY——每張 AI 生圖的車身佔畫布比例
+//     不同，靠這三個數字讓貼圖的兩個輪子精準對齊物理輪子位置（見下方各車皮註解，
+//     數值由 scripts 量測輪圈色塊中心點算出，不是憑感覺調的）。
 // localStorage 慣例同 medals.ts / streak.ts：try/catch 靜默 fallback，無版本欄位。
 
 export interface BikeSkin {
@@ -9,15 +13,28 @@ export interface BikeSkin {
   name: string;
   desc: string;
   price: number; // 0 = 預設，一開始就擁有
-  hueRotateDeg: number; // canvas ctx.filter hue-rotate 過渡色（之後可加 src 換真圖）
+  hueRotateDeg: number; // 無 src 時套用；有 src 則忽略
+  src?: string;             // 相對 BASE_URL 的圖檔路徑
+  spriteW?: number;         // 覆蓋 BIKE.spriteW（該車皮的繪製寬度，遊戲 px）
+  spriteOffsetX?: number;   // 覆蓋 BIKE.spriteOffsetX
+  spriteOffsetY?: number;   // 覆蓋 BIKE.spriteOffsetY
 }
 
-// v1 只有預設 + 2 台色彩變體（GARAGE_DESIGN.md 的 B1/B2 正式圖到位前的過渡）。
-// 任務/付費車款等真圖生成後再擴充這份清單。
 export const BIKE_SKINS: BikeSkin[] = [
   { id: "default", name: "原廠霓虹", desc: "出廠標準塗裝", price: 0, hueRotateDeg: 0 },
-  { id: "amber", name: "琥珀塗裝", desc: "暖色調變體（過渡色，之後換正式車皮圖）", price: 80, hueRotateDeg: 45 },
-  { id: "violet", name: "紫羅蘭塗裝", desc: "冷紫色調變體（過渡色，之後換正式車皮圖）", price: 80, hueRotateDeg: -70 },
+  // 輪圈位置由 rear/front 橘色光暈色塊中心點量測（1168×784 原圖 17.84%/79.86%w,
+  // 71.8~73.9%h），換算成對齊物理輪子（wheelBaseHalf=22, wheelDropY=7）的 scale+offset。
+  {
+    id: "b2-cafe-racer", name: "復古咖啡騎士", desc: "橘棕配色 + 皮革坐墊，復古跑車魂",
+    price: 80, hueRotateDeg: 0, src: "bikes/b2-cafe-racer.png",
+    spriteW: 71, spriteOffsetX: 0.8, spriteOffsetY: -3.9,
+  },
+  // 輪圈位置由 rear/front 青色光暈色塊中心點量測（23.92%/77.81%w, 71.0~71.1%h）。
+  {
+    id: "b1-street-white", name: "街頭通勤「小白」", desc: "簡潔白色速克達，親民出廠首選",
+    price: 80, hueRotateDeg: 0, src: "bikes/b1-street-white.png",
+    spriteW: 82, spriteOffsetX: -0.7, spriteOffsetY: -4.5,
+  },
 ];
 
 const COINS_KEY = "tr_garage_coins";
@@ -88,8 +105,7 @@ export function setActiveSkin(id: string): boolean {
   return true;
 }
 
-// GameCanvas 繪車時讀取目前選用車皮的 hue-rotate 角度（0 = 不套濾鏡）
-export function getActiveBikeHue(): number {
-  const active = BIKE_SKINS.find((s) => s.id === getActiveSkinId());
-  return active?.hueRotateDeg ?? 0;
+// GameCanvas 繪車時讀取目前選用的完整車皮設定
+export function getActiveBikeSkin(): BikeSkin {
+  return BIKE_SKINS.find((s) => s.id === getActiveSkinId()) ?? BIKE_SKINS[0];
 }

@@ -10,7 +10,7 @@ import { logEvent } from "../lib/analytics";
 import { haptics } from "../lib/haptics";
 import { fetchDeathHeatmap } from "../lib/deathHeatmap";
 import { startWakeLock } from "../lib/wakeLock";
-import { getActiveBikeHue } from "../lib/garage";
+import { getActiveBikeSkin } from "../lib/garage";
 
 export interface GameOverStats {
   score: number;
@@ -129,11 +129,25 @@ function flipScore(flips: number): number {
   return flips * RULES.flipBaseScore;
 }
 
-// 模組載入時就開始抓圖，避免每次進遊戲重新請求造成前幾秒顯示向量備援
-const _bikeImg = new Image();
-let _bikeImgReady = false;
-_bikeImg.onload = () => { _bikeImgReady = true; };
-_bikeImg.src = `${import.meta.env.BASE_URL}bike.png`;
+// 車皮圖片快取（模組層級，跨局重用，避免每次進遊戲重新請求）：
+// key = 完整 URL，value = { img, ready }。預設車皮在模組載入時就開始抓，
+// 避免前幾秒顯示向量備援；其他車皮圖第一次被選用時才抓（Garage 頁按縮圖預覽時
+// 用的是 <img> 標籤，不會提前熱進這份快取，但機率低不特別處理）。
+interface BikeImgEntry { img: HTMLImageElement; ready: boolean }
+const _bikeImgCache = new Map<string, BikeImgEntry>();
+function getBikeImageEntry(src: string): BikeImgEntry {
+  let entry = _bikeImgCache.get(src);
+  if (!entry) {
+    const img = new Image();
+    const e: BikeImgEntry = { img, ready: false };
+    img.onload = () => { e.ready = true; };
+    img.src = src;
+    _bikeImgCache.set(src, e);
+    entry = e;
+  }
+  return entry;
+}
+getBikeImageEntry(`${import.meta.env.BASE_URL}bike.png`); // 預熱預設車皮
 
 export default function GameCanvas({ prices, label, name, subtitle, onExit, onGameOver, hideMinimap = false, revivalEnabled = false, analyticsMode, pbKey }: GameCanvasProps) {
   const stars = difficultyStars(calcDifficulty(prices));
@@ -264,10 +278,17 @@ export default function GameCanvas({ prices, label, name, subtitle, onExit, onGa
     const ctx = canvas.getContext("2d")!;
 
     // ---- 車體貼圖（決定①：整張含輪去背 PNG，輪子不轉）----
-    // bikeImg 在模組載入時已開始預載（module scope），進遊戲時通常已 ready，不再閃向量備援
-    const bikeImg = _bikeImg;
-    // 車庫選用車皮（v1 過渡方案：hue-rotate 濾鏡，見 src/lib/garage.ts）；開局讀一次即可，中途不變
-    const bikeHueDeg = getActiveBikeHue();
+    // 車庫選用車皮：開局讀一次即可，中途不變。有 src 用獨立圖檔（各自校正過
+    // spriteW/offsetX/Y 讓兩個輪子對齊物理輪位）；無 src 套預設圖 + hue-rotate 濾鏡。
+    const activeSkin = getActiveBikeSkin();
+    const bikeImgSrc = activeSkin.src
+      ? `${import.meta.env.BASE_URL}${activeSkin.src}`
+      : `${import.meta.env.BASE_URL}bike.png`;
+    const bikeEntry = getBikeImageEntry(bikeImgSrc);
+    const bikeSpriteW = activeSkin.spriteW ?? BIKE.spriteW;
+    const bikeOffsetX = activeSkin.spriteOffsetX ?? BIKE.spriteOffsetX;
+    const bikeOffsetY = activeSkin.spriteOffsetY ?? BIKE.spriteOffsetY;
+    const bikeHueDeg = activeSkin.src ? 0 : activeSkin.hueRotateDeg;
     const bikeFilter = bikeHueDeg !== 0 ? `hue-rotate(${bikeHueDeg}deg)` : "none";
 
     // ---- 建立世界 ----
@@ -1011,9 +1032,9 @@ let crashTimer = 0;
       const cAngle = prevChassisAngle + (c.angle - prevChassisAngle) * alpha;
 
       // 有貼圖：整張圖（含輪）貼到車身，不另畫向量輪（決定①：輪子不轉）
-      if (_bikeImgReady) {
-        const w = BIKE.spriteW;
-        const h = w * (bikeImg.naturalHeight / bikeImg.naturalWidth);
+      if (bikeEntry.ready) {
+        const w = bikeSpriteW;
+        const h = w * (bikeEntry.img.naturalHeight / bikeEntry.img.naturalWidth);
         const sw = w * scale; // 隨鏡頭縮放（overview 時縮小，不遮賽道）
         const sh = h * scale;
         ctx.save();
@@ -1021,9 +1042,9 @@ let crashTimer = 0;
         ctx.rotate(cAngle);
         ctx.filter = bikeFilter;
         ctx.drawImage(
-          bikeImg,
-          (-w / 2 + BIKE.spriteOffsetX) * scale,
-          (-h / 2 + BIKE.spriteOffsetY) * scale,
+          bikeEntry.img,
+          (-w / 2 + bikeOffsetX) * scale,
+          (-h / 2 + bikeOffsetY) * scale,
           sw,
           sh,
         );

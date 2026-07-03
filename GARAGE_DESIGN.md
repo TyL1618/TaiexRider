@@ -2,7 +2,7 @@
 
 > 目標：解決「目前只有一台車，玩家沒有長期收集/解鎖動力」的問題。
 > 技術前提：物理體（圓形車身 r=10 + 兩個輪子 r=6）與貼圖完全分離——**換車皮只是換一張 PNG，不動物理/手感/難度/排行榜公平性**。
-> **狀態更新（2026-07-03，v0.12.16）：v1 基礎建設已上線**——`src/lib/garage.ts`（金幣＋擁有/選用）+ `src/screens/Garage.tsx`（車庫 UI）+ GameCanvas 套用選用車皮。目前只有 2 台「過渡色」車皮（本檔第 5 節的 hue-rotate 零成本方案），下方 10 台 AI 生圖 prompt **還沒生成/還沒換上**——這份文件仍是給 Grok 生圖用的完整規格，圖生完後把 `src/lib/garage.ts` 的 `BIKE_SKINS` 清單擴充/替換即可，不用動其他程式碼。
+> **狀態更新（2026-07-03，v0.12.19）：B1/B2 兩台基本車款已是正式圖，非過渡色**。使用者用 Grok 生成 → 自己手動去背 → 交給 Claude 量測輪圈色塊中心點（`scripts` 暫存腳本，未進版控）換算成 `spriteW`/`spriteOffsetX`/`spriteOffsetY`，讓兩個輪子精準對齊物理輪位，登記進 `src/lib/garage.ts` 的 `BIKE_SKINS`（`b2-cafe-racer`／`b1-street-white`，各 80 金幣）。**流程已驗證可行**，剩下 Q1~Q3（任務解鎖）+ P1~P5（付費）8 台照同一套流程處理即可：Grok 生圖 → 去背 → 量輪圈色塊座標 → 算 offset → 登記清單。原圖存放在 `public/bikes/raw/`（已 `.gitignore`，不進版控），成品在 `public/bikes/`。
 
 ---
 
