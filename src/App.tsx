@@ -10,6 +10,7 @@ import Home, { type Screen } from "./screens/Home";
 import RandomSlot from "./screens/RandomSlot";
 import DailyChallenge from "./screens/DailyChallenge";
 import ClassicSelect from "./screens/ClassicSelect";
+import Garage from "./screens/Garage";
 import type { TrackData } from "./data/tracks";
 import { submitDailyScore, fetchDailyTop } from "./lib/leaderboard";
 import { submitClassicRecord } from "./lib/classicRecords";
@@ -19,6 +20,8 @@ import { getPlayerName } from "./lib/playerId";
 import { dailyKey } from "./data/pick";
 import { setPlaying } from "./pwa";
 import { logEvent, type AnalyticsMode } from "./lib/analytics";
+import { addCoins } from "./lib/garage";
+import { recordRun } from "./lib/quests";
 
 export default function App() {
   const [screen, setScreen]         = useState<Screen>("home");
@@ -155,6 +158,13 @@ export default function App() {
     if (classicId && user) {
       submitClassicRecord(classicId, getPlayerName(), { score: stats.score, timeMs: stats.timeMs });
     }
+    // 車庫金幣：完賽/摔車都給小額基本獎勵，任何模式皆算（純個人習慣迴圈，見 RETENTION_PLAN.md）
+    addCoins(stats.finished ? 10 : 3);
+    // 每日任務：用裝置本地日曆日累計，跨模式共用同一組任務池
+    const newlyDone = recordRun(dailyKey(), {
+      score: stats.score, flips: stats.flips, perfect: stats.perfect, timeMs: stats.timeMs,
+    });
+    for (const q of newlyDone) addCoins(q.reward);
   }, [isDailyRun, user]);
 
   // 分析用模式標籤：依「從哪個畫面開局」判斷（screenRef 在 pick 當下仍是子頁）
@@ -213,6 +223,7 @@ export default function App() {
   if (screen === "custom")  return <TrackSelect   onPick={handleStartTrack} onBack={goHome} />;
   if (screen === "random")  return <RandomSlot    onPick={handleStartTrack} onBack={goHome} />;
   if (screen === "classic") return <ClassicSelect user={user} onPick={handleStartTrack} onBack={goHome} />;
+  if (screen === "garage")  return <Garage onBack={goHome} />;
   if (screen === "daily")  return (
     <DailyChallenge
       user={user}

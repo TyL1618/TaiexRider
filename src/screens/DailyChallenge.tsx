@@ -8,6 +8,7 @@ import { getPlayerName } from "../lib/playerId";
 import { getAttempts, incrementAttempts, MAX_ATTEMPTS, FREE_ATTEMPTS } from "../lib/challengeAttempts";
 import { recordStreak, getStreak, playedThisSession } from "../lib/streak";
 import { fetchDeathHeatmap, type HeatBucket } from "../lib/deathHeatmap";
+import { getDailyQuests } from "../lib/quests";
 import type { TrackData } from "../data/tracks";
 import "./DailyChallenge.css";
 
@@ -43,6 +44,7 @@ export default function DailyChallenge({
   const [streak, setStreak] = useState(0);
   const [streakLive, setStreakLive] = useState(false); // 本期已參賽（🔥 實心）或待延續（提示）
   const [heat, setHeat] = useState<HeatBucket[]>([]); // 今日全服死亡熱點（20 等分）
+  const [quests] = useState(() => getDailyQuests(dailyKey())); // 每日任務（裝置本地日曆日，跨模式共用）
 
   useEffect(() => {
     let alive = true;
@@ -138,6 +140,17 @@ export default function DailyChallenge({
             🔥 連續參賽 {streak} 天{streakLive ? "" : "・今天玩一場保持紀錄！"}
           </div>
         )}
+
+        <div className="daily-quests">
+          <div className="daily-quests-title">📋 今日任務</div>
+          {quests.map((q) => (
+            <div key={q.id} className={`quest-item${q.done ? " done" : ""}`}>
+              <span className="quest-check">{q.done ? "✅" : "⬜"}</span>
+              <span className="quest-title">{q.title}</span>
+              <span className="quest-progress">{q.progress}/{q.target}・+{q.reward}🏍️</span>
+            </div>
+          ))}
+        </div>
 
         {user ? (
           <div className="auth-row">

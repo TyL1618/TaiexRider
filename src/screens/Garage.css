@@ -1,0 +1,109 @@
+.garage-coins {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--neon-amber);
+  margin-bottom: 0.3rem;
+}
+
+.garage-intro {
+  font-size: 0.78rem;
+  color: var(--text-dim);
+  letter-spacing: 0.04em;
+  margin-bottom: 1.2rem;
+}
+
+.garage-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  width: 100%;
+  max-width: 480px;
+  padding-bottom: 1.5rem;
+}
+
+.garage-card {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.9rem 1.1rem;
+  background: rgba(45, 226, 230, 0.04);
+  border: 1px solid rgba(45, 226, 230, 0.25);
+  border-radius: 12px;
+  text-align: left;
+}
+
+.garage-card.equipped {
+  border-color: var(--neon-amber);
+  box-shadow: 0 0 16px rgba(255, 179, 0, 0.25);
+}
+
+.garage-preview {
+  flex: 0 0 auto;
+  width: 84px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(5, 8, 15, 0.5);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.garage-preview img { width: 100%; object-fit: contain; }
+
+.garage-card-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.garage-card-name {
+  font-size: 0.98rem;
+  font-weight: 700;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.garage-equipped-tag {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: #05080f;
+  background: var(--neon-amber);
+  padding: 0.1rem 0.4rem;
+  border-radius: 5px;
+}
+
+.garage-card-desc {
+  font-size: 0.72rem;
+  color: var(--text-dim);
+  letter-spacing: 0.03em;
+}
+
+.garage-btn {
+  align-self: flex-start;
+  margin-top: 0.15rem;
+  padding: 0.4rem 0.9rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: #05080f;
+  background: var(--neon-cyan);
+  border: none;
+  border-radius: 7px;
+  cursor: pointer;
+}
+
+.garage-btn.buy { background: var(--neon-amber); }
+.garage-btn.disabled { opacity: 0.4; cursor: default; }
+.garage-btn:not(.disabled):active { transform: scale(0.96); }
+
+.garage-more-hint {
+  font-size: 0.72rem;
+  color: var(--text-dim);
+  letter-spacing: 0.04em;
+  padding-bottom: 1rem;
+}

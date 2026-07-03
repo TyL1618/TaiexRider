@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.12.15";
+export const APP_VERSION = "0.12.16";
 
 export interface ChangelogEntry {
   date: string;
@@ -6,6 +6,15 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    date: "2026-07-03 (v0.12.16)",
+    notes: [
+      "新增車庫系統：完賽/摔車與每日任務都能賺金幣，解鎖車皮塗裝上場（首頁左上角進入）",
+      "新增每日任務：每天 3 個小任務，完成給金幣獎勵（每日排名賽頁面查看進度）",
+      "遊戲中保持螢幕常亮，不再玩到一半螢幕自動變暗",
+      "消除長按畫面跳出的瀏覽器選單、畫面切換加入淡入動畫、結算畫面分數改滾動呈現",
+    ],
+  },
   {
     date: "2026-07-03 (v0.12.15)",
     notes: [

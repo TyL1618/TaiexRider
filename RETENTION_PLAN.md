@@ -76,9 +76,9 @@
 | 經典模式獎牌制 | 小 | 12 關 × 銅/銀/金分數門檻（constants 定義），localStorage 記，選單卡片顯示獎牌，36 個短期目標 |
 | streak 連續參賽 | 小 | localStorage 記連續天數（用 resolveSessionDate 對齊連假），每日賽頁顯示 🔥N |
 | 分享卡視覺化 | 中 | Canvas 畫成績卡（走勢圖+成績+日期）→ navigator.share files / 下載圖片 |
-| **每日任務**（新） | 小 | seeded 每日任務池，localStorage 累計 events 進度，完成給軟通貨 |
-| **全站盤勢主題色**（新） | 小～中 | 大漲/大跌/平盤三組 CSS 變數，依 `resolveSessionDate()` 對應大盤資料切換 |
-| **車庫基本款**（新） | 中 | 軟通貨經濟 + 選車 UI + 2 台基本車款（先用色相偏移過渡，見 GARAGE_DESIGN.md） |
+| ~~每日任務~~（新） | 小 | ✅ **v0.12.16 已上線**：seeded 每日任務池（`src/lib/quests.ts`），localStorage 累計進度，完成給軟通貨 |
+| **全站盤勢主題色**（新） | 小～中 | 大漲/大跌/平盤三組 CSS 變數，依 `resolveSessionDate()` 對應大盤資料切換——**尚未做** |
+| ~~車庫基本款~~（新） | 中 | ✅ **v0.12.16 已上線**：軟通貨經濟 + 選車 UI + 2 台色相偏移過渡車皮（`src/lib/garage.ts` + `src/screens/Garage.tsx`），正式 AI 圖見 GARAGE_DESIGN.md，待生成後替換 |
 
 ### 第二批（需少量 schema，等使用者點頭）
 | 項目 | 成本 | 說明 |

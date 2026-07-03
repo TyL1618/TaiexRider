@@ -82,6 +82,39 @@
   text-shadow: 0 0 8px rgba(255, 179, 0, 0.4);
 }
 
+.daily-quests {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  width: 100%;
+  margin-top: 0.5rem;
+  padding: 0.6rem 0.8rem;
+  background: rgba(45, 226, 230, 0.04);
+  border: 1px solid rgba(45, 226, 230, 0.2);
+  border-radius: 10px;
+}
+
+.daily-quests-title {
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
+  margin-bottom: 0.2rem;
+}
+
+.quest-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.76rem;
+  color: var(--text);
+}
+
+.quest-item.done { color: var(--neon-amber); }
+.quest-check { flex: 0 0 auto; }
+.quest-title { flex: 1; text-align: left; letter-spacing: 0.03em; }
+.quest-progress { flex: 0 0 auto; color: var(--text-dim); font-size: 0.7rem; }
+.quest-item.done .quest-progress { color: var(--neon-amber); }
+
 .nickname-row {
   display: flex;
   align-items: center;

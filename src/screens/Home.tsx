@@ -4,10 +4,11 @@ import { signInWithGoogle, signOut, updateProfileName, type User } from "../lib/
 import { getPlayerName, setPlayerName, clampNameWidth } from "../lib/playerId";
 import { setVolume, getVolume } from "../game/audio";
 import { detectEnv } from "../lib/ads";
+import { getCoins } from "../lib/garage";
 import StatsScreen from "./StatsScreen";
 import "./Home.css";
 
-export type Screen = "home" | "custom" | "random" | "daily" | "classic";
+export type Screen = "home" | "custom" | "random" | "daily" | "classic" | "garage";
 
 export default function Home({ user, onNav }: { user: User | null; onNav: (s: Screen) => void }) {
   const [showSettings, setShowSettings] = useState(false);
@@ -62,6 +63,9 @@ export default function Home({ user, onNav }: { user: User | null; onNav: (s: Sc
     <div className="home-screen">
       <button className="corner-btn settings-corner-btn" onClick={() => setShowSettings(true)} aria-label="設定">
         ⚙
+      </button>
+      <button className="corner-btn garage-corner-btn" onClick={() => onNav("garage")} aria-label="車庫">
+        🏍️ {getCoins()}
       </button>
 
       <h1 className="home-title">TAIEX&shy;RIDER</h1>

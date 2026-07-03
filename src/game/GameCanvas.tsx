@@ -9,6 +9,8 @@ import { playFlip, playPerfectLanding, playCrash, playFinish, startEngine, updat
 import { logEvent } from "../lib/analytics";
 import { haptics } from "../lib/haptics";
 import { fetchDeathHeatmap } from "../lib/deathHeatmap";
+import { startWakeLock } from "../lib/wakeLock";
+import { getActiveBikeHue } from "../lib/garage";
 
 export interface GameOverStats {
   score: number;
@@ -162,6 +164,8 @@ export default function GameCanvas({ prices, label, name, subtitle, onExit, onGa
   // 結算面板剛彈出時短暫吃掉點擊（防止摔車/完賽瞬間手指還按著油門，畫面切換後
   // 抬指剛好落在新出現的「分享成績」等按鈕上被誤判成一次點擊）
   const [resultReady, setResultReady] = useState(false);
+  // 結算畫面分數滾動動畫（原生感 juice）：0 → 最終分數，跟畫面淡入同時發生
+  const [displayScore, setDisplayScore] = useState(0);
   // 讓事件處理可讀到最新的結束狀態
   const overRef = useRef(false);
   const dyingRef = useRef(false); // 死亡動畫進行中（在 useEffect 閉包內設定）
@@ -187,6 +191,24 @@ export default function GameCanvas({ prices, label, name, subtitle, onExit, onGa
     setResultReady(false);
     const t = setTimeout(() => setResultReady(true), 350);
     return () => clearTimeout(t);
+  }, [crashed, finished]);
+
+  // 結算分數滾動動畫：0 → hud.points，ease-out 約 550ms（原生感 juice）
+  useEffect(() => {
+    if (!crashed && !finished) { setDisplayScore(0); return; }
+    const target = hud.points;
+    const t0 = performance.now();
+    const DUR = 550;
+    let raf = 0;
+    const tick = (now: number) => {
+      const t = Math.min(1, (now - t0) / DUR);
+      const eased = 1 - Math.pow(1 - t, 3); // ease-out cubic
+      setDisplayScore(Math.round(target * eased));
+      if (t < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [crashed, finished]);
 
   // 分享成績：優先產生「成績圖卡」走 navigator.share files（手機原生面板，圖+文轉發效果最好）；
@@ -244,6 +266,9 @@ export default function GameCanvas({ prices, label, name, subtitle, onExit, onGa
     // ---- 車體貼圖（決定①：整張含輪去背 PNG，輪子不轉）----
     // bikeImg 在模組載入時已開始預載（module scope），進遊戲時通常已 ready，不再閃向量備援
     const bikeImg = _bikeImg;
+    // 車庫選用車皮（v1 過渡方案：hue-rotate 濾鏡，見 src/lib/garage.ts）；開局讀一次即可，中途不變
+    const bikeHueDeg = getActiveBikeHue();
+    const bikeFilter = bikeHueDeg !== 0 ? `hue-rotate(${bikeHueDeg}deg)` : "none";
 
     // ---- 建立世界 ----
     const engine = Engine.create();
@@ -340,6 +365,7 @@ export default function GameCanvas({ prices, label, name, subtitle, onExit, onGa
     window.addEventListener("pointercancel", release);
     window.addEventListener("keydown", onKeyDown);
     window.addEventListener("keyup", onKeyUp);
+    const stopWakeLock = startWakeLock();
 
     // ---- 畫布尺寸 ----
     let W = 0;
@@ -993,6 +1019,7 @@ let crashTimer = 0;
         ctx.save();
         ctx.translate(wx(cx), wy(cy));
         ctx.rotate(cAngle);
+        ctx.filter = bikeFilter;
         ctx.drawImage(
           bikeImg,
           (-w / 2 + BIKE.spriteOffsetX) * scale,
@@ -1375,6 +1402,7 @@ let crashTimer = 0;
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keyup", onKeyUp);
       window.removeEventListener("resize", resize);
+      stopWakeLock();
       Events.off(engine, "collisionStart", collStart);
       Events.off(engine, "collisionEnd", collEnd);
       Engine.clear(engine);
@@ -1507,7 +1535,7 @@ let crashTimer = 0;
             <div className="overlay-title">{finished ? "完賽！" : "摔車"}</div>
             <div className="overlay-track-name">{label} {name}</div>
             {subtitle && <div className="overlay-track-sub">{subtitle}</div>}
-            <div className="overlay-score">{hud.points} 分</div>
+            <div className="overlay-score">{displayScore} 分</div>
             {newPb && <div className="overlay-pb">🎉 新個人紀錄！</div>}
             <div className="overlay-time">{hud.timer}</div>
             <div className="overlay-stats">

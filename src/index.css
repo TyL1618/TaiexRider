@@ -45,6 +45,15 @@ body {
   touch-action: none;
 }
 
+/* 畫面轉場（原生感補強）：每個子畫面掛載時淡入+輕微上移，取代網頁式瞬間切換 */
+@keyframes screenFadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.home-screen, .select-screen, .daily-screen, .slot-screen {
+  animation: screenFadeIn 220ms ease-out;
+}
+
 /* GameCanvas lazy chunk 載入中的全螢幕佔位（深色，避免閃白） */
 .lazy-game-loading {
   position: fixed;
@@ -75,7 +84,10 @@ body {
   z-index: 50;
 }
 .corner-btn:hover { color: var(--neon-cyan); border-color: var(--neon-cyan); }
+.corner-btn:active { transform: scale(0.94); }
 .settings-corner-btn { right: 1rem; font-size: 1rem; padding: 0.25rem 0.6rem; }
+.garage-corner-btn { left: 1rem; font-size: 0.85rem; padding: 0.3rem 0.65rem; color: var(--neon-amber); border-color: rgba(255, 179, 0, 0.3); }
+.garage-corner-btn:hover { color: var(--neon-amber); border-color: var(--neon-amber); }
 
 /* 返回鈕（子畫面左上） */
 .back-btn {
@@ -93,6 +105,7 @@ body {
   z-index: 50;
 }
 .back-btn:hover { color: var(--neon-cyan); border-color: var(--neon-cyan); }
+.back-btn:active { transform: scale(0.94); }
 
 /* modal 彈窗 */
 .modal-overlay {
