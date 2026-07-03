@@ -4,7 +4,7 @@ import { signInWithGoogle, signOut, updateProfileName, type User } from "../lib/
 import { getPlayerName, setPlayerName, clampNameWidth } from "../lib/playerId";
 import { setVolume, getVolume } from "../game/audio";
 import { detectEnv } from "../lib/ads";
-import { getCoins } from "../lib/garage";
+import { getCoins, getActiveBikeSkin } from "../lib/garage";
 import CoinIcon from "../components/CoinIcon";
 import type { MarketMood } from "../lib/marketMood";
 import StatsScreen from "./StatsScreen";
@@ -55,6 +55,12 @@ export default function Home({
 
   const isDirty = nickname.trim() !== savedName;
 
+  // 首頁車庫展示：目前裝備車皮的高解析度大圖（遊戲內貼圖只有 64~90px 寬，細節看不出來）。
+  // 高解析版存在 bikes/hires/ 下（同檔名，1:1 對應遊戲版 src），未生成 hires 版的車皮
+  // （目前只有 default）直接退回原圖，因為 public/bike.png 本身解析度已經夠用。
+  const activeSkin = getActiveBikeSkin();
+  const showcaseSrc = activeSkin.src ? activeSkin.src.replace(/^bikes\//, "bikes/hires/") : "bike.png";
+
   const handleSaveName = () => {
     const trimmed = nickname.trim() || savedName;
     setPlayerName(trimmed);
@@ -94,6 +100,16 @@ export default function Home({
           今日盤勢為 {marketMood.dateStr} 之盤勢，{MOOD_LABEL[marketMood.mood]}
         </p>
       )}
+
+      <button className="bike-showcase" onClick={() => onNav("garage")}>
+        <img
+          src={`${import.meta.env.BASE_URL}${showcaseSrc}`}
+          alt={activeSkin.name}
+          className="bike-showcase-img"
+          style={{ filter: !activeSkin.src && activeSkin.hueRotateDeg !== 0 ? `hue-rotate(${activeSkin.hueRotateDeg}deg)` : undefined }}
+        />
+        <div className="bike-showcase-name">{activeSkin.name}</div>
+      </button>
 
       <div className="home-menu">
         <button className="home-btn daily" onClick={() => onNav("daily")}>

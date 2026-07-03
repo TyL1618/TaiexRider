@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.12.24";
+export const APP_VERSION = "0.12.25";
 
 export interface ChangelogEntry {
   date: string;
@@ -6,6 +6,12 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    date: "2026-07-04 (v0.12.25)",
+    notes: [
+      "首頁新增車皮展示框：目前裝備車款的高解析大圖，點擊直接進車庫換車",
+    ],
+  },
   {
     date: "2026-07-03 (v0.12.24)",
     notes: [

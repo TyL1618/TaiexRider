@@ -68,6 +68,32 @@
   opacity: 0.85;
 }
 
+/* 首頁車皮展示框：目前裝備車款的高解析大圖，點擊直接進車庫換車 */
+.bike-showcase {
+  width: 100%;
+  max-width: 420px;
+  margin-bottom: 1.4rem;
+  padding: 0.7rem 0.9rem 0.6rem;
+  background: rgba(45, 226, 230, 0.03);
+  border: 1px solid rgba(45, 226, 230, 0.22);
+  border-radius: 14px;
+  box-sizing: border-box;
+  cursor: pointer;
+}
+.bike-showcase:active { transform: scale(0.98); }
+.bike-showcase-img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+.bike-showcase-name {
+  margin-top: 0.35rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+}
+
 .home-menu {
   display: flex;
   flex-direction: column;
