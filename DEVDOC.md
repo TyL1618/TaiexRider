@@ -260,13 +260,15 @@ src/
 │   ├── bike.ts            # 機車物理體（chassis + 雙輪 + 約束）
 │   ├── terrain.ts         # 賽道生成 + 碰撞體
 │   ├── constants.ts       # 所有手感參數（DRIVE/BIKE/TRACK/RULES/COLOR）
-│   ├── audio.ts           # Web Audio API 程式生成音效（引擎 + 翻車 + 琶音）
+│   ├── audio.ts           # Web Audio API 程式生成音效（引擎 + 翻車 + 琶音 + 拉霸機音效）
 │   └── camera.ts          # 鏡頭跟隨
 ├── screens/
-│   ├── Home.tsx           # 首頁（四模式入口 + 設定 modal + 返回確認）
-│   ├── DailyChallenge.tsx # 每日排名賽（地圖預覽 + 排行榜 + Google 登入）
-│   ├── ClassicSelect.tsx  # 經典模式（歷史著名盤勢 12 條靜態關卡 + 事件說明）
-│   └── RandomSlot.tsx     # 隨機拉霸（Supabase pool，30 格 × 8 = 240 DOM nodes）
+│   ├── Home.tsx           # 首頁（四模式入口 + 設定 modal + 返回確認 + 盤勢主題說明）
+│   ├── DailyChallenge.tsx # 每日排名賽（地圖預覽 + 排行榜 + streak + 每日任務 + 死亡熱點）
+│   ├── ClassicSelect.tsx  # 經典模式（12 條靜態關卡 + 事件說明 + 獎牌制）
+│   ├── RandomSlot.tsx     # 隨機拉霸（Supabase pool，30 格 × 8 = 240 DOM nodes）
+│   ├── Garage.tsx         # 車庫（B/Q/P 車皮列表 + 金幣 + 看廣告拿金幣 + 成就進度）
+│   └── StatsScreen.tsx    # 隱藏統計頁（連點版本號 5 下開啟，admin_stats RPC）
 ├── TrackSelect.tsx        # 自選賽道（Supabase ~1000 支 + 無限捲動 30/次）
 ├── data/
 │   ├── tracks.ts          # 本地內建 24 支賽道（月線 fallback）
@@ -282,11 +284,25 @@ src/
 │   ├── auth.ts               # Google One Tap 登入 / signOut
 │   ├── playerId.ts           # localStorage UUID + 暱稱（clampNameWidth 限長）
 │   ├── challengeAttempts.ts  # 每日排名賽挑戰次數（localStorage，MAX 5 / FREE 2）
-│   └── ads.ts                # TWA 環境偵測 + AdSense/AdMob 雙軌 scaffold（Phase 1 無廣告）
+│   ├── ads.ts                # TWA 環境偵測 + AdSense/AdMob 雙軌 scaffold + 看廣告拿金幣 stub
+│   ├── adRewards.ts          # 看廣告拿金幣每日次數上限（車庫頁+結算畫面共用計數）
+│   ├── garage.ts             # 車皮清單（BIKE_SKINS）+ 金幣 + 擁有/裝備邏輯
+│   ├── achievements.ts       # Q 系列成就進度（大漲/大跌完賽次數，streak 沿用 streak.ts）
+│   ├── quests.ts             # 每日任務池（seeded by 裝置本地日曆日）
+│   ├── streak.ts             # 每日排名賽連續參賽天數
+│   ├── medals.ts             # 經典模式獎牌門檻（銅/銀/金，由 PB 推導）
+│   ├── marketMood.ts         # 全站盤勢主題氛圍（大漲/大跌/平盤 CSS 變數）
+│   ├── deathHeatmap.ts       # 全服死亡熱點（daily_death_heatmap RPC）
+│   ├── shareCard.ts          # 分享成績圖卡（離屏 canvas 生圖）
+│   ├── haptics.ts            # 全域按鈕震動回饋
+│   ├── wakeLock.ts           # 遊戲畫面螢幕常亮
+│   ├── analytics.ts          # events 打點（run_start/death/finish/revive）
+│   └── adminStats.ts         # 隱藏統計頁資料（admin_stats RPC，email 綁權限）
 ├── components/
-│   └── Sparkline.tsx      # 折線圖元件
+│   ├── Sparkline.tsx      # 折線圖元件
+│   └── CoinIcon.tsx       # 金幣圖示 SVG
 ├── version.ts             # APP_VERSION + CHANGELOG（遊戲內更新日誌）
-└── App.tsx                # 路由：home / daily / random / custom / classic / game
+└── App.tsx                # 路由：home / daily / random / custom / classic / garage / game
 ```
 
 ---
@@ -314,10 +330,11 @@ src/
 | Phase 4 | ✅ v0.6–0.7 | Supabase 後端：排行榜 + Google One Tap 登入 + 每日全台股自動更新（GitHub Actions） |
 | Phase 5 | ✅ v0.9.0 | PWA 離線快取：Workbox runtimeCaching（每日地圖 SWR 24h / 排行榜 NetworkFirst 5s） |
 | Phase 6 | ✅ v0.8–0.9 | 音效（Web Audio API）、夜景城市背景、難度星等 HUD、爆炸粒子強化 |
-| Phase 7 | 🟡 封測中 | TWA 打包上架（手動 Android Studio）；全螢幕 immersive ✅ 已完成；Google Play **封閉測試**（門檻：12 名測試者 + 連續 14 天） |
-| Phase 8 | 🟡 持續優化 | v0.9.4 連假讀取/排行榜跨連假同榜修正（`max(map_date ≤ 今天)`）；**v0.10 經典模式**（12 條歷史盤勢靜態關卡）；**v0.11 經典紀錄保持者**（`classic_records`，每關單一保持者）、返回離開改「再按一次返回鍵」、暱稱顯示寬度限長（12 寬）、每日長征 5 股預覽圖、開機深色霓虹 splash；**v0.12 懸空公平計時 + 每日排名賽每日 5 次上限（前 2 免費/後 3 看廣告）+ 死後原地復活（分數保留）+ 廣告雙軌 scaffold（`ads.ts` TWA 偵測，Phase 1 無廣告）** |
+| Phase 7 | 🟡 封測中 | TWA 打包上架（手動 Android Studio）；全螢幕 immersive ✅ 已完成；Google Play **封閉測試**（門檻：12 名測試者 + 連續 14 天，2026-06-25 起算，7/8 滿 14 天） |
+| Phase 8 | ✅ | v0.9.4 連假讀取/排行榜跨連假同榜修正（`max(map_date ≤ 今天)`）；**v0.10 經典模式**（12 條歷史盤勢靜態關卡）；**v0.11 經典紀錄保持者**（`classic_records`，每關單一保持者）、返回離開改「再按一次返回鍵」、暱稱顯示寬度限長（12 寬）、每日長征 5 股預覽圖、開機深色霓虹 splash；**v0.12.0~6 懸空公平計時 + 每日排名賽每日 5 次上限 + 死後原地復活 + App 捷徑/splash 品牌圖/預測性返回（vc10，已真機驗證）** |
+| Phase 9 | ✅ | **v0.12.7~24 留存批次**：完美落地計分定案、PB 突破/streak、經典獎牌制、分享圖卡、全服死亡熱點（漸層線視覺）、隱藏統計頁、卡縫脫困 watchdog、**車庫系統**（軟通貨+B/Q 共 5 台正式車皮上線、P 系列待生圖+Billing）、每日任務、全站盤勢主題氛圍、看廣告拿金幣（stub，每日 2 次+20 金幣）、Q 系列成就進度自動解鎖裝備 |
 
-> **🟠 待辦（Phase 7 收尾）**：TWA 啟動仍會閃一下 Chrome 網址列（封測版實測），需 Android splash（androidbrowserhelper `SPLASH_SCREEN_BACKGROUND_COLOR=#05080f` + 圖）遮住啟動空窗（#5 的 A，需重打包 AAB）。詳見 CLAUDE.md 交接 #5。
+> **🟠 待辦（正式上架後）**：反作弊機制完全未實作（見 [ANTICHEAT_DESIGN.md](ANTICHEAT_DESIGN.md)，2026-07-03 已拍板要做，Fable 5 負責）；廣告 AdMob/AdSense 真實串接；P 系列付費車款（需美術+Google Play Billing）；殼版本更新提示（v0.9.5b 設計，明確延後）。
 
 ---
 

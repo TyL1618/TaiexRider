@@ -23,7 +23,7 @@
 - [ ] 隱私權政策網址填 `https://taiexrider.pages.dev/privacy`
 - [ ] 資料安全性表單：目前申報「名稱 + 使用者 ID（OAuth）」——**下次更新表單時補「App 互動資料（匿名遊玩統計）」**（v0.12.2 起收集；非急件但正式版送審前補上最穩）
 - [ ] 12 名測試者在測試軌道全數未退出（Play Console → 測試人數）
-- [ ] AAB versionCode 6 有效；**若要讓 v0.12.6 的 App 捷徑/splash 圖/預測性返回生效，需重包 versionCode 7 上傳**（見 DEVDOC §9.1.1；不重包也不擋申請正式版，網頁端功能不受影響）
+- [ ] AAB versionCode 10 有效（✅ 2026-07-02 vc9 啟動崩潰事故已修復並確認，App 捷徑/splash 品牌圖/預測性返回/長按捷徑皆已真機驗證 OK，見 CLAUDE.md「vc9 啟動崩潰事故」段落）
 - [ ] keystore `taiexrider-release.jks` + 密碼已備份雲端（SECURITY_REVIEW 🔴）
 
 ## 三、申請當天流程（7/8）

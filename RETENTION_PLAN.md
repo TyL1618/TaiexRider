@@ -41,11 +41,12 @@
 
 **解決的問題**：BETA #2「多車型」原本只是「換 sprite」的小需求，升級成完整的長期收集/變現系統——車皮與物理完全分離（換皮不動手感/難度/排行榜公平性），10 台車已設計好 AI 生圖 prompt（2 基本／3 任務解鎖／5 付費），詳細規格與 prompt 全文在 GARAGE_DESIGN.md。
 
+> **狀態（2026-07-03 深夜）**：B（2 台）＋ Q（3 台）共 5 台美術+量測+裝備流程全數上線。**只剩 P 系列 5 台**未生圖，等生圖完成＋接 Google Play Billing 才能上。
+
 - **軟通貨（金幣）v1 已上線**（[x] v0.12.16，見 CLAUDE.md 進度）：完賽 +10／摔車 +3／每日任務 +15~25。
-- **任務車款解鎖條件綁定既有系統**：不需要新資料結構——大盤大漲/大跌日計數可搭配下方「盤勢事件化」的判定邏輯；streak 已有 `tr_daily_streak`。
+- ~~任務車款解鎖~~：✅ **v0.12.23~24 已上線**——Q1/Q2/Q3 綁大盤大漲/大跌日完賽次數＋streak 里程碑（`src/lib/achievements.ts`），不需要新資料結構，全部沿用既有 localStorage 系統。
 - **付費車款**：需要先接 Google Play Billing（IAP），排在其他項目之後，且是唯一需要處理金流/收據驗證的項目。
-- **過渡方案 v1 已上線**：AI 新圖到位前，先用零成本的 canvas 色相偏移（`hue-rotate`）做了 2 種免費配色變體，車庫頁面已有內容可解鎖。
-- **看廣告拿金幣（2026-07-03 討論定案方向，待廣告 SDK 上線才能做）**：使用者提案——每日限 2 次，每次 +5 金幣（刻意設低，避免稀釋既有任務/完賽的金幣價值：3 個每日任務就有 15~25/個，遠高於廣告的 5）。**技術阻塞點跟其他廣告功能一樣**：AdMob（TWA 原生）/AdSense（網頁）都要正式上架後才能申請/生效，見下方「廣告雙軌架構」段落，屬於同一批工程，不是獨立功能。實作時放在 Garage.tsx 加一顆「📺 看廣告 +5 金幣（今日 X/2）」按鈕，邏輯上比照現有「看廣告復活」的每日次數計數模式（`challengeAttempts.ts` 的 pattern 可直接參考）。
+- ~~看廣告拿金幣~~：✅ **v0.12.21~22 已上線（stub 階段）**。車庫頁+結算畫面各一顆按鈕，每日合計上限 2 次、每次 +20 金幣（`src/lib/adRewards.ts`），邏輯比照 `challengeAttempts.ts` 的次數計數模式。**真廣告 SDK 尚未串接**（`ads.ts requestRewardedCoins()` 現在直接 resolve(true) 發幣）——AdMob/AdSense 都要正式上架後才能申請，屬於下方「廣告雙軌架構」同一批工程，屆時只需替換 `requestRewardedCoins()` 函式本體。
 
 ## 每日任務（2026-07-03 新增，第一批可上）
 
@@ -78,19 +79,19 @@
 | streak 連續參賽 | 小 | localStorage 記連續天數（用 resolveSessionDate 對齊連假），每日賽頁顯示 🔥N |
 | 分享卡視覺化 | 中 | Canvas 畫成績卡（走勢圖+成績+日期）→ navigator.share files / 下載圖片 |
 | ~~每日任務~~（新） | 小 | ✅ **v0.12.16 已上線**：seeded 每日任務池（`src/lib/quests.ts`），localStorage 累計進度，完成給軟通貨 |
-| **全站盤勢主題色**（新） | 小～中 | 大漲/大跌/平盤三組 CSS 變數，依 `resolveSessionDate()` 對應大盤資料切換——**尚未做** |
-| ~~車庫基本款~~（新） | 中 | ✅ **v0.12.16 已上線**：軟通貨經濟 + 選車 UI + 2 台色相偏移過渡車皮（`src/lib/garage.ts` + `src/screens/Garage.tsx`），正式 AI 圖見 GARAGE_DESIGN.md，待生成後替換 |
+| ~~全站盤勢主題色~~（新） | 小～中 | ✅ **v0.12.18 已上線**：大漲/大跌/平盤三組 CSS 變數，依 `resolveMarketMood()` 對應大盤資料切換（`src/lib/marketMood.ts`） |
+| ~~車庫基本款~~（新） | 中 | ✅ **v0.12.16 上線，v0.12.19 換正式圖**：軟通貨經濟 + 選車 UI（`src/lib/garage.ts` + `src/screens/Garage.tsx`），B1/B2 已是正式 AI 圖非過渡色 |
 
 ### 第二批（需少量 schema，等使用者點頭）
 | 項目 | 成本 | 說明 |
 |------|------|------|
-| 全服死亡熱點 | 小～中 | events 已有數據；加一支「當日死亡分佈」彙總 RPC（匿名聚合，無隱私問題）＋賽道渲染骷髏標記 |
-| 經典模式 Top N + 百分位 | 中 | classic_records 改多列（schema/RPC 變更），UI 重用每日榜 |
-| 經典週榜 | 中 | 同上加 week key 欄位 |
-| 週任務 | 中 | 任務定義純前端（seeded 週目標），完成狀態 localStorage；先不做伺服器獎勵 |
-| 股票圖鑑 | 中 | run_start events 或 localStorage 記騎過的 code；圖鑑頁 + 完成度 |
-| **任務車款解鎖**（新） | 小～中 | 綁大盤事件計數／streak 里程碑，資料多半已存在，見 GARAGE_DESIGN.md |
-| **狂暴盤日/紀念日事件**（新） | 小 | 純前端判定（大盤振幅門檻／固定歷史日期），公告 + 獎勵倍率 |
+| ~~全服死亡熱點~~ | 小～中 | ✅ **v0.12.11 上線，v0.12.21 改連續漸層線**：`daily_death_heatmap` RPC（匿名聚合）＋ DailyChallenge 熱度視覺（`src/lib/deathHeatmap.ts`） |
+| 經典模式 Top N + 百分位 | 中 | classic_records 改多列（schema/RPC 變更），UI 重用每日榜——**待使用者點頭 schema，尚未做** |
+| 經典週榜 | 中 | 同上加 week key 欄位——**待使用者點頭 schema，尚未做** |
+| 週任務 | 中 | 任務定義純前端（seeded 週目標），完成狀態 localStorage；先不做伺服器獎勵——**尚未做** |
+| 股票圖鑑 | 中 | run_start events 或 localStorage 記騎過的 code；圖鑑頁 + 完成度——**尚未做** |
+| ~~任務車款解鎖~~（新） | 小～中 | ✅ **v0.12.23~24 已上線**：Q1/Q2/Q3 三台綁大盤事件計數／streak 里程碑（`src/lib/achievements.ts`），美術+量測+裝備流程全數到位 |
+| **狂暴盤日/紀念日事件**（新） | 小 | 純前端判定（大盤振幅門檻／固定歷史日期），公告 + 獎勵倍率——**尚未做** |
 
 ### 第三批（長期，工程量大）
 | 項目 | 說明 |
