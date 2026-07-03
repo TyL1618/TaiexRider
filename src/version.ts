@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.12.22";
+export const APP_VERSION = "0.12.23";
 
 export interface ChangelogEntry {
   date: string;
@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    date: "2026-07-03 (v0.12.23)",
+    notes: [
+      "Q 系列成就車款：空頭獵手/不死鳥美術上線可裝備（量測輪圈色塊算 offset）",
+      "修正解鎖後卡在「購買」按鈕不會自動變裝備的重繪問題",
+      "多頭鬥牛暫緩上線（生圖車身跟輪圈同色系+後輪被側箱擋住，量測不準，待重生）",
+    ],
+  },
   {
     date: "2026-07-03 (v0.12.22)",
     notes: [

@@ -12,7 +12,8 @@ export interface BikeSkin {
   id: string;
   name: string;
   desc: string;
-  price: number; // 0 = 免費（一開始就擁有，同 default）；> 0 = 金幣購買
+  price: number; // 0 = 免費／非金幣購買（一開始就擁有，除非 locked）；> 0 = 金幣購買
+  locked?: boolean; // true＝即使 price===0 也不自動擁有，須靠 unlockAchievementSkin() 解鎖（Q 系列）
   hueRotateDeg: number; // 無 src 時套用；有 src 則忽略
   src?: string;             // 相對 BASE_URL 的圖檔路徑
   spriteW?: number;         // 覆蓋 BIKE.spriteW（該車皮的繪製寬度，遊戲 px）
@@ -42,6 +43,23 @@ export const BIKE_SKINS: BikeSkin[] = [
     id: "b1-street-white", name: "街頭通勤「小白」", desc: "簡潔白色速克達，親民出廠首選",
     price: 0, hueRotateDeg: 0, src: "bikes/b1-street-white.png",
     spriteW: 82, spriteOffsetX: -0.7, spriteOffsetY: -6.7,
+  },
+  // Q 系列（任務解鎖，locked:true＝不自動擁有，靠 unlockAchievementSkin() 解鎖，
+  // 見 achievements.ts 對應同一組 id）。輪圈位置由 scripts 暫存量測腳本（色塊偵測，
+  // 未進版控）算出，換算方式同 B 系列（含 -2 上下地板間隙補償，已含 spriteW 等比放大）。
+  // 2026-07-03：q1-bull 生圖車體與輪圈同色系（皆為霓虹紅）+ 後輪被側箱擋住大半，
+  // 色塊偵測不可靠，尚未註冊——待用新版 GARAGE_DESIGN.md prompt 重生後再量測登記。
+  {
+    id: "q2-bear", name: "空頭獵手", desc: "暗夜獵殺者塗裝，毒液綠電路紋",
+    price: 0, locked: true, hueRotateDeg: 0, src: "bikes/q2-bear.png",
+    spriteW: 71, spriteOffsetX: -0.1, spriteOffsetY: -3.8,
+  },
+  // q3-phoenix 前輪量測受車體火焰裝飾同色污染，cyPct 用後輪對稱值人工校正
+  // （非純色塊自動算出），⚠️ 真機/preview 需比對輪子是否貼地確認。
+  {
+    id: "q3-phoenix", name: "不死鳥", desc: "熔金鳳凰塗裝，浴火重生",
+    price: 0, locked: true, hueRotateDeg: 0, src: "bikes/q3-phoenix.png",
+    spriteW: 77, spriteOffsetX: 0.0, spriteOffsetY: -5.0,
   },
 ];
 
@@ -78,8 +96,22 @@ export function getOwnedSkins(): string[] {
 
 export function isOwned(id: string): boolean {
   const skin = BIKE_SKINS.find((s) => s.id === id);
-  if (skin && skin.price === 0) return true; // 免費車款一律視為已擁有，不用走購買流程
+  if (skin && skin.price === 0 && !skin.locked) return true; // 免費車款一律視為已擁有，不用走購買流程
   return getOwnedSkins().includes(id);
+}
+
+// Q 系列成就解鎖：不扣金幣，直接加入擁有清單（由 Garage.tsx 偵測 achievements.ts
+// 進度已達成時呼叫，冪等——重複呼叫不影響已擁有狀態）
+export function unlockAchievementSkin(id: string): boolean {
+  if (isOwned(id)) return true;
+  const skin = BIKE_SKINS.find((s) => s.id === id);
+  if (!skin) return false;
+  const owned = getOwnedSkins();
+  owned.push(id);
+  try {
+    localStorage.setItem(OWNED_KEY, JSON.stringify(owned));
+  } catch { /* 靜默 */ }
+  return true;
 }
 
 // 購買：餘額足夠才扣款+加入擁有清單，回傳是否成功
