@@ -20,7 +20,7 @@ import { getPlayerName } from "./lib/playerId";
 import { dailyKey } from "./data/pick";
 import { setPlaying } from "./pwa";
 import { logEvent, type AnalyticsMode } from "./lib/analytics";
-import { addCoins } from "./lib/garage";
+import { addCoins, getCoins } from "./lib/garage";
 import { recordRun } from "./lib/quests";
 import { resolveMarketMood, type MarketMood } from "./lib/marketMood";
 
@@ -55,6 +55,14 @@ export default function App() {
     getUser().then(setUser);
     return onAuthStateChange(setUser);
   }, []);
+
+  // 開發者測試帳號：登入即補滿金幣，方便真機測車庫購買/裝備流程不用真的刷任務。
+  // 純前端 email 比對，不是安全機制（金幣沒有排行榜/競技意義，不影響公平性）。
+  useEffect(() => {
+    if (user?.email === "tyl161803@gmail.com" && getCoins() < 99999) {
+      addCoins(99999 - getCoins());
+    }
+  }, [user]);
 
   // 全站盤勢主題氛圍：解析當期大盤漲跌 → 背景色調 CSS 變數 + 首頁說明文字
   useEffect(() => {

@@ -12,7 +12,7 @@ export interface BikeSkin {
   id: string;
   name: string;
   desc: string;
-  price: number; // 0 = 預設，一開始就擁有
+  price: number; // 0 = 免費（一開始就擁有，同 default）；> 0 = 金幣購買
   hueRotateDeg: number; // 無 src 時套用；有 src 則忽略
   src?: string;             // 相對 BASE_URL 的圖檔路徑
   spriteW?: number;         // 覆蓋 BIKE.spriteW（該車皮的繪製寬度，遊戲 px）
@@ -20,19 +20,24 @@ export interface BikeSkin {
   spriteOffsetY?: number;   // 覆蓋 BIKE.spriteOffsetY
 }
 
+// 車款分級定案（2026-07-03 使用者拍板）：
+//   B（基本款）＝免費（price:0，同 default 開局即有）
+//   Q（任務解鎖款）＝成就條件解鎖，**不是**用金幣買（欄位/機制留待 Q 系列圖到位時再設計，
+//     避免現在建沒東西可用的空機制）
+//   P（付費款）＝真錢 IAP（Google Play Billing），非金幣購買；價格待 Grok 生圖完成後決定
 export const BIKE_SKINS: BikeSkin[] = [
   { id: "default", name: "原廠霓虹", desc: "出廠標準塗裝", price: 0, hueRotateDeg: 0 },
   // 輪圈位置由 rear/front 橘色光暈色塊中心點量測（1168×784 原圖 17.84%/79.86%w,
   // 71.8~73.9%h），換算成對齊物理輪子（wheelBaseHalf=22, wheelDropY=7）的 scale+offset。
   {
     id: "b2-cafe-racer", name: "復古咖啡騎士", desc: "橘棕配色 + 皮革坐墊，復古跑車魂",
-    price: 80, hueRotateDeg: 0, src: "bikes/b2-cafe-racer.png",
+    price: 0, hueRotateDeg: 0, src: "bikes/b2-cafe-racer.png",
     spriteW: 71, spriteOffsetX: 0.8, spriteOffsetY: -3.9,
   },
   // 輪圈位置由 rear/front 青色光暈色塊中心點量測（23.92%/77.81%w, 71.0~71.1%h）。
   {
     id: "b1-street-white", name: "街頭通勤「小白」", desc: "簡潔白色速克達，親民出廠首選",
-    price: 80, hueRotateDeg: 0, src: "bikes/b1-street-white.png",
+    price: 0, hueRotateDeg: 0, src: "bikes/b1-street-white.png",
     spriteW: 82, spriteOffsetX: -0.7, spriteOffsetY: -4.5,
   },
 ];
@@ -69,6 +74,8 @@ export function getOwnedSkins(): string[] {
 }
 
 export function isOwned(id: string): boolean {
+  const skin = BIKE_SKINS.find((s) => s.id === id);
+  if (skin && skin.price === 0) return true; // 免費車款一律視為已擁有，不用走購買流程
   return getOwnedSkins().includes(id);
 }
 
