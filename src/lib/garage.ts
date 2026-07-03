@@ -47,8 +47,13 @@ export const BIKE_SKINS: BikeSkin[] = [
   // Q 系列（任務解鎖，locked:true＝不自動擁有，靠 unlockAchievementSkin() 解鎖，
   // 見 achievements.ts 對應同一組 id）。輪圈位置由 scripts 暫存量測腳本（色塊偵測，
   // 未進版控）算出，換算方式同 B 系列（含 -2 上下地板間隙補償，已含 spriteW 等比放大）。
-  // 2026-07-03：q1-bull 生圖車體與輪圈同色系（皆為霓虹紅）+ 後輪被側箱擋住大半，
-  // 色塊偵測不可靠，尚未註冊——待用新版 GARAGE_DESIGN.md prompt 重生後再量測登記。
+  // 2026-07-03：q1-bull 重生後（改 no-saddlebags + chart 移到油箱）色塊偵測乾淨，
+  // 兩輪中心誤差 <2%（17.71%/84.23%w 對比規格 15.6%/84.4%w），量測結果可信。
+  {
+    id: "q1-bull", name: "多頭鬥牛", desc: "深紅巡航塗裝，金色輪圈燃燒多頭氣勢",
+    price: 0, locked: true, hueRotateDeg: 0, src: "bikes/q1-bull.png",
+    spriteW: 66, spriteOffsetX: -0.6, spriteOffsetY: -4.7,
+  },
   {
     id: "q2-bear", name: "空頭獵手", desc: "暗夜獵殺者塗裝，毒液綠電路紋",
     price: 0, locked: true, hueRotateDeg: 0, src: "bikes/q2-bear.png",

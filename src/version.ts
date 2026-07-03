@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.12.23";
+export const APP_VERSION = "0.12.24";
 
 export interface ChangelogEntry {
   date: string;
@@ -6,6 +6,12 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    date: "2026-07-03 (v0.12.24)",
+    notes: [
+      "多頭鬥牛（Q1）美術上線可裝備，Q 系列 5 台全數到齊",
+    ],
+  },
   {
     date: "2026-07-03 (v0.12.23)",
     notes: [
