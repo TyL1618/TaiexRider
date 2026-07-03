@@ -23,6 +23,58 @@
 
 ## 2. 生圖 Prompt（共 10 台，直接複製給 Grok）
 
+### 🔴 現在唯一要重生的：Q1 多頭鬥牛
+
+**B1、B2、Q2、Q3 都已經是正式圖且上線，不用重做。** 只有 Q1（多頭鬥牛）卡關待重生——
+原因：Grok 生成的是「bagger 旅行車」造型（不是設定的美式肌肉巡航車）+ 車身跟輪圈同色系
++ 後輪被側箱擋住，導致量測輪圈位置不可靠（詳見文件開頭 2026-07-03 狀態更新）。
+
+**下面這整段可以直接複製貼給 Grok**（附上 `public/bike.png` 當範例圖一起送出）：
+
+```
+Use the attached image as an EXACT composition template. Generate a new
+motorcycle in the SAME framing:
+
+- Full side view facing RIGHT, no rider, no human.
+- Same canvas aspect ratio as the reference (~3:2 landscape). Output at
+  least 1024px wide.
+- CRITICAL: both wheels must be in EXACTLY the same position and size as
+  the reference — rear wheel center at 15.6% of image width, front wheel
+  center at 84.4% of image width, both at 71% of image height, wheel
+  diameter ≈ 28% of image width. Do not move, resize, or tilt the wheels.
+- Same flat-vector / cel-shaded sticker art style as the reference: bold
+  clean shapes, crisp dark outlines, smooth gradients, glowing neon rim
+  accents on both wheels.
+- The overall body silhouette / vehicle type must look CLEARLY DIFFERENT
+  from the reference and from other bikes in this set — only the wheel
+  positions and size are locked, everything else about the frame, tank,
+  seat, and proportions should follow that bike's own STYLE description
+  below.
+- STRICTLY EXCLUDE anything beyond the motorcycle itself: NO motion/speed
+  lines, NO exhaust flames or smoke, NO ground shadow or reflection, NO
+  particles, sparks, or glow trails floating off the bike. The motorcycle
+  silhouette is the only thing allowed to touch the canvas edges of
+  content — everything else stays pure white.
+- Plain pure-white background, nothing else in frame. No text, no logo,
+  no watermark, no background scenery.
+
+VEHICLE TYPE: American muscle cruiser — long low-slung wheelbase, forward-
+mounted foot pegs, wide flat handlebars, chunky low seat.
+STYLE: An aggressive "bull market" muscle cruiser. Deep crimson and
+scarlet tank shaped with sharp forward-charging lines, twin horn-like
+winglets on the front fender evoking bull horns, glowing red candlestick-
+chart motif on the side panel, rising-arrow decal. Wheel rims glow bright
+GOLD, clearly a different color from the crimson body so the glowing rim
+reads as a distinct bright ring against the dark red bodywork (not another
+shade of red/orange). Embodiment of a raging, prosperous bull market.
+```
+
+生完一樣去背 → 放進 `public/bikes/raw/`（跟之前 B1/B2/Q2/Q3 同一個資料夾）→ 跟 Claude 說一聲即可重跑量測流程登記上線。
+
+---
+
+### 以下是 P1~P5（付費車款）留著之後生圖用，B/Q 系列的完整 STYLE 段落也留著備查（都已生成過，不用重貼）
+
 ### 每次都先貼這段「共用規格」，再貼對應那台車的 STYLE 段落，並附上 `public/bike.png` 當範例圖
 
 ```
