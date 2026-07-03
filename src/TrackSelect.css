@@ -229,9 +229,14 @@
 .lp-name { font-size: 0.78rem; color: var(--text-dim); }
 .long-preview-item svg { width: 100%; height: auto; }
 
-/* 選取中載入遮罩 */
-.select-screen.is-picking .track-list { opacity: 0.45; pointer-events: none; }
+/* 選取中載入遮罩：淡出賽道清單 + 浮出載入提示，取代原本瞬間切換的生硬感 */
+.track-list { transition: opacity 220ms ease; }
+.select-screen.is-picking .track-list { opacity: 0.4; pointer-events: none; }
 
+@keyframes pickingPop {
+  0%   { opacity: 0; transform: translateX(-50%) translateY(8px) scale(0.92); }
+  100% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+}
 .picking-overlay {
   position: fixed;
   bottom: calc(2rem + env(safe-area-inset-bottom, 0px));
@@ -245,4 +250,5 @@
   color: var(--neon-cyan);
   letter-spacing: 0.08em;
   pointer-events: none;
+  animation: pickingPop 220ms ease-out;
 }

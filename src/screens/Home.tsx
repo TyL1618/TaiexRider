@@ -5,6 +5,7 @@ import { getPlayerName, setPlayerName, clampNameWidth } from "../lib/playerId";
 import { setVolume, getVolume } from "../game/audio";
 import { detectEnv } from "../lib/ads";
 import { getCoins } from "../lib/garage";
+import CoinIcon from "../components/CoinIcon";
 import StatsScreen from "./StatsScreen";
 import "./Home.css";
 
@@ -64,12 +65,15 @@ export default function Home({ user, onNav }: { user: User | null; onNav: (s: Sc
       <button className="corner-btn settings-corner-btn" onClick={() => setShowSettings(true)} aria-label="設定">
         ⚙
       </button>
-      <button className="corner-btn garage-corner-btn" onClick={() => onNav("garage")} aria-label="車庫">
-        🏍️ {getCoins()}
-      </button>
 
       <h1 className="home-title">TAIEX&shy;RIDER</h1>
       <p className="home-sub">把台股走勢騎成霓虹賽道</p>
+
+      <button className="garage-entry-btn" onClick={() => onNav("garage")}>
+        <CoinIcon size={22} />
+        <span className="garage-entry-coins">{getCoins()}</span>
+        <span className="garage-entry-label">收藏車庫</span>
+      </button>
 
       <div className="home-menu">
         <button className="home-btn daily" onClick={() => onNav("daily")}>

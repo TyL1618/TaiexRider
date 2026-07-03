@@ -9,6 +9,7 @@ import { getAttempts, incrementAttempts, MAX_ATTEMPTS, FREE_ATTEMPTS } from "../
 import { recordStreak, getStreak, playedThisSession } from "../lib/streak";
 import { fetchDeathHeatmap, type HeatBucket } from "../lib/deathHeatmap";
 import { getDailyQuests } from "../lib/quests";
+import CoinIcon from "../components/CoinIcon";
 import type { TrackData } from "../data/tracks";
 import "./DailyChallenge.css";
 
@@ -147,7 +148,7 @@ export default function DailyChallenge({
             <div key={q.id} className={`quest-item${q.done ? " done" : ""}`}>
               <span className="quest-check">{q.done ? "✅" : "⬜"}</span>
               <span className="quest-title">{q.title}</span>
-              <span className="quest-progress">{q.progress}/{q.target}・+{q.reward}🏍️</span>
+              <span className="quest-progress">{q.progress}/{q.target}・+{q.reward}<CoinIcon size={11} /></span>
             </div>
           ))}
         </div>

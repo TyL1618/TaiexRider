@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.12.16";
+export const APP_VERSION = "0.12.17";
 
 export interface ChangelogEntry {
   date: string;
@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    date: "2026-07-03 (v0.12.17)",
+    notes: [
+      "車庫入口改成霓虹金幣圖示 + 「收藏車庫」大按鈕，移到標題下方置中（原本會跟標題疊在一起）",
+      "自選賽道選片、進入賽道時加入淡入轉場，載入提示更有存在感",
+    ],
+  },
   {
     date: "2026-07-03 (v0.12.16)",
     notes: [

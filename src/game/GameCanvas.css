@@ -2,6 +2,7 @@
   position: fixed;
   inset: 0;
   overflow: hidden;
+  animation: screenFadeIn 200ms ease-out;
 }
 
 /* ---- 觸碰開始提示（懸空等待期） ---- */

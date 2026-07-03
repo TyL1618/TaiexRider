@@ -112,7 +112,7 @@
 .quest-item.done { color: var(--neon-amber); }
 .quest-check { flex: 0 0 auto; }
 .quest-title { flex: 1; text-align: left; letter-spacing: 0.03em; }
-.quest-progress { flex: 0 0 auto; color: var(--text-dim); font-size: 0.7rem; }
+.quest-progress { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 0.15rem; color: var(--text-dim); font-size: 0.7rem; }
 .quest-item.done .quest-progress { color: var(--neon-amber); }
 
 .nickname-row {

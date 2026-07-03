@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { BIKE_SKINS, getCoins, isOwned, getActiveSkinId, purchaseSkin, setActiveSkin } from "../lib/garage";
+import CoinIcon from "../components/CoinIcon";
 import "../TrackSelect.css";
 import "./Garage.css";
 
@@ -23,7 +24,7 @@ export default function Garage({ onBack }: { onBack: () => void }) {
     <div className="select-screen garage-screen">
       <button className="back-btn" onClick={onBack}>‹ 返回</button>
       <h1 className="select-title">車庫</h1>
-      <p className="garage-coins">🏍️ 金幣 {coins}</p>
+      <p className="garage-coins"><CoinIcon size={22} /> 金幣 {coins}</p>
       <p className="garage-intro">完賽/摔車與每日任務都能賺金幣，解鎖車皮換上場</p>
 
       <div className="garage-list">
