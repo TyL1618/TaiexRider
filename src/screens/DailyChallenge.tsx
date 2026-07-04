@@ -6,7 +6,7 @@ import { fetchHardestDailyMap, resolveSessionDate, resolveSessionDisplayDate } f
 import { signInWithGoogle, type User } from "../lib/auth";
 import { getPlayerName } from "../lib/playerId";
 import { getAttempts, incrementAttempts, consumeAttemptServer, MAX_ATTEMPTS, FREE_ATTEMPTS } from "../lib/challengeAttempts";
-import { recordStreak, getStreak, playedThisSession } from "../lib/streak";
+import { recordStreak, getStreak, playedThisSession, writeStreakCache } from "../lib/streak";
 import { fetchDeathHeatmap, type HeatBucket } from "../lib/deathHeatmap";
 import { getDailyQuests } from "../lib/quests";
 import CoinIcon from "../components/CoinIcon";
@@ -190,12 +190,19 @@ export default function DailyChallenge({
           // 未登入/RPC 尚未建立時直接回 true，維持現行純前端計數行為不變。
           const handleStart = async () => {
             setCheckingStart(true);
-            const ok = await consumeAttemptServer();
+            const result = await consumeAttemptServer();
             setCheckingStart(false);
-            if (!ok) { setServerMaxed(true); return; }
+            if (!result.ok) { setServerMaxed(true); return; }
             incrementAttempts(sessionKeyRef.current);
             setAttempts(prev => prev + 1);
-            setStreak(recordStreak(sessionKeyRef.current)); // 連續參賽：進遊戲即算本期參賽
+            // 連續參賽：進遊戲即算本期參賽。已登入時伺服器已算好最新 streak（見
+            // consume_attempt() RPC），未登入才 fallback 本地 recordStreak()。
+            if (result.streak !== null) {
+              writeStreakCache(result.lastSessionKey, result.streak);
+              setStreak(result.streak);
+            } else {
+              setStreak(recordStreak(sessionKeyRef.current));
+            }
             setStreakLive(true);
             onPlay(track);
           };

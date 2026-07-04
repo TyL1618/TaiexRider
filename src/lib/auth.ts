@@ -1,5 +1,7 @@
 import type { User } from "@supabase/supabase-js";
 import { supabase } from "./supabase";
+import { NAME_KEY, resetPlayerName } from "./playerId";
+import { resetWalletCache } from "./garage";
 
 export type { User };
 
@@ -84,9 +86,15 @@ export async function signInWithGoogle(): Promise<void> {
   });
 }
 
+// 登出：清掉所有帳號相關的本地快取（暱稱/金幣/鑽石/擁有清單/裝備車皮/成就/streak），
+// 回到訪客預設值。背景：2026-07-05 發現這些 key 全是裝置共用、不分帳號，登出後
+// 完全沒清過，導致同裝置換登另一個 Google 帳號時會讀到上一個帳號的殘留資料
+// （見 NEXT_BATCH_PLAN.md 批次 1、CLAUDE.md 待辦 1b）。
 export async function signOut(): Promise<void> {
   window.google?.accounts?.id?.cancel();
   await supabase.auth.signOut();
+  resetPlayerName();
+  resetWalletCache(); // 內含金幣/鑽石/擁有清單/裝備車皮 + 成就/streak 快取歸零
 }
 
 // 將暱稱同步到 user_profiles，讓舊成績排行榜也顯示新名稱
@@ -106,12 +114,20 @@ export async function getUser(): Promise<User | null> {
   return user;
 }
 
-// 首次 Google 登入時，若暱稱還是預設 Rider#### 格式，自動改成 Google 顯示名稱
-export function initNicknameFromGoogle(user: User): void {
-  const current = localStorage.getItem("taiex_player_name");
+// 登入時同步暱稱：優先用伺服器 user_profiles.player_name（這個帳號自己設過的暱稱，
+// 一律以它為準蓋掉本地任何殘留值——這是修復「同裝置切換帳號暱稱互相污染」的關鍵）。
+// 伺服器還沒有暱稱（這個帳號第一次登入、從沒設過）才 fallback 舊邏輯：本地是空的
+// 或還是預設 Rider#### 格式時，改用 Google 顯示名稱。
+export async function initNicknameFromGoogle(user: User): Promise<void> {
+  const { data, error } = await supabase.rpc("get_player_name");
+  if (!error && data) {
+    try { localStorage.setItem(NAME_KEY, String(data).slice(0, 32)); } catch { /* 靜默 */ }
+    return;
+  }
+  const current = localStorage.getItem(NAME_KEY);
   if (!current || /^Rider\d{4}$/.test(current)) {
     const name = (user.user_metadata?.name as string) ?? "";
-    if (name) localStorage.setItem("taiex_player_name", name.trim().slice(0, 16));
+    if (name) { try { localStorage.setItem(NAME_KEY, name.trim().slice(0, 16)); } catch { /* 靜默 */ } }
   }
 }
 

@@ -13,20 +13,34 @@
 - [ ] 跑完後用真實 Google 帳號（`tyl161803@gmail.com`）登入真機/桌機驗證一輪：
       買車扣款是否正確、完賽/摔車/任務/看廣告是否有進帳、清 localStorage 後擁有清單還在、
       每日排名賽第 6 次挑戰是否被伺服器擋下。
-- [ ] **修登出沒清快取的 bug**（2026-07-04 晚發現，尚未修）：`src/lib/auth.ts` 的 `signOut()`
-      只呼叫了 GSI cancel + `supabase.auth.signOut()`，**完全沒清除 `garage.ts` 的 localStorage
-      錢包快取**（`tr_garage_coins`/`tr_garage_diamonds`/`tr_garage_owned`/`tr_garage_active`）。
-      症狀：用開發者帳號（99999 金幣+鑽石、裝備某車皮）登出後，首頁仍顯示舊數字/舊車皮，
-      要跳到其他頁面再回來才會（似乎）恢復預設——但追蹤程式碼後**找不到任何地方會真的清空
-      這幾把 localStorage 鑰匙**，`Home.tsx` 的 `getCoins()`/`getActiveBikeSkin()` 是 render
-      時直接讀 localStorage，`user` 變 `null` 只會觸發重新渲染、讀到的還是同一份沒被清過的
-      舊快取。修法：登出確定當下，把這幾把鑰匙重置回訪客預設值（金幣 0／鑽石 0／擁有清單只剩
-      `["default"]`／裝備車皮回 `default`），單靠這個重置 + 既有的 `user` 觸發重渲染就夠，
-      不一定需要額外 `window.location.reload()`（reload 不會清 localStorage，單獨加沒用）。
-- [ ] **討論決定要不要處理「切換 Google 帳號不刷新」**：這個無法只靠 reload 解決——
-      Supabase 的 `onAuthStateChange` 綁的是 session 生命週期，不是瀏覽器目前登入哪個 Google
-      帳號；不主動重新走一次 `signInWithGoogle()` 流程，app 完全偵測不到帳號已經換了。
-      工程量比登出清快取大（需要主動重新驗證登入狀態），7/6 討論值不值得做。
+- [x] **修登出沒清快取的 bug + 帳號污染三合一修復** 已完成（2026-07-06，migration_20260706.sql）。
+      背景：2026-07-05 晚發現不只是「登出沒清快取」，而是暱稱（`taiex_player_name`）、
+      Q 系列成就（`tr_achv_market`）、streak（`tr_daily_streak`）三個裝置共用 key
+      都不分帳號也不清，且 Garage.tsx 的自動解鎖邏輯會把「裝置上另一個帳號留下的假進度」
+      誤寫進「目前登入帳號」的伺服器擁有清單（已發生於 tommyisboy08@gmail.com 測試帳號，
+      使用者已手動 SQL 清除）。修法三塊一次做：
+      ① 暱稱改 DB 權威：新增 `get_player_name()` RPC，登入時 `auth.ts initNicknameFromGoogle()`
+         優先拉伺服器 `user_profiles.player_name` 蓋掉本地，伺服器沒有才 fallback 舊邏輯。
+      ② 錢包/成就/streak 登出全部歸零：`auth.ts signOut()` 呼叫 `resetPlayerName()` +
+         `garage.ts resetWalletCache()`（內含金幣/鑽石/擁有清單/裝備車皮 + achievements/streak）。
+      ③ 成就/streak 徹底搬 DB（不只是清快取，是把權威來源換掉）：新增
+         `player_achievements`/`player_streak` 表，完賽時 `record_market_finish()` RPC 伺服器
+         自己重算當期 TAIEX 漲跌（不信任前端傳的 mood）累加 bull/bear finish；進每日排名賽時
+         `consume_attempt()` RPC 順便更新 streak；**`wallet_unlock_achievement()` 改成伺服器自行
+         驗證門檻**（v1 只信任客戶端宣稱「達標了」就給，這正是 tommyisboy08 誤解鎖的根本路徑，
+         v2 這支 RPC 現在會自己查 player_achievements/player_streak 是否真的達標，不管客戶端
+         傳什麼都無法騙到）；`wallet_dev_grant()` 一併灌好開發者測試帳號的成就/streak，取代
+         舊版前端 `devSetProgress()`/`devForceStreak()` 純本地寫死。
+      typecheck 過，preview 驗證訪客路徑（首頁/車庫/每日挑戰頁）無回歸、零 console error。
+      **⚠️ 已登入路徑（暱稱同步/成就解鎖/streak/開發者帳號灌值）preview 無法測（需真實
+      Google OAuth），需使用者真機/桌機用兩個帳號交叉驗證：A 帳號改暱稱→登出→B 帳號登入
+      暱稱應顯示 B 自己的、不會看到 A 的殘留；A/B 互換都不會看到對方的 Q 車款解鎖進度。**
+      **⚠️ 待使用者在 Supabase SQL Editor 手動跑 `supabase/migration_20260706.sql`**（新
+      RPC/表不存在前，暱稱/成就/streak 維持舊的純本地行為，不影響遊戲能不能玩，但污染
+      問題不會被修好）。
+      **⚠️ 另有一次性資料清零 SQL**（使用者要求：不確定封測期間有沒有測試者已經在玩，
+      要把除了 tyl161803@gmail.com 以外所有玩家的金幣/鑽石/車庫/成就歸零)，見對話紀錄
+      /當次 commit 訊息附的 SQL，跑一次即可、不進 migration 檔案（一次性操作不需要留存重跑）。
 
 ## 批次 2 — 其他資安收尾（優先度中）
 

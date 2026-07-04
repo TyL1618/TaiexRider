@@ -10,14 +10,24 @@ import { supabase } from "./supabase";
 export const MAX_ATTEMPTS = 5;
 export const FREE_ATTEMPTS = 2;
 
-// 已登入時呼叫伺服器 RPC 真正扣次數，回傳是否還能玩（第 6 次起 false）；
-// 未登入或 RPC 尚未建立/網路失敗一律回傳 true（放行，維持現行純前端把關的定位不變）。
-export async function consumeAttemptServer(): Promise<boolean> {
+export interface ConsumeAttemptResult {
+  ok: boolean;
+  // streak/lastSessionKey 為 null 代表未登入或 RPC 失敗：呼叫端應 fallback 本地
+  // streak.ts recordStreak()，與現行未登入玩家純本地計數行為一致。
+  streak: number | null;
+  lastSessionKey: string | null;
+}
+
+// 已登入時呼叫伺服器 RPC 真正扣次數（第 6 次起 ok=false）+ 一併算好最新 streak
+// （consume_attempt() 內部同時更新 player_streak，見 migration_20260706.sql）；
+// 未登入或 RPC 尚未建立/網路失敗一律回傳 ok=true（放行，維持現行純前端把關的定位不變）。
+export async function consumeAttemptServer(): Promise<ConsumeAttemptResult> {
   const { data: { session } } = await supabase.auth.getSession();
-  if (!session) return true;
+  if (!session) return { ok: true, streak: null, lastSessionKey: null };
   const { data, error } = await supabase.rpc("consume_attempt");
-  if (error || typeof data !== "boolean") return true;
-  return data;
+  if (error || !data || !data[0]) return { ok: true, streak: null, lastSessionKey: null };
+  const row = data[0] as { ok: boolean; streak_count: number; last_session_key: string | null };
+  return { ok: row.ok, streak: row.streak_count, lastSessionKey: row.last_session_key };
 }
 
 function storageKey(sessionDate: string): string {

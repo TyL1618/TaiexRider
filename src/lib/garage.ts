@@ -16,6 +16,8 @@
 // 同步後」的快取值。未登入玩家（無法上排行榜、竄改零風險）維持純本地。
 
 import { supabase } from "./supabase";
+import { writeAchievementsCache, resetAchievementsCache } from "./achievements";
+import { writeStreakCache, resetStreakCache } from "./streak";
 
 export interface BikeSkin {
   id: string;
@@ -110,17 +112,47 @@ function writeOwnedCache(owned: string[]): void {
   try { localStorage.setItem(OWNED_KEY, JSON.stringify(owned)); } catch { /* 靜默 */ }
 }
 
-// 已登入時把伺服器錢包（金幣/鑽石/擁有清單）同步進本地快取；未登入/RPC 失敗靜默略過
-// （App.tsx 登入後呼叫一次；Garage.tsx 掛載時也呼叫一次，確保換裝置登入時不會卡在舊快取）。
+// 已登入時把伺服器錢包（金幣/鑽石/擁有清單/成就進度/streak）同步進本地快取；
+// 未登入/RPC 失敗靜默略過（App.tsx 登入後呼叫一次；Garage.tsx 掛載時也呼叫一次，
+// 確保換裝置/換帳號登入時不會卡在舊快取——這正是 2026-07-05 帳號污染 bug 的修復核心：
+// 每次登入都整包覆寫，不管裝置上原本殘留哪個帳號的資料）。
 export async function syncWalletFromServer(): Promise<void> {
   const uid = await getUid();
   if (!uid) return;
   const { data, error } = await supabase.rpc("wallet_get");
   if (error || !data || !data[0]) return; // RPC 尚未建立/未登入/網路失敗：本地快取先頂著
-  const row = data[0] as { coins: number; diamonds: number; owned: string[] };
+  const row = data[0] as {
+    coins: number; diamonds: number; owned: string[];
+    bull_finishes: number; bear_finishes: number;
+    streak_count: number; last_session_key: string | null;
+  };
   writeCoinsCache(row.coins);
   writeDiamondsCache(row.diamonds);
   writeOwnedCache(row.owned);
+  writeAchievementsCache(row.bull_finishes, row.bear_finishes);
+  writeStreakCache(row.last_session_key, row.streak_count);
+}
+
+// 登出時呼叫：把錢包/成就/streak 快取全部歸零成訪客預設值，避免下一個登入的帳號
+// （或登出後的訪客畫面）看到上一個帳號的金幣/鑽石/車皮/成就殘影。
+export function resetWalletCache(): void {
+  writeCoinsCache(0);
+  writeDiamondsCache(0);
+  writeOwnedCache(["default"]);
+  try { localStorage.setItem(ACTIVE_KEY, "default"); } catch { /* 靜默 */ }
+  resetAchievementsCache();
+  resetStreakCache();
+}
+
+// 完賽時呼叫（App.tsx，僅已登入玩家；未登入走 achievements.ts 本地 recordFinish）。
+// 伺服器自己查當期 TAIEX 漲跌決定算 bull 還是 bear，不信任客戶端傳的 mood。
+export async function recordMarketFinish(): Promise<void> {
+  const uid = await getUid();
+  if (!uid) return;
+  const { data, error } = await supabase.rpc("record_market_finish");
+  if (error || !data || !data[0]) return;
+  const row = data[0] as { bull_finishes: number; bear_finishes: number };
+  writeAchievementsCache(row.bull_finishes, row.bear_finishes);
 }
 
 export function getCoins(): number {
@@ -244,16 +276,22 @@ export async function purchaseSkin(id: string): Promise<boolean> {
   return true;
 }
 
-// 開發者測試帳號補滿金幣+鑽石（wallet_dev_grant RPC，JWT email 綁定，取代舊的
-// 前端「getCoins()<99999 就 addCoins」本地 hack）。非開發者帳號呼叫會被伺服器靜默拒絕。
+// 開發者測試帳號補滿金幣+鑽石+成就進度+streak（wallet_dev_grant RPC，JWT email 綁定，
+// 取代舊的前端 devSetProgress()/devForceStreak() 本地寫死）。非開發者帳號呼叫會被伺服器靜默拒絕。
 export async function grantDevWallet(): Promise<void> {
   const uid = await getUid();
   if (!uid) return;
   const { data, error } = await supabase.rpc("wallet_dev_grant");
   if (error || !data || !data[0]) return;
-  const row = data[0] as { coins: number; diamonds: number };
+  const row = data[0] as {
+    coins: number; diamonds: number;
+    bull_finishes: number; bear_finishes: number;
+    streak_count: number; last_session_key: string | null;
+  };
   writeCoinsCache(row.coins);
   writeDiamondsCache(row.diamonds);
+  writeAchievementsCache(row.bull_finishes, row.bear_finishes);
+  writeStreakCache(row.last_session_key, row.streak_count);
 }
 
 export function getActiveSkinId(): string {

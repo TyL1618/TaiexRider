@@ -2,7 +2,7 @@
 // 不做 Google 登入（延後）。見 DEVDOC §11。
 
 const ID_KEY = "taiex_player_id";
-const NAME_KEY = "taiex_player_name";
+export const NAME_KEY = "taiex_player_name";
 
 export function getPlayerId(): string {
   let id = localStorage.getItem(ID_KEY);
@@ -51,4 +51,10 @@ export function clampNameWidth(s: string, max = NAME_MAX_WIDTH): string {
 
 export function setPlayerName(name: string): void {
   localStorage.setItem(NAME_KEY, clampNameWidth(name.trim()) || getPlayerName());
+}
+
+// 登出時呼叫：清掉本地暱稱快取（不分帳號的裝置級 key），下次 getPlayerName()
+// 會重新產生訪客用的隨機 Rider####，避免上一個帳號的暱稱殘留給下一個登入者看到。
+export function resetPlayerName(): void {
+  try { localStorage.removeItem(NAME_KEY); } catch { /* 靜默 */ }
 }

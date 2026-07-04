@@ -20,11 +20,10 @@ import { getPlayerName } from "./lib/playerId";
 import { dailyKey } from "./data/pick";
 import { setPlaying } from "./pwa";
 import { logEvent, type AnalyticsMode } from "./lib/analytics";
-import { addCoins, earnCoins, syncWalletFromServer, grantDevWallet } from "./lib/garage";
+import { addCoins, earnCoins, syncWalletFromServer, grantDevWallet, recordMarketFinish } from "./lib/garage";
 import { recordRun } from "./lib/quests";
 import { resolveMarketMood, type MarketMood } from "./lib/marketMood";
-import { recordFinish, devSetProgress, Q1_BULL_TARGET, Q2_BEAR_TARGET, Q3_STREAK_TARGET } from "./lib/achievements";
-import { devForceStreak } from "./lib/streak";
+import { recordFinish } from "./lib/achievements";
 
 export default function App() {
   const [screen, setScreen]         = useState<Screen>("home");
@@ -58,21 +57,22 @@ export default function App() {
     return onAuthStateChange(setUser);
   }, []);
 
-  // 任何已登入玩家：把伺服器錢包（金幣/鑽石/擁有清單，2026-07-05 起改伺服器端權威）
-  // 拉到本地快取——換裝置登入或清過 localStorage 時，畫面才不會卡在舊/空值。
+  // 任何已登入玩家：把伺服器錢包（金幣/鑽石/擁有清單/成就進度/streak，2026-07-05~06
+  // 起改伺服器端權威）拉到本地快取——換裝置/換帳號登入或清過 localStorage 時，
+  // 畫面才不會卡在舊值，也不會誤讀到裝置上殘留的「另一個帳號」的資料。
   useEffect(() => {
     if (user) syncWalletFromServer();
   }, [user]);
 
-  // 開發者測試帳號：登入即補滿金幣+鑽石（wallet_dev_grant RPC，JWT email 綁定於伺服器端，
-  // 非開發者帳號呼叫會被靜默拒絕）＋直接解鎖 Q 系列成就進度，方便真機測車庫購買/裝備/
+  // 開發者測試帳號：登入即補滿金幣+鑽石+Q 系列成就進度+streak（wallet_dev_grant RPC，
+  // JWT email 綁定於伺服器端，非開發者帳號呼叫會被靜默拒絕），方便真機測車庫購買/裝備/
   // 解鎖 UI 不用真的刷任務、真的等大漲大跌日、真的連續玩 30 天。
-  // Q 系列成就進度本身仍是純前端 email 比對（無排行榜/競技意義，不影響公平性）。
+  // 2026-07-06 起改成單一 RPC 直接寫伺服器 player_achievements/player_streak，
+  // 取代舊版前端 devSetProgress()/devForceStreak() 純本地寫死（那正是同裝置切換
+  // 帳號會互相污染的源頭之一，見 achievements.ts/streak.ts 開頭說明）。
   useEffect(() => {
     if (user?.email !== "tyl161803@gmail.com") return;
     grantDevWallet();
-    devSetProgress(Q1_BULL_TARGET, Q2_BEAR_TARGET);
-    resolveSessionDate(dailyKey()).then((key) => devForceStreak(key, Q3_STREAK_TARGET));
   }, [user]);
 
   // 全站盤勢主題氛圍：解析當期大盤漲跌 → 背景色調 CSS 變數 + 首頁說明文字
@@ -200,8 +200,12 @@ export default function App() {
       score: stats.score, flips: stats.flips, perfect: stats.perfect, timeMs: stats.timeMs,
     });
     for (const q of newlyDone) { addCoins(q.reward); earnCoins("quest"); }
-    // Q 系列成就：完賽才算，依當期大盤漲跌累計（見 lib/achievements.ts）
-    if (stats.finished) recordFinish(marketMood?.mood ?? null);
+    // Q 系列成就：完賽才算，依當期大盤漲跌累計。已登入時改由伺服器 record_market_finish
+    // RPC 自己重算當期 TAIEX 漲跌（不信任前端傳的 mood），未登入才用本地 recordFinish()。
+    if (stats.finished) {
+      if (user) recordMarketFinish();
+      else recordFinish(marketMood?.mood ?? null);
+    }
   }, [isDailyRun, user, marketMood]);
 
   // 分析用模式標籤：依「從哪個畫面開局」判斷（screenRef 在 pick 當下仍是子頁）

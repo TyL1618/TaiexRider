@@ -1,7 +1,13 @@
-// Q 系列任務解鎖車款的成就計數（純本地 localStorage，設計見 GARAGE_DESIGN.md）。
-// Q1 多頭鬥牛／Q2 空頭獵手＝大漲/大跌日「完賽」累計次數；Q3 不死鳥沿用既有 streak.ts
-// 連續參賽天數，不重複記一份。美術（Grok 生圖）尚未到位，先做計數+UI 殼，
-// 解鎖判定跑在前，圖到位時只需在 garage.ts BIKE_SKINS 補上對應 src。
+// Q 系列任務解鎖車款的成就計數。Q1 多頭鬥牛／Q2 空頭獵手＝大漲/大跌日「完賽」累計次數；
+// Q3 不死鳥沿用既有 streak.ts 連續參賽天數，不重複記一份。
+//
+// 2026-07-06：已登入玩家改以伺服器 player_achievements 表（migration_20260706.sql）
+// 為權威來源，這裡的 localStorage 只當「顯示用快取」——登入時由 garage.ts
+// syncWalletFromServer() 覆寫（writeAchievementsCache），登出時清零
+// （resetAchievementsCache）。背景：舊版純本地+不分帳號，導致同裝置切換 Google
+// 帳號時，舊帳號的假進度被新帳號讀到，Garage.tsx 甚至因此誤呼叫解鎖 RPC 把
+// Q 車款寫進新帳號的伺服器擁有清單（tommyisboy08 誤解鎖事件，2026-07-05）。
+// 未登入玩家維持純本地 recordFinish() 累計（無法上排行榜，接受）。
 
 const KEY = "tr_achv_market";
 
@@ -37,9 +43,15 @@ export function recordFinish(mood: "up" | "down" | "flat" | null): MarketAchv {
   return d;
 }
 
-// 開發者測試帳號專用：直接寫死次數，繞過真的要打 10 場大漲/大跌日（見 App.tsx dev 帳號效果）
-export function devSetProgress(bullFinishes: number, bearFinishes: number): void {
+// 已登入時由伺服器覆寫本地顯示快取（登入同步 / 完賽後 record_market_finish 回應 /
+// 開發者測試帳號 wallet_dev_grant 回應，三處呼叫端見 garage.ts）。
+export function writeAchievementsCache(bullFinishes: number, bearFinishes: number): void {
   save({ bullFinishes, bearFinishes });
+}
+
+// 登出時呼叫：清零本地快取，避免下一個登入的帳號看到上一個帳號的進度殘影。
+export function resetAchievementsCache(): void {
+  save({ bullFinishes: 0, bearFinishes: 0 });
 }
 
 export const Q1_BULL_TARGET = 10;

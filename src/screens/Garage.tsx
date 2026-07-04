@@ -29,23 +29,28 @@ export default function Garage({ onBack }: { onBack: () => void }) {
   const [, forceRender] = useState(0);
 
   // Q 系列 streak 進度依「目前這一期」session key 讀（連假整段算同一期，跟 DailyChallenge 同源）
+  const refreshAchvBikes = async (checkAlive: () => boolean) => {
+    const key = await resolveSessionDate(dailyKey());
+    if (checkAlive()) setAchvBikes(getAchievementBikes(getStreak(key)));
+  };
   useEffect(() => {
     let alive = true;
-    resolveSessionDate(dailyKey()).then((key) => {
-      if (alive) setAchvBikes(getAchievementBikes(getStreak(key)));
-    });
+    refreshAchvBikes(() => alive);
     return () => { alive = false; };
   }, []);
 
-  // 掛載時把伺服器錢包（金幣/鑽石/擁有清單）同步進本地快取——換裝置登入或清過
-  // localStorage 時，車庫畫面才不會卡在舊/空值（見 garage.ts syncWalletFromServer 註解）。
+  // 掛載時把伺服器錢包（金幣/鑽石/擁有清單/成就進度/streak）同步進本地快取——換裝置/
+  // 換帳號登入或清過 localStorage 時，車庫畫面才不會卡在舊值，也不會卡在裝置上殘留的
+  // 另一個帳號的成就進度（見 garage.ts syncWalletFromServer 註解）。同步完後重讀一次
+  // achvBikes，避免畫面短暫顯示同步前的舊快取。
   useEffect(() => {
     let alive = true;
-    syncWalletFromServer().then(() => {
+    syncWalletFromServer().then(async () => {
       if (!alive) return;
       setCoins(getCoins());
       setDiamonds(getDiamonds());
-      forceRender((n) => n + 1);
+      await refreshAchvBikes(() => alive);
+      if (alive) forceRender((n) => n + 1);
     });
     return () => { alive = false; };
   }, []);
