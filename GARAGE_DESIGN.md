@@ -21,6 +21,9 @@
 > 佔位價，車庫「鑽石車款」區塊，取代原本的「付費車款」名稱與 disabled 佔位卡）；P3~P5 尚未生圖
 > 仍「敬請期待」。金幣/鑽石/擁有清單已改接伺服器端 RPC（`supabase/migration_20260705.sql`，見
 > [WALLET_PLAN.md](WALLET_PLAN.md)），localStorage 不再是唯一權威來源。
+> **狀態更新（2026-07-06）**：Q 系列成就進度（大漲/大跌完賽次數、streak）與暱稱也一併搬進
+> 資料庫（`supabase/migration_20260706.sql`），修復同裝置切換 Google 帳號互相污染的問題，
+> 詳見 §4 車款分級「Q（任務解鎖款）」段落與 [WALLET_PLAN.md](WALLET_PLAN.md)。
 
 ---
 
@@ -272,7 +275,7 @@ other bikes. Silent. Deadly. Almost invisible.
 車庫本身不是獨立功能，是**留存迴圈的解鎖出口**。**車款分級定案（2026-07-04 使用者更新拍板，取代 2026-07-03 舊版，已寫進 `garage.ts`）**：
 
 - **B（基本款）＝金幣購買**：`b2-cafe-racer` 200 金幣／`b1-street-white` 150 金幣（2026-07-03 曾一度改免費，2026-07-04 使用者拍板收回改回金幣購買）。
-- **Q（任務解鎖款）＝成就條件解鎖**，明確**不是**金幣/鑽石購買——`achievements.ts`/`streak.ts` 算出的大漲/大跌完賽次數與連續參賽天數達標即可，見 `wallet_unlock_achievement` RPC（v1 信任客戶端宣稱，cosmetic 無競技意義）。
+- **Q（任務解鎖款）＝成就條件解鎖**，明確**不是**金幣/鑽石購買——大漲/大跌完賽次數與連續參賽天數達標即可解鎖。2026-07-06 起，這些進度已改為伺服器端權威（`player_achievements`/`player_streak` 表，`achievements.ts`/`streak.ts` 的 localStorage 只當顯示快取），`wallet_unlock_achievement` RPC 也改成伺服器自行驗證門檻是否真的達標，不再信任客戶端宣稱——舊版（v1）信任客戶端曾導致同裝置切換 Google 帳號互相污染，見 [WALLET_PLAN.md](WALLET_PLAN.md) 2026-07-06 段落。
 - **P（鑽石車款）＝正式上線後走真錢 IAP**（Google Play Billing，**目前尚未接**），先用「鑽石」這個新軟通貨頂替：P1 300 鑽石／P2 380 鑽石（暫定佔位價，真實定價待 Billing 接上後由使用者決定）。**鑽石目前沒有任何獲取管道**（無廣告/任務/完賽獎勵），只有開發者測試帳號會補到 99999——之後會做一個購買頁讓玩家花台幣分別買鑽石/金幣。
 
 金幣/鑽石（軟通貨）與車皮擁有清單已於 2026-07-04 晚改接伺服器端錢包（`supabase/migration_20260705.sql` + `garage.ts`），已登入玩家的餘額/擁有清單以伺服器為權威，localStorage 只當顯示快取，詳見 [WALLET_PLAN.md](WALLET_PLAN.md)。

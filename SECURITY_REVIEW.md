@@ -20,7 +20,8 @@
 | 🟢 已修補 | `cleanup_old_scores_if_needed` anon 可呼叫 | **已收權**（同 migration b），改由每日 CI 帶 service key 呼叫（fetchDailyMap.ts）；cron-job.org 的 cleanup 排程可刪、keepalive 保留 |
 | 🟢 已上線 | 無 CSP / 安全 headers | **`public/_headers` 已加**：nosniff/XFO DENY/Referrer-Policy/Permissions-Policy＋**CSP 已正式執法**（先 Report-Only 部署，使用者真機走完登入/遊玩/分享全流程 console 零違規後轉正，2026-07-04 晚） |
 | 🟢 已上線 | GitHub Actions 未 pin SHA（首輪供應鏈潔癖項） | checkout / setup-node 已 pin 到 commit SHA |
-| 🟢 已實作 | 車庫金幣/擁有清單/任務/streak/成就全為 localStorage，可被使用者端竄改 | **使用者 2026-07-04 晚拍板後當場改口「不用等 7/5」，同晚已實作伺服器端錢包**（`migration_20260705.sql` + garage.ts 全面改接，方案見 [WALLET_PLAN.md](WALLET_PLAN.md)）。**⚠️ 待使用者跑 migration 才生效，且需真實帳號登入驗證**（streak/成就進度本身仍是純前端信任客戶端宣稱，只有「擁有清單」本身移到伺服器，v1 設計如此，見 wallet_unlock_achievement 註解） |
+| 🟢 已實作 | 車庫金幣/擁有清單/任務/streak/成就全為 localStorage，可被使用者端竄改 | **使用者 2026-07-04 晚拍板後當場改口「不用等 7/5」，同晚已實作伺服器端錢包**（`migration_20260705.sql` + garage.ts 全面改接，方案見 [WALLET_PLAN.md](WALLET_PLAN.md)）。 |
+| 🟢 已修復 | **暱稱/Q 系列成就/streak 純本地不分帳號，導致「同裝置切換 Google 帳號」真實污染事件**（2026-07-05 發現，非理論風險——tommyisboy08@gmail.com 測試帳號被裝置上另一帳號的假成就進度誤解鎖 Q 車款，寫進了伺服器端真實擁有清單） | `supabase/migration_20260706.sql`：新增 `player_achievements`/`player_streak` 表 + `get_player_name()`/`record_market_finish()`，**`wallet_unlock_achievement()` 改成伺服器自行驗證門檻**（v1 只信任客戶端宣稱「已達標」就給，正是這次污染事件能寫進伺服器的根本路徑；v2 這支 RPC 現在自己查 DB 判斷，客戶端傳什麼都無法騙到），`auth.ts signOut()` 補上暱稱/錢包/成就/streak 全部歸零。使用者已跑 migration + 一次性資料清零 SQL（把非開發者帳號的金幣/鑽石/車庫/成就全部歸零）+ 真機兩帳號交叉驗證通過。詳見 CLAUDE.md 待辦 1b。 |
 | 🟢 已實作 | 每日 5 次挑戰上限純前端（清 localStorage 可繞過） | `consume_attempt` RPC **已與錢包同一批做完**（`migration_20260705.sql` + DailyChallenge.tsx/challengeAttempts.ts 已改接）。**⚠️ 待使用者跑 migration 才生效** |
 | 🟡 已答覆 | upload keystore 雲端備份 | 使用者 2026-07-04 回覆：密碼公司/家裡皆有記錄；keystore **檔案本體**備份狀態不確定但暫緩（Play App Signing 保底，upload key 遺失可向 Google 申請重置） |
 | 🟢 乾淨 | XSS 重掃（含新增畫面）／密鑰／npm audit prod 0 漏洞 | 無需動作 |
@@ -34,12 +35,14 @@
 > 客戶端全面改接（已登入→伺服器 RPC 為權威；未登入→維持純本地，接受）。詳見 [WALLET_PLAN.md](WALLET_PLAN.md)
 > 開頭的完成狀態註記。**⚠️ 待使用者跑 migration + 真實帳號登入驗證才算真正生效**。
 
-- `tr_garage_coins`（金幣）、`tr_garage_diamonds`（鑽石）、`tr_garage_owned`（擁有車皮）已改為
-  「已登入玩家伺服器端為權威，localStorage 只當顯示快取」；`tr_quest_progress`（每日任務進度）、
-  `tr_daily_streak`、`tr_achv_market`（Q 系列成就進度）、`tr_ad_coin_claims_*`（廣告金幣每日
-  2 次上限的顯示計數）、`tr_pb_*`（獎牌 PB）**仍是純 localStorage**——這些是「進度/計數」本身，
-  不是「餘額/擁有權」，竄改它們最多只能提前解鎖 Q 系列 cosmetic 車皮（`wallet_unlock_achievement`
-  v1 信任客戶端宣稱，見 migration 註解），不影響金幣/鑽石餘額或排行榜，公平性影響仍是零。
+- `tr_garage_coins`（金幣）、`tr_garage_diamonds`（鑽石）、`tr_garage_owned`（擁有車皮）、
+  `tr_daily_streak`（streak）、`tr_achv_market`（Q 系列成就進度）、暱稱（`taiex_player_name`）
+  皆已改為「已登入玩家伺服器端為權威，localStorage 只當顯示快取」（2026-07-06，
+  `migration_20260706.sql`，見上方新增列）。`tr_quest_progress`（每日任務進度）、
+  `tr_ad_coin_claims_*`（廣告金幣每日 2 次上限的顯示計數）、`tr_pb_*`（獎牌 PB）**仍是純
+  localStorage**——這些是無競技/金錢意義的個人顯示用計數，竄改只影響自己單機的收藏/顯示，
+  不影響金幣/鑽石餘額或排行榜，公平性影響仍是零；但**同裝置切換帳號一樣會有殘留/污染的
+  UX 問題**（跟 2026-07-06 修的那批是同一類，只是風險等級低很多，尚未排入修復）。
 - **P 系列鑽石車款（P1/P2）已用同一套錢包保護**：`wallet_spend_skin` RPC 內建價格白名單+ 餘額
   驗證，`isOwned()` 讀的擁有清單來自伺服器（已登入時），不能再靠改 localStorage 免費解鎖。
   **真錢 IAP（Google Play Billing）串接時**，仍需額外驗證 Play Developer API 購買憑證後才呼叫

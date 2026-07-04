@@ -105,6 +105,23 @@ create table if not exists public.classic_records (
 
 經典關卡是固定地形，適合永久排行榜。提交走 RPC `submit_classic_record(p_level,p_name,p_score,p_time)`（security definer，需登入；分數高優先、同分時間短才覆蓋）。前端 `src/lib/classicRecords.ts` 讀取（整表 ~12 列、Map 快取）+ 提交。⚠️ 改 schema 後 push 不會更新，要手動在 Supabase SQL Editor 跑建表 + `create or replace function`。
 
+### 2.5 帳號相關資料（錢包/成就/streak/暱稱）— 伺服器端權威
+
+2026-07-05~06 起，已登入玩家的金幣/鑽石/擁有清單/Q 系列成就進度/streak/暱稱全部改為
+**伺服器端權威、localStorage 只當顯示快取**（未登入玩家維持純本地，接受）。完整 schema/RPC
+定義見 `supabase/migration_20260705.sql`（`player_wallet`/`wallet_earn_log`/
+`wallet_daily_attempts` + `wallet_get`/`wallet_earn`/`wallet_spend_skin`/
+`wallet_unlock_achievement`/`wallet_dev_grant`/`consume_attempt`）與
+`supabase/migration_20260706.sql`（`player_achievements`/`player_streak` +
+`get_player_name`/`record_market_finish`，並擴充前述數支 RPC 一併回傳成就/streak）。
+規劃背景與踩雷見 [WALLET_PLAN.md](WALLET_PLAN.md)。
+
+⚠️ **關鍵設計**：`wallet_unlock_achievement()` 是伺服器**自行查 `player_achievements`/
+`player_streak` 是否達標**才放行，不是「客戶端說達標就給」——早期版本信任客戶端宣稱，
+曾導致同裝置切換 Google 帳號時，一個帳號的假成就進度被拿去誤解鎖另一個帳號的車款
+（2026-07-05 事故，見 CLAUDE.md 待辦 1b）。之後任何「解鎖/發獎勵」類 RPC 新增時，
+都應該讓伺服器自己查權威資料判斷資格，不要只信任客戶端傳的「我達標了」。
+
 ---
 
 ## 3. 資料管線（Data Pipeline）

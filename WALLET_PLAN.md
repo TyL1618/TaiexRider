@@ -1,5 +1,21 @@
 # 伺服器端錢包 + DB 端每日次數上限——實作計畫（2026-07-04 晚拍板）
 
+> ✅ **2026-07-06 追加：暱稱 + Q 系列成就/streak 也搬進資料庫**（`supabase/migration_20260706.sql`）。
+> 背景：2026-07-05 晚發現同裝置切換 Google 帳號會互相污染——暱稱（`taiex_player_name`）、
+> Q 系列成就（`tr_achv_market`）、streak（`tr_daily_streak`）三個裝置共用 localStorage key
+> 不分帳號也不會在登出時清空，且 `wallet_unlock_achievement`（本文件下方第 4 點原規劃的
+> `wallet_unlock`）當時就是照「v1 先信任客戶端宣稱」的設計走，導致 tommyisboy08@gmail.com
+> 測試帳號被裝置上另一帳號（開發者測試帳號）留下的假進度誤解鎖 Q 車款（伺服器端真實資料，
+> 使用者已手動 SQL 清除）。修法：新增 `get_player_name()`／`player_achievements`／
+> `player_streak`／`record_market_finish()`，`wallet_get()`/`consume_attempt()`/
+> `wallet_dev_grant()` 一併擴充回傳這些欄位；**`wallet_unlock_achievement()` 改成伺服器
+> 自行查 `player_achievements`/`player_streak` 是否真的達標**，不再是「客戶端說達標就給」
+> ——這正補上本文件第 4 點當初就承認的已知風險（v1 只信任客戶端宣稱）。`auth.ts signOut()`
+> 也補上暱稱/錢包/成就/streak 全部歸零。同時跑了一次性資料清零 SQL（不進 migration 檔案），
+> 把除了 tyl161803@gmail.com 以外所有玩家的金幣/鑽石/車庫/成就歸零，防漏網測試者受汙染影響。
+> 使用者已跑完兩份 SQL 並真機用兩個帳號交叉驗證通過。詳見 CLAUDE.md 待辦 1b、
+> NEXT_BATCH_PLAN.md 批次 1。
+>
 > ✅ **2026-07-04 當晚已提前實作完成**（使用者：「不用等 7/5，現在就處理」）。
 > `supabase/migration_20260705.sql` 已寫好（**⚠️ 待使用者在 Supabase SQL Editor 手動跑才生效**，
 > push 不會更新 DB），客戶端（garage.ts/App.tsx/Garage.tsx/GameCanvas.tsx/DailyChallenge.tsx/
