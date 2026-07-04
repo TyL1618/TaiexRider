@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.12.26";
+export const APP_VERSION = "0.12.27";
 
 export interface ChangelogEntry {
   date: string;
@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    date: "2026-07-04 (v0.12.27)",
+    notes: [
+      "P1 赤紅暴走／P2 銀河鍍鉻正式開放測試：車庫「鑽石車款」區塊可直接購買裝備（P3~P5 仍敬請期待）",
+      "新增鑽石軟通貨（目前無任何獲取管道，僅開發者測試帳號會補滿）",
+      "復古咖啡騎士／街頭通勤小白改回金幣購買（原免費），街頭通勤小白移除「」符號",
+    ],
+  },
   {
     date: "2026-07-04 (v0.12.26)",
     notes: [

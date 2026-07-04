@@ -20,7 +20,7 @@ import { getPlayerName } from "./lib/playerId";
 import { dailyKey } from "./data/pick";
 import { setPlaying } from "./pwa";
 import { logEvent, type AnalyticsMode } from "./lib/analytics";
-import { addCoins, getCoins } from "./lib/garage";
+import { addCoins, getCoins, addDiamonds, getDiamonds } from "./lib/garage";
 import { recordRun } from "./lib/quests";
 import { resolveMarketMood, type MarketMood } from "./lib/marketMood";
 import { recordFinish, devSetProgress, Q1_BULL_TARGET, Q2_BEAR_TARGET, Q3_STREAK_TARGET } from "./lib/achievements";
@@ -58,12 +58,13 @@ export default function App() {
     return onAuthStateChange(setUser);
   }, []);
 
-  // 開發者測試帳號：登入即補滿金幣＋直接解鎖 Q 系列成就進度，方便真機測車庫購買/裝備/
+  // 開發者測試帳號：登入即補滿金幣+鑽石＋直接解鎖 Q 系列成就進度，方便真機測車庫購買/裝備/
   // 解鎖 UI 不用真的刷任務、真的等大漲大跌日、真的連續玩 30 天。
-  // 純前端 email 比對，不是安全機制（金幣/成就沒有排行榜/競技意義，不影響公平性）。
+  // 純前端 email 比對，不是安全機制（金幣/鑽石/成就沒有排行榜/競技意義，不影響公平性）。
   useEffect(() => {
     if (user?.email !== "tyl161803@gmail.com") return;
     if (getCoins() < 99999) addCoins(99999 - getCoins());
+    if (getDiamonds() < 99999) addDiamonds(99999 - getDiamonds());
     devSetProgress(Q1_BULL_TARGET, Q2_BEAR_TARGET);
     resolveSessionDate(dailyKey()).then((key) => devForceStreak(key, Q3_STREAK_TARGET));
   }, [user]);

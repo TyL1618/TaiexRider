@@ -9,6 +9,11 @@
   margin-bottom: 0.3rem;
 }
 
+.garage-diamonds {
+  color: #c9a8ff;
+  margin-bottom: 0.5rem;
+}
+
 .garage-intro {
   font-size: 0.78rem;
   color: var(--text-dim);
@@ -117,6 +122,7 @@
 }
 
 .garage-btn.buy { background: var(--neon-amber); }
+.garage-btn.buy-diamond { background: #c9a8ff; }
 .garage-btn.disabled { opacity: 0.4; cursor: default; }
 .garage-btn:not(.disabled):active { transform: scale(0.96); }
 
@@ -150,12 +156,6 @@
 
 .garage-preview-locked {
   font-size: 1.8rem;
-}
-
-.garage-preview-paid img {
-  width: 100%;
-  object-fit: contain;
-  filter: grayscale(0.4) brightness(0.75);
 }
 
 .achv-progress-track {

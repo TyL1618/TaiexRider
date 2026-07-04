@@ -12,7 +12,8 @@ export interface BikeSkin {
   id: string;
   name: string;
   desc: string;
-  price: number; // 0 = 免費／非金幣購買（一開始就擁有，除非 locked）；> 0 = 金幣購買
+  price: number; // 0 = 免費（一開始就擁有，除非 locked）；> 0 = 依 currency 花費金幣或鑽石購買
+  currency?: "coin" | "diamond"; // 預設 "coin"；"diamond" = 鑽石車款（IAP 概念先用鑽石代替，見 garage.ts 頂部說明）
   locked?: boolean; // true＝即使 price===0 也不自動擁有，須靠 unlockAchievementSkin() 解鎖（Q 系列）
   hueRotateDeg: number; // 無 src 時套用；有 src 則忽略
   src?: string;             // 相對 BASE_URL 的圖檔路徑
@@ -21,11 +22,14 @@ export interface BikeSkin {
   spriteOffsetY?: number;   // 覆蓋 BIKE.spriteOffsetY
 }
 
-// 車款分級定案（2026-07-03 使用者拍板）：
-//   B（基本款）＝免費（price:0，同 default 開局即有）
+// 車款分級定案（2026-07-04 使用者更新拍板，取代 2026-07-03 舊版）：
+//   B（基本款）＝金幣購買（原本免費，使用者改口收金幣，見下方 b1/b2 的 price）
 //   Q（任務解鎖款）＝成就條件解鎖，**不是**用金幣買（欄位/機制留待 Q 系列圖到位時再設計，
 //     避免現在建沒東西可用的空機制）
-//   P（付費款）＝真錢 IAP（Google Play Billing），非金幣購買；價格待 Grok 生圖完成後決定
+//   P（鑽石車款）＝正式上線後走真錢 IAP（Google Play Billing），**目前 Billing 未接**，
+//     先用「鑽石」這個新軟通貨頂替（見下方 DIAMONDS_KEY）。鑽石目前沒有任何獲取方式
+//     （無廣告/任務/完賽獎勵），只有開發者測試帳號會補到 99999——等 IAP 接上後才會有
+//     正式的「花台幣買鑽石」購買頁，屆時鑽石車款的真實售價/是否保留鑽石中介層再決定。
 // 2026-07-04：五台車重新量測（原圖全數重生，來源＝public/bikes/Grok_Original/ →
 // For_Gaming/ 手動去背+去底部陰影 → 這裡的成品）。改用 OpenCV HoughCircles 直接在
 // alpha 遮罩上找兩個輪胎圓（純幾何、不吃顏色），不再靠色塊偵測——q1/q3 車身裝飾跟
@@ -36,12 +40,12 @@ export const BIKE_SKINS: BikeSkin[] = [
   { id: "default", name: "原廠霓虹", desc: "出廠標準塗裝", price: 0, hueRotateDeg: 0 },
   {
     id: "b2-cafe-racer", name: "復古咖啡騎士", desc: "橘棕配色 + 皮革坐墊，復古跑車魂",
-    price: 0, hueRotateDeg: 0, src: "bikes/b2-cafe-racer.png",
+    price: 200, hueRotateDeg: 0, src: "bikes/b2-cafe-racer.png",
     spriteW: 75.3, spriteOffsetX: -0.3, spriteOffsetY: -5.6,
   },
   {
-    id: "b1-street-white", name: "街頭通勤「小白」", desc: "簡潔白色速克達，親民出廠首選",
-    price: 0, hueRotateDeg: 0, src: "bikes/b1-street-white.png",
+    id: "b1-street-white", name: "街頭通勤小白", desc: "簡潔白色速克達，親民出廠首選",
+    price: 150, hueRotateDeg: 0, src: "bikes/b1-street-white.png",
     spriteW: 83.8, spriteOffsetX: -1.1, spriteOffsetY: -8.3,
   },
   // Q 系列（任務解鎖，locked:true＝不自動擁有，靠 unlockAchievementSkin() 解鎖，
@@ -61,9 +65,23 @@ export const BIKE_SKINS: BikeSkin[] = [
     price: 0, locked: true, hueRotateDeg: 0, src: "bikes/q3-phoenix.png",
     spriteW: 80.0, spriteOffsetX: -1.5, spriteOffsetY: -5.7,
   },
+  // 鑽石車款（P 系列，2 台已生圖可測；P3~P5 尚未生圖，維持 Garage.tsx 的「敬請期待」清單）。
+  // 量測方式同 Q 系列：OpenCV HoughCircles 找 alpha 遮罩上的兩個輪胎圓，換算 spriteW/offsetX/Y；
+  // 價格為暫定佔位值（IAP 真實定價待 Billing 接上後再決定，見上方註解）。
+  {
+    id: "p1-crimson", name: "赤紅暴走", desc: "旗艦全整流罩仿賽，霓虹紅賽車魂",
+    price: 300, currency: "diamond", hueRotateDeg: 0, src: "bikes/p1-crimson.png",
+    spriteW: 74.7, spriteOffsetX: -0.2, spriteOffsetY: -5.7,
+  },
+  {
+    id: "p2-galaxy", name: "銀河鍍鉻", desc: "鏡面鍍鉻概念車，內嵌流轉星河",
+    price: 380, currency: "diamond", hueRotateDeg: 0, src: "bikes/p2-galaxy.png",
+    spriteW: 73.3, spriteOffsetX: -0.4, spriteOffsetY: -2.7,
+  },
 ];
 
 const COINS_KEY = "tr_garage_coins";
+const DIAMONDS_KEY = "tr_garage_diamonds";
 const OWNED_KEY = "tr_garage_owned";
 const ACTIVE_KEY = "tr_garage_active";
 
@@ -81,6 +99,24 @@ export function addCoins(n: number): number {
   try {
     localStorage.setItem(COINS_KEY, String(next));
   } catch { /* localStorage 不可用時略過 */ }
+  return next;
+}
+
+// 鑽石：目前沒有任何獲取管道（無廣告/任務/完賽獎勵），只有開發者測試帳號會補滿——
+// 之後接上 IAP 購買頁才會開放一般玩家取得。
+export function getDiamonds(): number {
+  try {
+    return parseInt(localStorage.getItem(DIAMONDS_KEY) ?? "0", 10) || 0;
+  } catch {
+    return 0;
+  }
+}
+
+export function addDiamonds(n: number): number {
+  const next = Math.max(0, getDiamonds() + n);
+  try {
+    localStorage.setItem(DIAMONDS_KEY, String(next));
+  } catch { /* 靜默 */ }
   return next;
 }
 
@@ -114,13 +150,19 @@ export function unlockAchievementSkin(id: string): boolean {
   return true;
 }
 
-// 購買：餘額足夠才扣款+加入擁有清單，回傳是否成功
+// 購買：餘額足夠才扣款+加入擁有清單，回傳是否成功（依 currency 欄位扣金幣或鑽石）
 export function purchaseSkin(id: string): boolean {
   if (isOwned(id)) return true;
   const skin = BIKE_SKINS.find((s) => s.id === id);
   if (!skin) return false;
-  if (getCoins() < skin.price) return false;
-  addCoins(-skin.price);
+  const currency = skin.currency ?? "coin";
+  if (currency === "diamond") {
+    if (getDiamonds() < skin.price) return false;
+    addDiamonds(-skin.price);
+  } else {
+    if (getCoins() < skin.price) return false;
+    addCoins(-skin.price);
+  }
   const owned = getOwnedSkins();
   owned.push(id);
   try {

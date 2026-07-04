@@ -267,7 +267,7 @@ src/
 │   ├── DailyChallenge.tsx # 每日排名賽（地圖預覽 + 排行榜 + streak + 每日任務 + 死亡熱點）
 │   ├── ClassicSelect.tsx  # 經典模式（12 條靜態關卡 + 事件說明 + 獎牌制）
 │   ├── RandomSlot.tsx     # 隨機拉霸（Supabase pool，30 格 × 8 = 240 DOM nodes）
-│   ├── Garage.tsx         # 車庫（B/Q/P 車皮列表 + 金幣 + 看廣告拿金幣 + 成就進度）
+│   ├── Garage.tsx         # 車庫（B/Q/鑽石車款列表 + 金幣/鑽石 + 看廣告拿金幣 + 成就進度）
 │   └── StatsScreen.tsx    # 隱藏統計頁（連點版本號 5 下開啟，admin_stats RPC）
 ├── TrackSelect.tsx        # 自選賽道（Supabase ~1000 支 + 無限捲動 30/次）
 ├── data/
@@ -286,7 +286,7 @@ src/
 │   ├── challengeAttempts.ts  # 每日排名賽挑戰次數（localStorage，MAX 5 / FREE 2）
 │   ├── ads.ts                # TWA 環境偵測 + AdSense/AdMob 雙軌 scaffold + 看廣告拿金幣 stub
 │   ├── adRewards.ts          # 看廣告拿金幣每日次數上限（車庫頁+結算畫面共用計數）
-│   ├── garage.ts             # 車皮清單（BIKE_SKINS）+ 金幣 + 擁有/裝備邏輯
+│   ├── garage.ts             # 車皮清單（BIKE_SKINS）+ 金幣/鑽石雙通貨 + 擁有/裝備邏輯
 │   ├── achievements.ts       # Q 系列成就進度（大漲/大跌完賽次數，streak 沿用 streak.ts）
 │   ├── quests.ts             # 每日任務池（seeded by 裝置本地日曆日）
 │   ├── streak.ts             # 每日排名賽連續參賽天數
@@ -332,9 +332,9 @@ src/
 | Phase 6 | ✅ v0.8–0.9 | 音效（Web Audio API）、夜景城市背景、難度星等 HUD、爆炸粒子強化 |
 | Phase 7 | 🟡 封測中 | TWA 打包上架（手動 Android Studio）；全螢幕 immersive ✅ 已完成；Google Play **封閉測試**（門檻：12 名測試者 + 連續 14 天，2026-06-25 起算，7/8 滿 14 天） |
 | Phase 8 | ✅ | v0.9.4 連假讀取/排行榜跨連假同榜修正（`max(map_date ≤ 今天)`）；**v0.10 經典模式**（12 條歷史盤勢靜態關卡）；**v0.11 經典紀錄保持者**（`classic_records`，每關單一保持者）、返回離開改「再按一次返回鍵」、暱稱顯示寬度限長（12 寬）、每日長征 5 股預覽圖、開機深色霓虹 splash；**v0.12.0~6 懸空公平計時 + 每日排名賽每日 5 次上限 + 死後原地復活 + App 捷徑/splash 品牌圖/預測性返回（vc10，已真機驗證）** |
-| Phase 9 | ✅ | **v0.12.7~24 留存批次**：完美落地計分定案、PB 突破/streak、經典獎牌制、分享圖卡、全服死亡熱點（漸層線視覺）、隱藏統計頁、卡縫脫困 watchdog、**車庫系統**（軟通貨+B/Q 共 5 台正式車皮上線、P 系列待生圖+Billing）、每日任務、全站盤勢主題氛圍、看廣告拿金幣（stub，每日 2 次+20 金幣）、Q 系列成就進度自動解鎖裝備 |
+| Phase 9 | ✅ | **v0.12.7~27 留存批次**：完美落地計分定案、PB 突破/streak、經典獎牌制、分享圖卡、全服死亡熱點（漸層線視覺）、隱藏統計頁、卡縫脫困 watchdog、**車庫系統**（金幣/鑽石雙通貨+B/Q/鑽石車款共 7 台正式車皮上線，P3~P5 待生圖+Billing）、每日任務、全站盤勢主題氛圍、看廣告拿金幣（stub，每日 2 次+20 金幣）、Q 系列成就進度自動解鎖裝備 |
 
-> **🟠 待辦（正式上架後）**：反作弊機制完全未實作（見 [ANTICHEAT_DESIGN.md](ANTICHEAT_DESIGN.md)，2026-07-03 已拍板要做，Fable 5 負責）；廣告 AdMob/AdSense 真實串接；P 系列付費車款（需美術+Google Play Billing）；殼版本更新提示（v0.9.5b 設計，明確延後）。
+> **🟠 待辦（正式上架後）**：反作弊機制完全未實作（見 [ANTICHEAT_DESIGN.md](ANTICHEAT_DESIGN.md)，2026-07-03 已拍板要做，Fable 5 負責）；廣告 AdMob/AdSense 真實串接；鑽石車款 P3~P5（需美術+Google Play Billing+鑽石購買頁）；殼版本更新提示（v0.9.5b 設計，明確延後）；**清空伺服器所有玩家遊戲數據**（daily_scores/classic_records/events，但保留已註冊 Google 帳號，2026-07-04 使用者交代）。
 
 ---
 

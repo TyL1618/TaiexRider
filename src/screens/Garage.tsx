@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { BIKE_SKINS, getCoins, isOwned, getActiveSkinId, purchaseSkin, setActiveSkin, addCoins, unlockAchievementSkin, type BikeSkin } from "../lib/garage";
+import { BIKE_SKINS, getCoins, getDiamonds, isOwned, getActiveSkinId, purchaseSkin, setActiveSkin, addCoins, unlockAchievementSkin, type BikeSkin } from "../lib/garage";
 import { requestRewardedCoins } from "../lib/ads";
 import { AD_COIN_REWARD, MAX_AD_COIN_CLAIMS_PER_DAY, getAdCoinClaims, incrementAdCoinClaims } from "../lib/adRewards";
 import { getAchievementBikes, type AchvBikeView } from "../lib/achievements";
@@ -10,12 +10,10 @@ import CoinIcon from "../components/CoinIcon";
 import "../TrackSelect.css";
 import "./Garage.css";
 
-// 付費車款（P 系列）：真錢 IAP（Google Play Billing），非金幣購買，設計見 GARAGE_DESIGN.md。
-// 定價/Billing 都還沒定案，按鈕一律 disabled；美術到位的先放圖預覽（不算解鎖），
-// 沒圖的維持 💎 佔位圖示。
-const PAID_BIKES = [
-  { id: "p1-crimson", name: "赤紅暴走", desc: "旗艦全整流罩仿賽，霓虹紅賽車魂", src: "bikes/p1-crimson.png" },
-  { id: "p2-galaxy", name: "銀河鍍鉻", desc: "鏡面鍍鉻概念車，內嵌流轉星河", src: "bikes/p2-galaxy.png" },
+// 鑽石車款（P 系列）尚未生圖的部分：真錢 IAP（Google Play Billing）接上前，
+// 連鑽石購買都還沒美術可放，維持「敬請期待」佔位卡。已生圖的 P1/P2 已登記進
+// garage.ts 的 BIKE_SKINS（currency:"diamond"），走一般購買流程，不在這份清單。
+const PAID_BIKES_COMING_SOON = [
   { id: "p3-gold", name: "黃金大亨", desc: "黑金巡航旗艦，排行榜霸主座駕" },
   { id: "p4-samurai", name: "電馭武士", desc: "電馭武士甲，冰藍電路紋" },
   { id: "p5-phantom", name: "幽靈匿蹤", desc: "暗夜匿蹤，血色微光" },
@@ -23,6 +21,7 @@ const PAID_BIKES = [
 
 export default function Garage({ onBack }: { onBack: () => void }) {
   const [coins, setCoins] = useState(() => getCoins());
+  const [diamonds, setDiamonds] = useState(() => getDiamonds());
   const [active, setActive] = useState(() => getActiveSkinId());
   const [watchingAd, setWatchingAd] = useState(false);
   const [adClaims, setAdClaims] = useState(() => getAdCoinClaims(dailyKey()));
@@ -56,6 +55,7 @@ export default function Garage({ onBack }: { onBack: () => void }) {
   const handleBuy = (id: string) => {
     if (purchaseSkin(id)) {
       setCoins(getCoins());
+      setDiamonds(getDiamonds());
       forceRender((n) => n + 1);
     }
   };
@@ -80,6 +80,9 @@ export default function Garage({ onBack }: { onBack: () => void }) {
   const renderSkinCard = (s: BikeSkin) => {
     const owned = isOwned(s.id);
     const equipped = active === s.id;
+    const currency = s.currency ?? "coin";
+    const balance = currency === "diamond" ? diamonds : coins;
+    const afford = balance >= s.price;
     return (
       <div key={s.id} className={`garage-card${equipped ? " equipped" : ""}`}>
         <div className="garage-preview">
@@ -102,11 +105,11 @@ export default function Garage({ onBack }: { onBack: () => void }) {
             </button>
           ) : (
             <button
-              className={`garage-btn buy${coins < s.price ? " disabled" : ""}`}
-              disabled={coins < s.price}
+              className={`garage-btn buy${currency === "diamond" ? " buy-diamond" : ""}${afford ? "" : " disabled"}`}
+              disabled={!afford}
               onClick={() => handleBuy(s.id)}
             >
-              購買・{s.price} 金幣
+              購買・{s.price} {currency === "diamond" ? "鑽石" : "金幣"}
             </button>
           )}
         </div>
@@ -119,6 +122,7 @@ export default function Garage({ onBack }: { onBack: () => void }) {
       <button className="back-btn" onClick={onBack}>‹ 返回</button>
       <h1 className="select-title">車庫</h1>
       <p className="garage-coins"><CoinIcon size={22} /> 金幣 {coins}</p>
+      <p className="garage-coins garage-diamonds">💎 鑽石 {diamonds}</p>
       <p className="garage-intro">完賽/摔車與每日任務都能賺金幣，解鎖車皮換上場</p>
       <button
         className="garage-ad-btn"
@@ -133,7 +137,7 @@ export default function Garage({ onBack }: { onBack: () => void }) {
       </button>
 
       <div className="garage-list">
-        {BIKE_SKINS.filter((s) => !s.locked).map(renderSkinCard)}
+        {BIKE_SKINS.filter((s) => !s.locked && s.currency !== "diamond").map(renderSkinCard)}
       </div>
 
       <h2 className="garage-section-title">🎯 任務解鎖車款</h2>
@@ -161,19 +165,14 @@ export default function Garage({ onBack }: { onBack: () => void }) {
         })}
       </div>
 
-      <h2 className="garage-section-title">💎 付費車款</h2>
+      <h2 className="garage-section-title">💎 鑽石車款</h2>
       <div className="garage-list">
-        {PAID_BIKES.map((p) => (
+        {BIKE_SKINS.filter((s) => s.currency === "diamond").map(renderSkinCard)}
+        {PAID_BIKES_COMING_SOON.map((p) => (
           <div key={p.id} className="garage-card locked">
-            {"src" in p && p.src ? (
-              <div className="garage-preview garage-preview-paid">
-                <img src={`${import.meta.env.BASE_URL}${p.src}`} alt={p.name} />
-              </div>
-            ) : (
-              <div className="garage-preview garage-preview-locked">
-                <span className="garage-lock-icon">💎</span>
-              </div>
-            )}
+            <div className="garage-preview garage-preview-locked">
+              <span className="garage-lock-icon">💎</span>
+            </div>
             <div className="garage-card-body">
               <div className="garage-card-name">{p.name}</div>
               <div className="garage-card-desc">{p.desc}</div>
