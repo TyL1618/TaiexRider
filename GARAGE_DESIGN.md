@@ -7,6 +7,14 @@
 > - **q2-bear（空頭獵手）**：毒液綠輪圈跟暗綠/黑車身色相區隔夠大，色塊偵測乾淨，量測結果可信。已登記上線。
 > - **q3-phoenix（不死鳥）**：金色輪圈跟「熔金鳳凰」車身同色系，前輪量測受車體火焰裝飾污染，cyPct 用後輪對稱值人工校正（非純自動算出）。已登記上線但**⚠️ 真機/可見視窗需比對輪子是否貼地，可能要再微調 offsetY**。
 > - **q1-bull（多頭鬥牛）✅ 2026-07-03 深夜已登記上線**：改良版 prompt（明講禁側箱/panniers+chart 圖案移到油箱+輪圈金色）重生兩次才成功（第一次跑出 123RF 圖庫浮水印，判斷是生圖模型記憶體洩漏，重生一次就消失；第二次仍是側箱擋輪，判斷是「chart on side panel」措辭跟側箱造型互相誘發，改成禁側箱的硬性條件+chart 畫在油箱上才解決）。最終版兩輪色塊偵測乾淨、跟規格座標誤差 <2%（量測結果見下方 BIKE_SKINS 註解）。
+> **狀態更新（2026-07-04，v0.12.26）：原圖來源改為三個版控資料夾，取代 `public/bikes/raw/`**。
+> 前情提要：v0.12.26 曾嘗試寫自動去背腳本重跑全部車皮，結果把圖弄壞，6 分鐘內整包 revert（`c84f3f7`→`90d1247`）。
+> 使用者之後手動處理圖檔、重新建立更嚴格的資料夾規範，**這三個資料夾禁止 Claude 修改或覆蓋，只能讀取**：
+> - `public/bikes/Grok_Original/`：Grok 生成的原始白底圖（JPEG），最上游來源。
+> - `public/bikes/For_Lobby/`：使用者手動去背，**保留車底陰影**，給首頁高解析展示框（`bikes/hires/`）用。
+> - `public/bikes/For_Gaming/`：使用者手動去背＋**去除車底陰影**，給遊戲內貼圖（`spriteW`/`offsetX`/`offsetY` 對齊物理輪位）用。
+> 三個資料夾都已進版控（不再 gitignore）——先前 `raw/` 沒進版控，一旦處理壞掉就無法復原，這次改保留原圖避免重蹈覆轍。
+> 量測方式也改良：用 OpenCV `HoughCircles` 直接在 alpha 遮罩上偵測兩個輪胎圓（純幾何、不吃顏色），車身裝飾跟輪圈同色系（q1/q3 都踩過這雷）也不受影響。offsetY 的地板間隙補償從憑經驗的固定值，改成用「量到的輪胎視覺半徑 − 物理 wheelRadius=6」算出來的精確值。B1/B2/Q1/Q2/Q3 五台＋新增的 P1/P2 都已重新處理上線（P1/P2 尚未接 Billing，車庫「付費車款」區塊先用真圖預覽取代 💎 佔位圖示，按鈕仍 disabled）。
 
 ---
 
@@ -77,7 +85,7 @@ distinct bright ring against the dark red bodywork (not another shade of
 red/orange). Embodiment of a raging, prosperous bull market.
 ```
 
-生完一樣去背 → 放進 `public/bikes/raw/`（跟之前 B1/B2/Q2/Q3 同一個資料夾）→ 跟 Claude 說一聲即可重跑量測流程登記上線。
+生完先丟 `public/bikes/Grok_Original/`，使用者手動去背成 `public/bikes/For_Lobby/`（留車底陰影）＋ `public/bikes/For_Gaming/`（去車底陰影）兩份 → 跟 Claude 說一聲即可重跑量測流程登記上線（流程見文件開頭 2026-07-04 狀態更新）。
 
 ---
 

@@ -26,45 +26,40 @@ export interface BikeSkin {
 //   Q（任務解鎖款）＝成就條件解鎖，**不是**用金幣買（欄位/機制留待 Q 系列圖到位時再設計，
 //     避免現在建沒東西可用的空機制）
 //   P（付費款）＝真錢 IAP（Google Play Billing），非金幣購買；價格待 Grok 生圖完成後決定
+// 2026-07-04：五台車重新量測（原圖全數重生，來源＝public/bikes/Grok_Original/ →
+// For_Gaming/ 手動去背+去底部陰影 → 這裡的成品）。改用 OpenCV HoughCircles 直接在
+// alpha 遮罩上找兩個輪胎圓（純幾何、不吃顏色），不再靠色塊偵測——q1/q3 車身裝飾跟
+// 輪圈同色系時色塊法會誤判，圓形偵測不受影響。offsetY 的地板間隙補償也改成算出來的
+// （量到的輪胎視覺半徑 − 物理 wheelRadius=6，換算成 local 單位後從 offsetY 扣除），
+// 不再是憑經驗的固定 -2。量測腳本用完即丟，未進版控。
 export const BIKE_SKINS: BikeSkin[] = [
   { id: "default", name: "原廠霓虹", desc: "出廠標準塗裝", price: 0, hueRotateDeg: 0 },
-  // 輪圈位置由 rear/front 橘色光暈色塊中心點量測（1168×784 原圖 17.84%/79.86%w,
-  // 71.8~73.9%h），換算成對齊物理輪子（wheelBaseHalf=22, wheelDropY=7）的 scale+offset。
-  // 2026-07-03：真機回報視覺輪胎陷入地板（AI 生圖的輪胎視覺半徑比物理輪子
-  // wheelRadius=6 大一圈，輪心對齊後輪胎底部仍會疊進地板線）。offsetY 在原量測值
-  // 上再往上補償一點地板線厚度（-2 上下，依 spriteW 等比放大），非重新量測。
   {
     id: "b2-cafe-racer", name: "復古咖啡騎士", desc: "橘棕配色 + 皮革坐墊，復古跑車魂",
     price: 0, hueRotateDeg: 0, src: "bikes/b2-cafe-racer.png",
-    spriteW: 71, spriteOffsetX: 0.8, spriteOffsetY: -6.0,
+    spriteW: 75.3, spriteOffsetX: -0.3, spriteOffsetY: -5.6,
   },
-  // 輪圈位置由 rear/front 青色光暈色塊中心點量測（23.92%/77.81%w, 71.0~71.1%h）。
   {
     id: "b1-street-white", name: "街頭通勤「小白」", desc: "簡潔白色速克達，親民出廠首選",
     price: 0, hueRotateDeg: 0, src: "bikes/b1-street-white.png",
-    spriteW: 82, spriteOffsetX: -0.7, spriteOffsetY: -6.7,
+    spriteW: 83.8, spriteOffsetX: -1.1, spriteOffsetY: -8.3,
   },
   // Q 系列（任務解鎖，locked:true＝不自動擁有，靠 unlockAchievementSkin() 解鎖，
-  // 見 achievements.ts 對應同一組 id）。輪圈位置由 scripts 暫存量測腳本（色塊偵測，
-  // 未進版控）算出，換算方式同 B 系列（含 -2 上下地板間隙補償，已含 spriteW 等比放大）。
-  // 2026-07-03：q1-bull 重生後（改 no-saddlebags + chart 移到油箱）色塊偵測乾淨，
-  // 兩輪中心誤差 <2%（17.71%/84.23%w 對比規格 15.6%/84.4%w），量測結果可信。
+  // 見 achievements.ts 對應同一組 id）。
   {
     id: "q1-bull", name: "多頭鬥牛", desc: "深紅巡航塗裝，金色輪圈燃燒多頭氣勢",
     price: 0, locked: true, hueRotateDeg: 0, src: "bikes/q1-bull.png",
-    spriteW: 66, spriteOffsetX: -0.6, spriteOffsetY: -4.7,
+    spriteW: 67.8, spriteOffsetX: -0.8, spriteOffsetY: -5.0,
   },
   {
     id: "q2-bear", name: "空頭獵手", desc: "暗夜獵殺者塗裝，毒液綠電路紋",
     price: 0, locked: true, hueRotateDeg: 0, src: "bikes/q2-bear.png",
-    spriteW: 71, spriteOffsetX: -0.1, spriteOffsetY: -3.8,
+    spriteW: 72.0, spriteOffsetX: -0.3, spriteOffsetY: -4.4,
   },
-  // q3-phoenix 前輪量測受車體火焰裝飾同色污染，cyPct 用後輪對稱值人工校正
-  // （非純色塊自動算出），⚠️ 真機/preview 需比對輪子是否貼地確認。
   {
     id: "q3-phoenix", name: "不死鳥", desc: "熔金鳳凰塗裝，浴火重生",
     price: 0, locked: true, hueRotateDeg: 0, src: "bikes/q3-phoenix.png",
-    spriteW: 77, spriteOffsetX: 0.0, spriteOffsetY: -5.0,
+    spriteW: 80.0, spriteOffsetX: -1.5, spriteOffsetY: -5.7,
   },
 ];
 

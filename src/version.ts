@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.12.25";
+export const APP_VERSION = "0.12.26";
 
 export interface ChangelogEntry {
   date: string;
@@ -6,6 +6,12 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    date: "2026-07-04 (v0.12.26)",
+    notes: [
+      "五台車皮（含新生出的 P1 赤紅暴走／P2 銀河鍍鉻）重新對齊輪位，車庫付費車款區塊先秀真圖預覽",
+    ],
+  },
   {
     date: "2026-07-04 (v0.12.25)",
     notes: [

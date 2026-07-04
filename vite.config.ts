@@ -58,6 +58,10 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ["**/*.{js,css,html,svg,png,woff2}"],
+        // 車皮原始圖檔資料夾（Grok_Original/For_Lobby/For_Gaming）只是量測/處理用的
+        // 素材，遊戲實際只讀 public/bikes/{id}.png 與 public/bikes/hires/{id}.png，
+        // 排除在 PWA 離線快取外，不然每個原圖 500KB~1MB、全部掃進去會讓 SW 預快取暴增。
+        globIgnores: ["bikes/For_Gaming/**", "bikes/For_Lobby/**", "bikes/Grok_Original/**"],
         // 不設 skipWaiting：prompt 模式需要等待中的新 SW 才能觸發 onNeedRefresh，
         // 由 updateSW(true) 在適當時機（非遊玩中）主動 skipWaiting + reload。
         runtimeCaching: [

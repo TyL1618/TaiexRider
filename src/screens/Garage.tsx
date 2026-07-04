@@ -11,10 +11,11 @@ import "../TrackSelect.css";
 import "./Garage.css";
 
 // 付費車款（P 系列）：真錢 IAP（Google Play Billing），非金幣購買，設計見 GARAGE_DESIGN.md。
-// 美術＋定價都還沒定案，先做 UI 殼＋「敬請期待」佔位，Billing 串接前按鈕一律 disabled。
+// 定價/Billing 都還沒定案，按鈕一律 disabled；美術到位的先放圖預覽（不算解鎖），
+// 沒圖的維持 💎 佔位圖示。
 const PAID_BIKES = [
-  { id: "p1-crimson", name: "赤紅暴走", desc: "旗艦全整流罩仿賽，霓虹紅賽車魂" },
-  { id: "p2-galaxy", name: "銀河鍍鉻", desc: "鏡面鍍鉻概念車，內嵌流轉星河" },
+  { id: "p1-crimson", name: "赤紅暴走", desc: "旗艦全整流罩仿賽，霓虹紅賽車魂", src: "bikes/p1-crimson.png" },
+  { id: "p2-galaxy", name: "銀河鍍鉻", desc: "鏡面鍍鉻概念車，內嵌流轉星河", src: "bikes/p2-galaxy.png" },
   { id: "p3-gold", name: "黃金大亨", desc: "黑金巡航旗艦，排行榜霸主座駕" },
   { id: "p4-samurai", name: "電馭武士", desc: "電馭武士甲，冰藍電路紋" },
   { id: "p5-phantom", name: "幽靈匿蹤", desc: "暗夜匿蹤，血色微光" },
@@ -164,9 +165,15 @@ export default function Garage({ onBack }: { onBack: () => void }) {
       <div className="garage-list">
         {PAID_BIKES.map((p) => (
           <div key={p.id} className="garage-card locked">
-            <div className="garage-preview garage-preview-locked">
-              <span className="garage-lock-icon">💎</span>
-            </div>
+            {"src" in p && p.src ? (
+              <div className="garage-preview garage-preview-paid">
+                <img src={`${import.meta.env.BASE_URL}${p.src}`} alt={p.name} />
+              </div>
+            ) : (
+              <div className="garage-preview garage-preview-locked">
+                <span className="garage-lock-icon">💎</span>
+              </div>
+            )}
             <div className="garage-card-body">
               <div className="garage-card-name">{p.name}</div>
               <div className="garage-card-desc">{p.desc}</div>

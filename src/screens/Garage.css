@@ -152,6 +152,12 @@
   font-size: 1.8rem;
 }
 
+.garage-preview-paid img {
+  width: 100%;
+  object-fit: contain;
+  filter: grayscale(0.4) brightness(0.75);
+}
+
 .achv-progress-track {
   width: 100%;
   height: 6px;
