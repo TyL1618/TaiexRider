@@ -1,8 +1,85 @@
-# TaiexRider 全面資安檢查報告（2026-07-02）
+# TaiexRider 全面資安檢查報告（2026-07-02 首輪 ＋ 2026-07-04 第二輪）
 
 > 範圍：前端（React/PWA）、Supabase（RLS/RPC/VIEW）、GitHub Actions/CI 密鑰、TWA/assetlinks、相依套件、金鑰管理。
 > 由 Fable 5 執行（FABLE5_HANDOFF 資安任務）。結論先講：**沒有發現可直接遠端入侵或竊資的漏洞**；
 > 主要風險集中在「已登入使用者濫用寫入路徑」（作弊/塞爆類），以及一項金鑰管理待確認。
+
+---
+
+## 🔁 2026-07-04 第二輪複查（Fable 5）
+
+> 比照首輪規格重掃一遍，**新增涵蓋**：車庫/金幣（garage.ts、Garage.tsx）、每日任務（quests.ts）、
+> streak/medals/achievements/adRewards、看廣告拿金幣 stub（ads.ts）、開發者測試帳號（App.tsx）、
+> 分享圖卡（shareCard.ts）、死亡熱點（deathHeatmap.ts + RPC）、隱藏統計頁（admin_stats RPC）、
+> 打點（analytics.ts + log_event RPC）。首輪各項狀態變化一併更新。結論：**無新的遠端入侵/竊資面**。
+
+| 等級 | 項目 | 狀態 |
+|------|------|------|
+| 🟢 已改善 | RPC 物理一致性 + 提交冷卻（首輪 🟠「RPC 濫用面」主體） | **反作弊 Phase A 已實作**（`migration_20260704.sql`，⚠️ 待使用者手動跑；含經典 level_id 白名單，順帶修掉任意字串塞列的污染面） |
+| 🟠 設計性現況 | 車庫金幣/擁有清單/任務/streak/成就全為 localStorage，可被使用者端竄改 | 接受（見下），**但 P 系列 IAP 上線前必須搬伺服器端** |
+| 🟡 新攻擊面 | `log_event` RPC anon 可無限呼叫 → events 表灌爆（DB 膨脹） | 封測期接受，正式上架後併 Phase B 處理 |
+| 🟡 未變 | 無 CSP、每日 5 次上限純前端、`cleanup_old_scores_if_needed` anon 可呼叫 | 維持首輪結論（正式上架後處理） |
+| 🔴 未確認 | upload keystore 雲端備份 | 首輪待辦，**仍未見使用者確認**，再次提醒 |
+| 🟢 乾淨 | XSS 重掃（含新增畫面）／密鑰／npm audit prod 0 漏洞 | 無需動作 |
+
+### 車庫/金幣/任務/成就：localStorage 可竄改（設計性現況，非漏洞）
+
+- `tr_garage_coins`（金幣）、`tr_garage_owned`（擁有車皮）、`tr_quest_progress`（每日任務）、
+  `tr_daily_streak`、`tr_achv_market`（Q 系列成就）、`tr_ad_coin_claims_*`（廣告金幣每日 2 次上限）、
+  `tr_pb_*`（獎牌 PB）全部存 localStorage，任何人開 DevTools 都能直接改。
+- **公平性影響：零**——這些數值不進排行榜、不影響計分、不與其他玩家比較，純個人收藏/習慣迴圈。
+  改了只是騙自己，與首輪對「每日 5 次上限」的定位一致。
+- **⚠️ 唯一要當真的邊界：P 系列付費車款（真錢 IAP）**。`isOwned()` 目前讀 localStorage 擁有清單，
+  若 P 系列上線時沿用同一套（把 P 車 id 塞進 `tr_garage_owned` 就能免費解鎖），等於**收入直接漏光**。
+  Google Play Billing 串接時，P 車擁有權必須改為伺服器端驗證（Play Developer API 驗票 or
+  Supabase 表記錄 purchase token 驗證後發放），localStorage 只能當顯示快取。已在此立此存照。
+- 看廣告拿金幣 stub（`ads.ts requestRewardedCoins()` 現在直接 resolve(true)）＋每日 2 次上限也在前端——
+  真廣告 SDK 串接後，「看完才發幣」的 callback 本來就在 SDK/伺服器側，屆時自然收斂，現況接受。
+
+### 開發者測試帳號（App.tsx 明碼 email 比對）
+
+- `tyl161803@gmail.com` 登入時前端自動補滿金幣 99999 + 解鎖 Q 系列成就。email 字串會出現在
+  公開 JS bundle 裡——該 email 本來就是隱私權政策公開聯絡信箱，無新增洩漏；效果僅限 localStorage
+  （金幣/成就），無排行榜/後端影響。**別人就算改自己的 localStorage 冒充也只是改到自己的收藏**，可接受。
+- 後端側的 admin 權限（`admin_stats` RPC）鎖在 Supabase JWT 的 email claim（Google 驗證過），
+  前端比對只是 UX 糖衣，權限模型正確。
+
+### 新增 RPC 複查（migration_20260702b + 20260704）
+
+- `daily_death_heatmap()`：純聚合（20 bucket 死亡計數）、不含個別玩家資訊，anon 可呼叫無隱私疑慮。
+  每次呼叫全掃當日 death events（時區表達式用不到索引），量大時是小型 CPU 濫用面——目前資料量
+  （封測 12 人）可忽略，正式上架後若 events 量大可加 materialized 快取，記錄不動。
+- `admin_stats(p_days)`：security definer + email 硬編碼閘門，非 admin 回 null 不留線索；p_days 有 1~90 夾擠。乾淨。
+- `log_event()`：白名單 + 欄位上限都在，但 **anon 可無限次呼叫**（每列 props 上限 2KB）→
+  惡意腳本可灌爆 events 表（免費方案 500MB）。90 天清理擋不住短時間灌入。封測期網址未公開、
+  攻擊動機低，接受；**正式上架後建議併反作弊 Phase B 加輕量節流**（如同 device_id 每分鐘上限，
+  或 Cloudflare WAF rate limit——後者零 SQL 改動，更省事）。
+- `submit_daily_score` / `submit_classic_record`（Phase A 版）：欄位間物理一致性驗證 + 10s 冷卻 +
+  經典關卡白名單，全部靜默拒絕。上線前已拿線上真實資料回測（27+12 筆，0 誤殺），
+  公式與設計文件的偏差及理由見 `migration_20260704.sql` 檔頭。
+
+### 相依套件（npm audit，與 2026-07-02 基準比對）
+
+- **生產依賴：0 漏洞**（`npm audit --omit=dev`，與首輪相同）。
+- dev 依賴 2 個：esbuild ≤0.24.2（moderate，dev server 任意讀取——首輪已知接受）＋
+  vite ≤6.4.2（因依賴上述 esbuild 被連坐標記）。首輪的 undici/wrangler 項已不在清單（依賴鏈更新後消失）。
+  修復仍需 vite@8 breaking change，封測期維持接受，與首輪結論一致。
+
+### 其他複查結果（乾淨）
+
+- **XSS**：全 src 重掃 `dangerouslySetInnerHTML`/`innerHTML`/`eval`/`new Function` 零匹配；
+  新增畫面（Garage/StatsScreen/展示框）全走 React 轉義；車皮圖檔路徑來自寫死的 `BIKE_SKINS` 清單非使用者輸入。
+- **密鑰**：`.env.local` 確認在 gitignore；repo 內無 service key；`GOOGLE_CLIENT_ID`/anon key 屬設計上公開。
+- **深連結 `?goto=`**：白名單四值比對，無 open redirect / 注入面。
+- **分享圖卡**：離屏 canvas 自繪 + navigator.share，無外部資源注入面。
+- **AdSense 載入**（未啟用）：pub ID 寫死空字串，`loadAdSense` 目前死碼；啟用時 src 由常數組成，無注入面。
+
+### 第二輪待辦彙整
+
+1. **使用者**：Supabase SQL Editor 跑 `supabase/migration_20260704.sql`（反作弊 Phase A）。
+2. **使用者**：確認 keystore + 密碼已雲端備份（首輪 🔴，仍未確認）。
+3. **P 系列 IAP 動工時**：擁有權驗證必須伺服器端（本輪最重要的前瞻性結論）。
+4. **正式上架後**：log_event 節流（併 Phase B）、CSP `_headers`、每日次數上限搬 DB（Phase B）。
 
 ---
 
