@@ -18,7 +18,7 @@
 | 🟢 已改善 | RPC 物理一致性 + 提交冷卻（首輪 🟠「RPC 濫用面」主體） | **反作弊 Phase A 已實作並上線**（`migration_20260704.sql`，使用者 2026-07-04 已跑；含經典 level_id 白名單，順帶修掉任意字串塞列的污染面） |
 | 🟢 已修補 | `log_event` RPC anon 可無限呼叫 → events 表灌爆（DB 膨脹） | **三層節流已實作**（`migration_20260704b.sql`：單 IP 60/分 + 全服 10k/時 + 50k/日，props 上限 2048→512，膨脹絕對上限 ≈ 25MB/天）⚠️ 待使用者跑 |
 | 🟢 已修補 | `cleanup_old_scores_if_needed` anon 可呼叫 | **已收權**（同 migration b），改由每日 CI 帶 service key 呼叫（fetchDailyMap.ts）；cron-job.org 的 cleanup 排程可刪、keepalive 保留 |
-| 🟢 已上線 | 無 CSP / 安全 headers | **`public/_headers` 已加**：nosniff/XFO DENY/Referrer-Policy/Permissions-Policy 直接執法；CSP 先 **Report-Only** 觀察（怕誤擋 GSI 登入），真機確認 console 無違規後改名轉正（檔內有說明） |
+| 🟢 已上線 | 無 CSP / 安全 headers | **`public/_headers` 已加**：nosniff/XFO DENY/Referrer-Policy/Permissions-Policy＋**CSP 已正式執法**（先 Report-Only 部署，使用者真機走完登入/遊玩/分享全流程 console 零違規後轉正，2026-07-04 晚） |
 | 🟢 已上線 | GitHub Actions 未 pin SHA（首輪供應鏈潔癖項） | checkout / setup-node 已 pin 到 commit SHA |
 | 🟠 已拍板 | 車庫金幣/擁有清單/任務/streak/成就全為 localStorage，可被使用者端竄改 | **使用者 2026-07-04 晚拍板：伺服器端錢包，7/5 動工**（方案細節見 [WALLET_PLAN.md](WALLET_PLAN.md)） |
 | 🟡 已拍板 | 每日 5 次挑戰上限純前端（清 localStorage 可繞過） | `consume_attempt` RPC **與錢包同一批（7/5）做**（WALLET_PLAN.md 第 5 項） |
@@ -91,7 +91,7 @@
 1. ✅ `migration_20260704.sql`（反作弊 Phase A）——使用者已跑，真機驗證成績正常上榜。
 2. **使用者**：Supabase SQL Editor 跑 **`migration_20260704b.sql`**（log_event 節流 + cleanup 收權）。
 3. **使用者**：cron-job.org 上呼叫 `cleanup_old_scores_if_needed` 的排程**可以刪了**（收權後會開始回權限錯誤；keepalive ping 排程保留不動）。
-4. **使用者**：部署後真機/桌機玩一輪＋登入，開 DevTools console 看有無 `Content-Security-Policy-Report-Only` 違規訊息；乾淨的話回報，把 `_headers` 的 CSP 改名轉正式執法。
+4. ✅ CSP 已轉正式執法（使用者桌機 PWA 走完登入/遊玩/分享全流程確認 console 乾淨後改名，2026-07-04 晚）。之後加新外部資源（AdSense 等）記得先補白名單。
 5. ✅ 已拍板（2026-07-04 晚）：伺服器端錢包＋每日 5 次上限搬 DB，**7/5 同一批動工**，計畫見 [WALLET_PLAN.md](WALLET_PLAN.md)。
 6. **P 系列 IAP 動工時**：擁有權驗證必須伺服器端（前瞻性結論，與第 5 項同一套伺服器錢包可一起解）。
 7. keystore：密碼已確認兩地留存；檔案本體備份使用者暫緩（Play App Signing 保底），不再追蹤為 🔴。
