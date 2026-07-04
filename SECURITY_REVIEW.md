@@ -20,8 +20,8 @@
 | 🟢 已修補 | `cleanup_old_scores_if_needed` anon 可呼叫 | **已收權**（同 migration b），改由每日 CI 帶 service key 呼叫（fetchDailyMap.ts）；cron-job.org 的 cleanup 排程可刪、keepalive 保留 |
 | 🟢 已上線 | 無 CSP / 安全 headers | **`public/_headers` 已加**：nosniff/XFO DENY/Referrer-Policy/Permissions-Policy 直接執法；CSP 先 **Report-Only** 觀察（怕誤擋 GSI 登入），真機確認 console 無違規後改名轉正（檔內有說明） |
 | 🟢 已上線 | GitHub Actions 未 pin SHA（首輪供應鏈潔癖項） | checkout / setup-node 已 pin 到 commit SHA |
-| 🟠 待決策 | 車庫金幣/擁有清單/任務/streak/成就全為 localStorage，可被使用者端竄改 | **使用者 2026-07-04 明確不接受**「竄改自己數值」→ 不再標「接受」。真解＝伺服器端錢包（需登入＋動 garage/quests 客戶端，見下），實作方案與時機待使用者拍板 |
-| 🟡 待排程 | 每日 5 次挑戰上限純前端（清 localStorage 可繞過） | 反作弊 Phase B 的 `consume_attempt` RPC（動 schema＋開局流程，封測求穩期未動），與上項一起排 |
+| 🟠 已拍板 | 車庫金幣/擁有清單/任務/streak/成就全為 localStorage，可被使用者端竄改 | **使用者 2026-07-04 晚拍板：伺服器端錢包，7/5 動工**（方案細節見 [WALLET_PLAN.md](WALLET_PLAN.md)） |
+| 🟡 已拍板 | 每日 5 次挑戰上限純前端（清 localStorage 可繞過） | `consume_attempt` RPC **與錢包同一批（7/5）做**（WALLET_PLAN.md 第 5 項） |
 | 🟡 已答覆 | upload keystore 雲端備份 | 使用者 2026-07-04 回覆：密碼公司/家裡皆有記錄；keystore **檔案本體**備份狀態不確定但暫緩（Play App Signing 保底，upload key 遺失可向 Google 申請重置） |
 | 🟢 乾淨 | XSS 重掃（含新增畫面）／密鑰／npm audit prod 0 漏洞 | 無需動作 |
 | 🟡 dev-only | esbuild/vite dev server 漏洞 2 個 | **不進產品 bundle、只影響本機 dev server**——非上架風險；修復需 vite@8 breaking change，排正式上架後升級（跑 dev 時別逛可疑網站的緩解照舊） |
@@ -92,7 +92,7 @@
 2. **使用者**：Supabase SQL Editor 跑 **`migration_20260704b.sql`**（log_event 節流 + cleanup 收權）。
 3. **使用者**：cron-job.org 上呼叫 `cleanup_old_scores_if_needed` 的排程**可以刪了**（收權後會開始回權限錯誤；keepalive ping 排程保留不動）。
 4. **使用者**：部署後真機/桌機玩一輪＋登入，開 DevTools console 看有無 `Content-Security-Policy-Report-Only` 違規訊息；乾淨的話回報，把 `_headers` 的 CSP 改名轉正式執法。
-5. **待使用者拍板**：localStorage 金幣/擁有清單搬伺服器端的方案與時機（🟠 待決策項）＋每日 5 次上限搬 DB（Phase B）。
+5. ✅ 已拍板（2026-07-04 晚）：伺服器端錢包＋每日 5 次上限搬 DB，**7/5 同一批動工**，計畫見 [WALLET_PLAN.md](WALLET_PLAN.md)。
 6. **P 系列 IAP 動工時**：擁有權驗證必須伺服器端（前瞻性結論，與第 5 項同一套伺服器錢包可一起解）。
 7. keystore：密碼已確認兩地留存；檔案本體備份使用者暫緩（Play App Signing 保底），不再追蹤為 🔴。
 
