@@ -5,7 +5,7 @@ import { fetchDailyTop, invalidateDailyTop, isLeaderboardConfigured, type ScoreR
 import { fetchHardestDailyMap, resolveSessionDate, resolveSessionDisplayDate } from "../lib/dailyMap";
 import { signInWithGoogle, type User } from "../lib/auth";
 import { getPlayerName } from "../lib/playerId";
-import { getAttempts, incrementAttempts, MAX_ATTEMPTS, FREE_ATTEMPTS } from "../lib/challengeAttempts";
+import { getAttempts, incrementAttempts, consumeAttemptServer, MAX_ATTEMPTS, FREE_ATTEMPTS } from "../lib/challengeAttempts";
 import { recordStreak, getStreak, playedThisSession } from "../lib/streak";
 import { fetchDeathHeatmap, type HeatBucket } from "../lib/deathHeatmap";
 import { getDailyQuests } from "../lib/quests";
@@ -54,6 +54,8 @@ export default function DailyChallenge({
   // 非日曆日 dailyKey()，避免連假第二天起換到空榜。handleRefresh 也讀它。
   const sessionKeyRef = useRef<string>(dailyKey());
   const [attempts, setAttempts] = useState(() => getAttempts(dailyKey()));
+  const [serverMaxed, setServerMaxed] = useState(false); // 伺服器判定今日已達上限（優先於本地計數，防清 localStorage 繞過）
+  const [checkingStart, setCheckingStart] = useState(false);
   const [streak, setStreak] = useState(0);
   const [streakLive, setStreakLive] = useState(false); // 本期已參賽（🔥 實心）或待延續（提示）
   const [heat, setHeat] = useState<HeatBucket[]>([]); // 今日全服死亡熱點（20 等分）
@@ -181,10 +183,16 @@ export default function DailyChallenge({
         )}
 
         {(() => {
-          const canPlay = attempts < MAX_ATTEMPTS;
+          const canPlay = attempts < MAX_ATTEMPTS && !serverMaxed;
           const showAd  = attempts >= FREE_ATTEMPTS;
           const num     = attempts + 1; // 即將進行的第幾次
-          const handleStart = () => {
+          // 已登入玩家先問伺服器 consume_attempt()（真正把關，清 localStorage 也繞不過）；
+          // 未登入/RPC 尚未建立時直接回 true，維持現行純前端計數行為不變。
+          const handleStart = async () => {
+            setCheckingStart(true);
+            const ok = await consumeAttemptServer();
+            setCheckingStart(false);
+            if (!ok) { setServerMaxed(true); return; }
             incrementAttempts(sessionKeyRef.current);
             setAttempts(prev => prev + 1);
             setStreak(recordStreak(sessionKeyRef.current)); // 連續參賽：進遊戲即算本期參賽
@@ -194,14 +202,16 @@ export default function DailyChallenge({
           return (
             <button
               className={`daily-challenge-btn${showAd && canPlay ? " ad" : ""}${!canPlay ? " maxed" : ""}`}
-              disabled={!canPlay}
+              disabled={!canPlay || checkingStart}
               onClick={canPlay ? handleStart : undefined}
             >
               {!canPlay
                 ? "今日已達上限"
-                : showAd
-                  ? `看廣告開始 (${num}/5)`
-                  : `開始挑戰 (${num}/5)`}
+                : checkingStart
+                  ? "確認中…"
+                  : showAd
+                    ? `看廣告開始 (${num}/5)`
+                    : `開始挑戰 (${num}/5)`}
             </button>
           );
         })()}

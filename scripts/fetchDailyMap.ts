@@ -276,6 +276,14 @@ async function main() {
   });
   console.log(scDel.ok ? "daily_scores 容量檢查完成" : "daily_scores 清理呼叫失敗（無妨，下次再試）");
 
+  // 錢包節流表清理：wallet_earn_log/wallet_daily_attempts 只留 14 天（migration_20260705.sql 未跑之前 404，無妨）。
+  const wDel = await fetch(`${SUPABASE_URL}/rest/v1/rpc/cleanup_old_wallet_logs`, {
+    method: "POST",
+    headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, "Content-Type": "application/json" },
+    body: "{}",
+  });
+  console.log(wDel.ok ? "錢包節流表舊資料已清理" : "錢包節流表清理跳過（RPC 尚未建立）");
+
   console.log("✅ 完成");
 }
 

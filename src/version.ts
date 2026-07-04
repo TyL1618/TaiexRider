@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.12.27";
+export const APP_VERSION = "0.12.28";
 
 export interface ChangelogEntry {
   date: string;
@@ -6,6 +6,12 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    date: "2026-07-04 (v0.12.28)",
+    notes: [
+      "內部：車庫金幣/鑽石/擁有清單改接伺服器端錢包（已登入玩家），一般玩家無感",
+    ],
+  },
   {
     date: "2026-07-04 (v0.12.27)",
     notes: [

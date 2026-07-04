@@ -10,7 +10,7 @@ import { logEvent } from "../lib/analytics";
 import { haptics } from "../lib/haptics";
 import { fetchDeathHeatmap } from "../lib/deathHeatmap";
 import { startWakeLock } from "../lib/wakeLock";
-import { getActiveBikeSkin, addCoins } from "../lib/garage";
+import { getActiveBikeSkin, addCoins, earnCoins } from "../lib/garage";
 import { requestRewardedCoins } from "../lib/ads";
 import { AD_COIN_REWARD, MAX_AD_COIN_CLAIMS_PER_DAY, getAdCoinClaims, incrementAdCoinClaims } from "../lib/adRewards";
 import { dailyKey } from "../data/pick";
@@ -191,6 +191,7 @@ export default function GameCanvas({ prices, label, name, subtitle, onExit, onGa
         incrementAdCoinClaims(dailyKey());
         setAdClaimsToday(getAdCoinClaims(dailyKey()));
         addCoins(AD_COIN_REWARD);
+        earnCoins("ad");
       }
     });
   };

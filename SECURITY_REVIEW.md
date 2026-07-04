@@ -20,30 +20,33 @@
 | 🟢 已修補 | `cleanup_old_scores_if_needed` anon 可呼叫 | **已收權**（同 migration b），改由每日 CI 帶 service key 呼叫（fetchDailyMap.ts）；cron-job.org 的 cleanup 排程可刪、keepalive 保留 |
 | 🟢 已上線 | 無 CSP / 安全 headers | **`public/_headers` 已加**：nosniff/XFO DENY/Referrer-Policy/Permissions-Policy＋**CSP 已正式執法**（先 Report-Only 部署，使用者真機走完登入/遊玩/分享全流程 console 零違規後轉正，2026-07-04 晚） |
 | 🟢 已上線 | GitHub Actions 未 pin SHA（首輪供應鏈潔癖項） | checkout / setup-node 已 pin 到 commit SHA |
-| 🟠 已拍板 | 車庫金幣/擁有清單/任務/streak/成就全為 localStorage，可被使用者端竄改 | **使用者 2026-07-04 晚拍板：伺服器端錢包，7/5 動工**（方案細節見 [WALLET_PLAN.md](WALLET_PLAN.md)） |
-| 🟡 已拍板 | 每日 5 次挑戰上限純前端（清 localStorage 可繞過） | `consume_attempt` RPC **與錢包同一批（7/5）做**（WALLET_PLAN.md 第 5 項） |
+| 🟢 已實作 | 車庫金幣/擁有清單/任務/streak/成就全為 localStorage，可被使用者端竄改 | **使用者 2026-07-04 晚拍板後當場改口「不用等 7/5」，同晚已實作伺服器端錢包**（`migration_20260705.sql` + garage.ts 全面改接，方案見 [WALLET_PLAN.md](WALLET_PLAN.md)）。**⚠️ 待使用者跑 migration 才生效，且需真實帳號登入驗證**（streak/成就進度本身仍是純前端信任客戶端宣稱，只有「擁有清單」本身移到伺服器，v1 設計如此，見 wallet_unlock_achievement 註解） |
+| 🟢 已實作 | 每日 5 次挑戰上限純前端（清 localStorage 可繞過） | `consume_attempt` RPC **已與錢包同一批做完**（`migration_20260705.sql` + DailyChallenge.tsx/challengeAttempts.ts 已改接）。**⚠️ 待使用者跑 migration 才生效** |
 | 🟡 已答覆 | upload keystore 雲端備份 | 使用者 2026-07-04 回覆：密碼公司/家裡皆有記錄；keystore **檔案本體**備份狀態不確定但暫緩（Play App Signing 保底，upload key 遺失可向 Google 申請重置） |
 | 🟢 乾淨 | XSS 重掃（含新增畫面）／密鑰／npm audit prod 0 漏洞 | 無需動作 |
 | 🟡 dev-only | esbuild/vite dev server 漏洞 2 個 | **不進產品 bundle、只影響本機 dev server**——非上架風險；修復需 vite@8 breaking change，排正式上架後升級（跑 dev 時別逛可疑網站的緩解照舊） |
 
-### 車庫/金幣/任務/成就：localStorage 可竄改（🟠 待決策——使用者不接受擱置）
+### 車庫/金幣/鑽石/擁有清單：localStorage 竄改（🟢 2026-07-04 晚已實作伺服器端錢包）
 
 > **2026-07-04 晚使用者裁示**：「任何影響遊戲的數值竄改都不接受，不管有沒有影響其他玩家」——
-> 本節原本的「接受」定位作廢。真解＝伺服器端錢包（金幣餘額/擁有清單存 DB、發幣走 RPC 帶
-> 伺服器端驗證與每日上限），需要登入、需要動 garage/quests 客戶端，方案與時機待使用者拍板
-> （見文末待辦第 5 項）。以下保留原始風險分析供決策參考。
+> 原訂 7/5 動工的伺服器端錢包，使用者當場改口「現在就處理」，同晚完成實作：
+> `migration_20260705.sql`（`player_wallet` 等三表 + 六個 security definer RPC）+ garage.ts 等
+> 客戶端全面改接（已登入→伺服器 RPC 為權威；未登入→維持純本地，接受）。詳見 [WALLET_PLAN.md](WALLET_PLAN.md)
+> 開頭的完成狀態註記。**⚠️ 待使用者跑 migration + 真實帳號登入驗證才算真正生效**。
 
-- `tr_garage_coins`（金幣）、`tr_garage_owned`（擁有車皮）、`tr_quest_progress`（每日任務）、
-  `tr_daily_streak`、`tr_achv_market`（Q 系列成就）、`tr_ad_coin_claims_*`（廣告金幣每日 2 次上限）、
-  `tr_pb_*`（獎牌 PB）全部存 localStorage，任何人開 DevTools 都能直接改。
-- **公平性影響：零**——這些數值不進排行榜、不影響計分、不與其他玩家比較，純個人收藏/習慣迴圈。
-  改了只是騙自己，與首輪對「每日 5 次上限」的定位一致。
-- **⚠️ 唯一要當真的邊界：P 系列付費車款（真錢 IAP）**。`isOwned()` 目前讀 localStorage 擁有清單，
-  若 P 系列上線時沿用同一套（把 P 車 id 塞進 `tr_garage_owned` 就能免費解鎖），等於**收入直接漏光**。
-  Google Play Billing 串接時，P 車擁有權必須改為伺服器端驗證（Play Developer API 驗票 or
-  Supabase 表記錄 purchase token 驗證後發放），localStorage 只能當顯示快取。已在此立此存照。
-- 看廣告拿金幣 stub（`ads.ts requestRewardedCoins()` 現在直接 resolve(true)）＋每日 2 次上限也在前端——
-  真廣告 SDK 串接後，「看完才發幣」的 callback 本來就在 SDK/伺服器側，屆時自然收斂，現況接受。
+- `tr_garage_coins`（金幣）、`tr_garage_diamonds`（鑽石）、`tr_garage_owned`（擁有車皮）已改為
+  「已登入玩家伺服器端為權威，localStorage 只當顯示快取」；`tr_quest_progress`（每日任務進度）、
+  `tr_daily_streak`、`tr_achv_market`（Q 系列成就進度）、`tr_ad_coin_claims_*`（廣告金幣每日
+  2 次上限的顯示計數）、`tr_pb_*`（獎牌 PB）**仍是純 localStorage**——這些是「進度/計數」本身，
+  不是「餘額/擁有權」，竄改它們最多只能提前解鎖 Q 系列 cosmetic 車皮（`wallet_unlock_achievement`
+  v1 信任客戶端宣稱，見 migration 註解），不影響金幣/鑽石餘額或排行榜，公平性影響仍是零。
+- **P 系列鑽石車款（P1/P2）已用同一套錢包保護**：`wallet_spend_skin` RPC 內建價格白名單+ 餘額
+  驗證，`isOwned()` 讀的擁有清單來自伺服器（已登入時），不能再靠改 localStorage 免費解鎖。
+  **真錢 IAP（Google Play Billing）串接時**，仍需額外驗證 Play Developer API 購買憑證後才呼叫
+  `wallet_spend_skin`（或另建對應 RPC），現在的鑽石中介層本身不是真錢驗證，只是防「改本地數字」。
+- 看廣告拿金幣 stub（`ads.ts requestRewardedCoins()` 現在直接 resolve(true)）——真廣告 SDK 串接後，
+  「看完才發幣」的 callback 本來就在 SDK/伺服器側；每日 2 次上限現在已是 `wallet_earn('ad')` 的
+  伺服器端 cap（`tr_ad_coin_claims_*` 只是顯示計數），現況接受。
 
 ### 開發者測試帳號（App.tsx 明碼 email 比對）
 
@@ -92,8 +95,8 @@
 2. **使用者**：Supabase SQL Editor 跑 **`migration_20260704b.sql`**（log_event 節流 + cleanup 收權）。
 3. **使用者**：cron-job.org 上呼叫 `cleanup_old_scores_if_needed` 的排程**可以刪了**（收權後會開始回權限錯誤；keepalive ping 排程保留不動）。
 4. ✅ CSP 已轉正式執法（使用者桌機 PWA 走完登入/遊玩/分享全流程確認 console 乾淨後改名，2026-07-04 晚）。之後加新外部資源（AdSense 等）記得先補白名單。
-5. ✅ 已拍板（2026-07-04 晚）：伺服器端錢包＋每日 5 次上限搬 DB，**7/5 同一批動工**，計畫見 [WALLET_PLAN.md](WALLET_PLAN.md)。
-6. **P 系列 IAP 動工時**：擁有權驗證必須伺服器端（前瞻性結論，與第 5 項同一套伺服器錢包可一起解）。
+5. ✅ 伺服器端錢包＋每日 5 次上限搬 DB——原訂 7/5，**使用者當場改口「現在就處理」，2026-07-04 晚已實作完成**，計畫與完成狀態見 [WALLET_PLAN.md](WALLET_PLAN.md)。**使用者**：Supabase SQL Editor 跑 **`migration_20260705.sql`** 才生效，之後拿真實帳號登入驗證一輪。
+6. **P 系列真錢 IAP 動工時**：擁有權驗證仍需接 Play Developer API 驗票（現在的鑽石中介層只防「改本地數字」，不是真錢購買驗證，見上方新增段落）。
 7. keystore：密碼已確認兩地留存；檔案本體備份使用者暫緩（Play App Signing 保底），不再追蹤為 🔴。
 
 ---

@@ -283,10 +283,10 @@ src/
 │   ├── longTrack.ts          # 每日長征串接 + fetchLongPreview（5 股預覽）
 │   ├── auth.ts               # Google One Tap 登入 / signOut
 │   ├── playerId.ts           # localStorage UUID + 暱稱（clampNameWidth 限長）
-│   ├── challengeAttempts.ts  # 每日排名賽挑戰次數（localStorage，MAX 5 / FREE 2）
+│   ├── challengeAttempts.ts  # 每日排名賽挑戰次數（MAX 5 / FREE 2；已登入→consume_attempt RPC 真正把關，未登入→localStorage）
 │   ├── ads.ts                # TWA 環境偵測 + AdSense/AdMob 雙軌 scaffold + 看廣告拿金幣 stub
 │   ├── adRewards.ts          # 看廣告拿金幣每日次數上限（車庫頁+結算畫面共用計數）
-│   ├── garage.ts             # 車皮清單（BIKE_SKINS）+ 金幣/鑽石雙通貨 + 擁有/裝備邏輯
+│   ├── garage.ts             # 車皮清單（BIKE_SKINS）+ 金幣/鑽石雙通貨 + 擁有/裝備邏輯（已登入→伺服器錢包 RPC 為權威，未登入→純本地）
 │   ├── achievements.ts       # Q 系列成就進度（大漲/大跌完賽次數，streak 沿用 streak.ts）
 │   ├── quests.ts             # 每日任務池（seeded by 裝置本地日曆日）
 │   ├── streak.ts             # 每日排名賽連續參賽天數

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { BIKE_SKINS, getCoins, getDiamonds, isOwned, getActiveSkinId, purchaseSkin, setActiveSkin, addCoins, unlockAchievementSkin, type BikeSkin } from "../lib/garage";
+import { BIKE_SKINS, getCoins, getDiamonds, isOwned, getActiveSkinId, purchaseSkin, setActiveSkin, addCoins, earnCoins, unlockAchievementSkin, syncWalletFromServer, type BikeSkin } from "../lib/garage";
 import { requestRewardedCoins } from "../lib/ads";
 import { AD_COIN_REWARD, MAX_AD_COIN_CLAIMS_PER_DAY, getAdCoinClaims, incrementAdCoinClaims } from "../lib/adRewards";
 import { getAchievementBikes, type AchvBikeView } from "../lib/achievements";
@@ -37,23 +37,40 @@ export default function Garage({ onBack }: { onBack: () => void }) {
     return () => { alive = false; };
   }, []);
 
-  // 成就達成＋美術已到位（BIKE_SKINS 有登記對應 id）就自動解鎖擁有，不用另外按按鈕
-  // （unlockAchievementSkin 本身冪等，重複呼叫不影響已擁有狀態）。
-  // ⚠️ unlockAchievementSkin 只寫 localStorage、不帶 React state，寫完必須手動
-  // forceRender 一次，不然畫面會停在舊的「購買」按鈕，直到別的地方剛好觸發重繪。
+  // 掛載時把伺服器錢包（金幣/鑽石/擁有清單）同步進本地快取——換裝置登入或清過
+  // localStorage 時，車庫畫面才不會卡在舊/空值（見 garage.ts syncWalletFromServer 註解）。
   useEffect(() => {
-    let changed = false;
-    for (const a of achvBikes) {
-      if (a.unlocked && BIKE_SKINS.some((s) => s.id === a.id) && !isOwned(a.id)) {
-        unlockAchievementSkin(a.id);
-        changed = true;
+    let alive = true;
+    syncWalletFromServer().then(() => {
+      if (!alive) return;
+      setCoins(getCoins());
+      setDiamonds(getDiamonds());
+      forceRender((n) => n + 1);
+    });
+    return () => { alive = false; };
+  }, []);
+
+  // 成就達成＋美術已到位（BIKE_SKINS 有登記對應 id）就自動解鎖擁有，不用另外按按鈕
+  // （unlockAchievementSkin 本身冪等，重複呼叫不影響已擁有狀態；已登入時會走伺服器 RPC）。
+  // ⚠️ unlockAchievementSkin 寫完快取不帶 React state，必須手動 forceRender 一次，
+  // 不然畫面會停在舊的「購買」按鈕，直到別的地方剛好觸發重繪。
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      let changed = false;
+      for (const a of achvBikes) {
+        if (a.unlocked && BIKE_SKINS.some((s) => s.id === a.id) && !isOwned(a.id)) {
+          await unlockAchievementSkin(a.id);
+          changed = true;
+        }
       }
-    }
-    if (changed) forceRender((n) => n + 1);
+      if (changed && alive) forceRender((n) => n + 1);
+    })();
+    return () => { alive = false; };
   }, [achvBikes]);
 
-  const handleBuy = (id: string) => {
-    if (purchaseSkin(id)) {
+  const handleBuy = async (id: string) => {
+    if (await purchaseSkin(id)) {
       setCoins(getCoins());
       setDiamonds(getDiamonds());
       forceRender((n) => n + 1);
@@ -69,6 +86,7 @@ export default function Garage({ onBack }: { onBack: () => void }) {
         incrementAdCoinClaims(dailyKey());
         setAdClaims(getAdCoinClaims(dailyKey()));
         setCoins(addCoins(AD_COIN_REWARD));
+        earnCoins("ad").then(() => setCoins(getCoins()));
       }
     });
   };

@@ -20,7 +20,7 @@ import { getPlayerName } from "./lib/playerId";
 import { dailyKey } from "./data/pick";
 import { setPlaying } from "./pwa";
 import { logEvent, type AnalyticsMode } from "./lib/analytics";
-import { addCoins, getCoins, addDiamonds, getDiamonds } from "./lib/garage";
+import { addCoins, earnCoins, syncWalletFromServer, grantDevWallet } from "./lib/garage";
 import { recordRun } from "./lib/quests";
 import { resolveMarketMood, type MarketMood } from "./lib/marketMood";
 import { recordFinish, devSetProgress, Q1_BULL_TARGET, Q2_BEAR_TARGET, Q3_STREAK_TARGET } from "./lib/achievements";
@@ -58,13 +58,19 @@ export default function App() {
     return onAuthStateChange(setUser);
   }, []);
 
-  // 開發者測試帳號：登入即補滿金幣+鑽石＋直接解鎖 Q 系列成就進度，方便真機測車庫購買/裝備/
+  // 任何已登入玩家：把伺服器錢包（金幣/鑽石/擁有清單，2026-07-05 起改伺服器端權威）
+  // 拉到本地快取——換裝置登入或清過 localStorage 時，畫面才不會卡在舊/空值。
+  useEffect(() => {
+    if (user) syncWalletFromServer();
+  }, [user]);
+
+  // 開發者測試帳號：登入即補滿金幣+鑽石（wallet_dev_grant RPC，JWT email 綁定於伺服器端，
+  // 非開發者帳號呼叫會被靜默拒絕）＋直接解鎖 Q 系列成就進度，方便真機測車庫購買/裝備/
   // 解鎖 UI 不用真的刷任務、真的等大漲大跌日、真的連續玩 30 天。
-  // 純前端 email 比對，不是安全機制（金幣/鑽石/成就沒有排行榜/競技意義，不影響公平性）。
+  // Q 系列成就進度本身仍是純前端 email 比對（無排行榜/競技意義，不影響公平性）。
   useEffect(() => {
     if (user?.email !== "tyl161803@gmail.com") return;
-    if (getCoins() < 99999) addCoins(99999 - getCoins());
-    if (getDiamonds() < 99999) addDiamonds(99999 - getDiamonds());
+    grantDevWallet();
     devSetProgress(Q1_BULL_TARGET, Q2_BEAR_TARGET);
     resolveSessionDate(dailyKey()).then((key) => devForceStreak(key, Q3_STREAK_TARGET));
   }, [user]);
@@ -184,13 +190,16 @@ export default function App() {
     if (classicId && user) {
       submitClassicRecord(classicId, getPlayerName(), { score: stats.score, timeMs: stats.timeMs });
     }
-    // 車庫金幣：完賽/摔車都給小額基本獎勵，任何模式皆算（純個人習慣迴圈，見 RETENTION_PLAN.md）
+    // 車庫金幣：完賽/摔車都給小額基本獎勵，任何模式皆算（純個人習慣迴圈，見 RETENTION_PLAN.md）。
+    // addCoins 做本地樂觀更新（不管有沒有登入都立刻反映在畫面上）；earnCoins 已登入時
+    // 背景呼叫伺服器 RPC 覆寫成真實餘額（含每日上限），未登入時 earnCoins 直接略過。
     addCoins(stats.finished ? 10 : 3);
+    earnCoins(stats.finished ? "finish" : "crash");
     // 每日任務：用裝置本地日曆日累計，跨模式共用同一組任務池
     const newlyDone = recordRun(dailyKey(), {
       score: stats.score, flips: stats.flips, perfect: stats.perfect, timeMs: stats.timeMs,
     });
-    for (const q of newlyDone) addCoins(q.reward);
+    for (const q of newlyDone) { addCoins(q.reward); earnCoins("quest"); }
     // Q 系列成就：完賽才算，依當期大盤漲跌累計（見 lib/achievements.ts）
     if (stats.finished) recordFinish(marketMood?.mood ?? null);
   }, [isDailyRun, user, marketMood]);

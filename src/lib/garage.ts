@@ -7,6 +7,15 @@
 //     不同，靠這三個數字讓貼圖的兩個輪子精準對齊物理輪子位置（見下方各車皮註解，
 //     數值由 scripts 量測輪圈色塊中心點算出，不是憑感覺調的）。
 // localStorage 慣例同 medals.ts / streak.ts：try/catch 靜默 fallback，無版本欄位。
+//
+// 2026-07-05：伺服器端錢包上線（migration_20260705.sql，見 WALLET_PLAN.md）。
+// 已登入玩家的金幣/鑽石/擁有清單改以 Supabase RPC（wallet_get/wallet_earn/
+// wallet_spend_skin/wallet_unlock_achievement）為權威來源，localStorage 只當
+// 「顯示用快取」——每次 RPC 回應都會覆寫本地快取，getCoins()/getDiamonds()/
+// getOwnedSkins() 這幾個同步讀取函式維持不變，讀的一律是「最後一次跟伺服器
+// 同步後」的快取值。未登入玩家（無法上排行榜、竄改零風險）維持純本地。
+
+import { supabase } from "./supabase";
 
 export interface BikeSkin {
   id: string;
@@ -85,6 +94,35 @@ const DIAMONDS_KEY = "tr_garage_diamonds";
 const OWNED_KEY = "tr_garage_owned";
 const ACTIVE_KEY = "tr_garage_active";
 
+async function getUid(): Promise<string | null> {
+  const { data: { session } } = await supabase.auth.getSession();
+  return session?.user.id ?? null;
+}
+
+// 把伺服器回應寫進本地快取（覆寫，不是疊加——伺服器永遠是最新真相）
+function writeCoinsCache(n: number): void {
+  try { localStorage.setItem(COINS_KEY, String(Math.max(0, n))); } catch { /* 靜默 */ }
+}
+function writeDiamondsCache(n: number): void {
+  try { localStorage.setItem(DIAMONDS_KEY, String(Math.max(0, n))); } catch { /* 靜默 */ }
+}
+function writeOwnedCache(owned: string[]): void {
+  try { localStorage.setItem(OWNED_KEY, JSON.stringify(owned)); } catch { /* 靜默 */ }
+}
+
+// 已登入時把伺服器錢包（金幣/鑽石/擁有清單）同步進本地快取；未登入/RPC 失敗靜默略過
+// （App.tsx 登入後呼叫一次；Garage.tsx 掛載時也呼叫一次，確保換裝置登入時不會卡在舊快取）。
+export async function syncWalletFromServer(): Promise<void> {
+  const uid = await getUid();
+  if (!uid) return;
+  const { data, error } = await supabase.rpc("wallet_get");
+  if (error || !data || !data[0]) return; // RPC 尚未建立/未登入/網路失敗：本地快取先頂著
+  const row = data[0] as { coins: number; diamonds: number; owned: string[] };
+  writeCoinsCache(row.coins);
+  writeDiamondsCache(row.diamonds);
+  writeOwnedCache(row.owned);
+}
+
 export function getCoins(): number {
   try {
     return parseInt(localStorage.getItem(COINS_KEY) ?? "0", 10) || 0;
@@ -120,6 +158,19 @@ export function addDiamonds(n: number): number {
   return next;
 }
 
+// 發幣入口（完賽/摔車/任務/看廣告呼叫）：先用 addCoins() 本地樂觀更新（不管有沒有登入都
+// 立刻反映在畫面上，體感零延遲），已登入時再背景呼叫伺服器 RPC 覆寫成真實餘額——
+// 若伺服器判定當日該管道已達上限，樂觀加的量會被這次覆寫收回，不留竄改空間。
+export async function earnCoins(kind: "finish" | "crash" | "quest" | "ad"): Promise<void> {
+  const uid = await getUid();
+  if (!uid) return; // 未登入：addCoins() 樂觀更新已經是最終結果，不用再校正
+  const { data, error } = await supabase.rpc("wallet_earn", { p_kind: kind });
+  if (error || !data || !data[0]) return; // RPC 尚未建立/網路失敗：樂觀值先頂著
+  const row = data[0] as { coins: number; diamonds: number };
+  writeCoinsCache(row.coins);
+  writeDiamondsCache(row.diamonds);
+}
+
 export function getOwnedSkins(): string[] {
   try {
     const raw = localStorage.getItem(OWNED_KEY);
@@ -137,25 +188,49 @@ export function isOwned(id: string): boolean {
 }
 
 // Q 系列成就解鎖：不扣金幣，直接加入擁有清單（由 Garage.tsx 偵測 achievements.ts
-// 進度已達成時呼叫，冪等——重複呼叫不影響已擁有狀態）
-export function unlockAchievementSkin(id: string): boolean {
+// 進度已達成時呼叫，冪等——重複呼叫不影響已擁有狀態）。已登入時改走
+// wallet_unlock_achievement RPC 寫回伺服器擁有清單（v1 仍信任客戶端算的成就進度，
+// 見 migration_20260705.sql 註解；未登入維持純本地）。
+export async function unlockAchievementSkin(id: string): Promise<boolean> {
   if (isOwned(id)) return true;
   const skin = BIKE_SKINS.find((s) => s.id === id);
   if (!skin) return false;
+
+  const uid = await getUid();
+  if (uid) {
+    const { data, error } = await supabase.rpc("wallet_unlock_achievement", { p_skin_id: id });
+    if (!error && data && data[0]) {
+      writeOwnedCache((data[0] as { owned: string[] }).owned);
+      return true;
+    }
+    // RPC 失敗（尚未跑 migration/網路問題）：退回本地寫入，下次登入同步時會被伺服器覆寫
+  }
   const owned = getOwnedSkins();
   owned.push(id);
-  try {
-    localStorage.setItem(OWNED_KEY, JSON.stringify(owned));
-  } catch { /* 靜默 */ }
+  writeOwnedCache(owned);
   return true;
 }
 
-// 購買：餘額足夠才扣款+加入擁有清單，回傳是否成功（依 currency 欄位扣金幣或鑽石）
-export function purchaseSkin(id: string): boolean {
+// 購買：餘額足夠才扣款+加入擁有清單，回傳是否成功（依 currency 欄位扣金幣或鑽石）。
+// 已登入時改走 wallet_spend_skin RPC（伺服器驗證價格與餘額，本地無法竄改）；
+// 未登入維持純本地（上不了排行榜，接受）。
+export async function purchaseSkin(id: string): Promise<boolean> {
   if (isOwned(id)) return true;
   const skin = BIKE_SKINS.find((s) => s.id === id);
   if (!skin) return false;
   const currency = skin.currency ?? "coin";
+
+  const uid = await getUid();
+  if (uid) {
+    const { data, error } = await supabase.rpc("wallet_spend_skin", { p_skin_id: id });
+    if (error || !data || !data[0]) return false; // RPC 尚未建立/網路失敗：不放行購買（避免免費解鎖）
+    const row = data[0] as { coins: number; diamonds: number; owned: string[]; ok: boolean };
+    writeCoinsCache(row.coins);
+    writeDiamondsCache(row.diamonds);
+    writeOwnedCache(row.owned);
+    return row.ok;
+  }
+
   if (currency === "diamond") {
     if (getDiamonds() < skin.price) return false;
     addDiamonds(-skin.price);
@@ -165,10 +240,20 @@ export function purchaseSkin(id: string): boolean {
   }
   const owned = getOwnedSkins();
   owned.push(id);
-  try {
-    localStorage.setItem(OWNED_KEY, JSON.stringify(owned));
-  } catch { /* 靜默 */ }
+  writeOwnedCache(owned);
   return true;
+}
+
+// 開發者測試帳號補滿金幣+鑽石（wallet_dev_grant RPC，JWT email 綁定，取代舊的
+// 前端「getCoins()<99999 就 addCoins」本地 hack）。非開發者帳號呼叫會被伺服器靜默拒絕。
+export async function grantDevWallet(): Promise<void> {
+  const uid = await getUid();
+  if (!uid) return;
+  const { data, error } = await supabase.rpc("wallet_dev_grant");
+  if (error || !data || !data[0]) return;
+  const row = data[0] as { coins: number; diamonds: number };
+  writeCoinsCache(row.coins);
+  writeDiamondsCache(row.diamonds);
 }
 
 export function getActiveSkinId(): string {

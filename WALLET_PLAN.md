@@ -1,5 +1,15 @@
-# 伺服器端錢包 + DB 端每日次數上限——實作計畫（2026-07-04 晚拍板，7/5 動工）
+# 伺服器端錢包 + DB 端每日次數上限——實作計畫（2026-07-04 晚拍板）
 
+> ✅ **2026-07-04 當晚已提前實作完成**（使用者：「不用等 7/5，現在就處理」）。
+> `supabase/migration_20260705.sql` 已寫好（**⚠️ 待使用者在 Supabase SQL Editor 手動跑才生效**，
+> push 不會更新 DB），客戶端（garage.ts/App.tsx/Garage.tsx/GameCanvas.tsx/DailyChallenge.tsx/
+> challengeAttempts.ts）已全部改接。跑完 migration 前，已登入玩家的購買/發幣/攻略次數 RPC 呼叫
+> 會靜默失敗（garage.ts 對應函式回傳 false/略過，不影響遊戲，但也還沒有伺服器保護）——
+> **真正生效必須先跑那份 migration，之後拿真實 Google 帳號真機/桌機登入驗證一輪**
+> （購買車皮扣款、完賽發幣、每日第 6 次挑戰被擋）。以下維持原始規劃內容備查，
+> 實作與此文件唯一的落差：鑽石車款（P1/P2，本文件寫下時還沒生圖上線）也一併納入
+> wallet_spend_skin 的白名單，不是只有「無金幣售價車皮」的骨架。
+>
 > 背景：SECURITY_REVIEW 2026-07-04 第二輪 🟠 項。使用者裁示「任何影響遊戲的數值竄改都不接受」，
 > localStorage 金幣/擁有清單/任務進度必須搬伺服器端；「每日挑戰 5 次上限」（反作弊 Phase B 的
 > consume_attempt）同一批做，一次動完開局/結算流程一次測。
