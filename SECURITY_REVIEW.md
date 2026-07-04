@@ -15,14 +15,23 @@
 
 | 等級 | 項目 | 狀態 |
 |------|------|------|
-| 🟢 已改善 | RPC 物理一致性 + 提交冷卻（首輪 🟠「RPC 濫用面」主體） | **反作弊 Phase A 已實作**（`migration_20260704.sql`，⚠️ 待使用者手動跑；含經典 level_id 白名單，順帶修掉任意字串塞列的污染面） |
-| 🟠 設計性現況 | 車庫金幣/擁有清單/任務/streak/成就全為 localStorage，可被使用者端竄改 | 接受（見下），**但 P 系列 IAP 上線前必須搬伺服器端** |
-| 🟡 新攻擊面 | `log_event` RPC anon 可無限呼叫 → events 表灌爆（DB 膨脹） | 封測期接受，正式上架後併 Phase B 處理 |
-| 🟡 未變 | 無 CSP、每日 5 次上限純前端、`cleanup_old_scores_if_needed` anon 可呼叫 | 維持首輪結論（正式上架後處理） |
-| 🔴 未確認 | upload keystore 雲端備份 | 首輪待辦，**仍未見使用者確認**，再次提醒 |
+| 🟢 已改善 | RPC 物理一致性 + 提交冷卻（首輪 🟠「RPC 濫用面」主體） | **反作弊 Phase A 已實作並上線**（`migration_20260704.sql`，使用者 2026-07-04 已跑；含經典 level_id 白名單，順帶修掉任意字串塞列的污染面） |
+| 🟢 已修補 | `log_event` RPC anon 可無限呼叫 → events 表灌爆（DB 膨脹） | **三層節流已實作**（`migration_20260704b.sql`：單 IP 60/分 + 全服 10k/時 + 50k/日，props 上限 2048→512，膨脹絕對上限 ≈ 25MB/天）⚠️ 待使用者跑 |
+| 🟢 已修補 | `cleanup_old_scores_if_needed` anon 可呼叫 | **已收權**（同 migration b），改由每日 CI 帶 service key 呼叫（fetchDailyMap.ts）；cron-job.org 的 cleanup 排程可刪、keepalive 保留 |
+| 🟢 已上線 | 無 CSP / 安全 headers | **`public/_headers` 已加**：nosniff/XFO DENY/Referrer-Policy/Permissions-Policy 直接執法；CSP 先 **Report-Only** 觀察（怕誤擋 GSI 登入），真機確認 console 無違規後改名轉正（檔內有說明） |
+| 🟢 已上線 | GitHub Actions 未 pin SHA（首輪供應鏈潔癖項） | checkout / setup-node 已 pin 到 commit SHA |
+| 🟠 待決策 | 車庫金幣/擁有清單/任務/streak/成就全為 localStorage，可被使用者端竄改 | **使用者 2026-07-04 明確不接受**「竄改自己數值」→ 不再標「接受」。真解＝伺服器端錢包（需登入＋動 garage/quests 客戶端，見下），實作方案與時機待使用者拍板 |
+| 🟡 待排程 | 每日 5 次挑戰上限純前端（清 localStorage 可繞過） | 反作弊 Phase B 的 `consume_attempt` RPC（動 schema＋開局流程，封測求穩期未動），與上項一起排 |
+| 🟡 已答覆 | upload keystore 雲端備份 | 使用者 2026-07-04 回覆：密碼公司/家裡皆有記錄；keystore **檔案本體**備份狀態不確定但暫緩（Play App Signing 保底，upload key 遺失可向 Google 申請重置） |
 | 🟢 乾淨 | XSS 重掃（含新增畫面）／密鑰／npm audit prod 0 漏洞 | 無需動作 |
+| 🟡 dev-only | esbuild/vite dev server 漏洞 2 個 | **不進產品 bundle、只影響本機 dev server**——非上架風險；修復需 vite@8 breaking change，排正式上架後升級（跑 dev 時別逛可疑網站的緩解照舊） |
 
-### 車庫/金幣/任務/成就：localStorage 可竄改（設計性現況，非漏洞）
+### 車庫/金幣/任務/成就：localStorage 可竄改（🟠 待決策——使用者不接受擱置）
+
+> **2026-07-04 晚使用者裁示**：「任何影響遊戲的數值竄改都不接受，不管有沒有影響其他玩家」——
+> 本節原本的「接受」定位作廢。真解＝伺服器端錢包（金幣餘額/擁有清單存 DB、發幣走 RPC 帶
+> 伺服器端驗證與每日上限），需要登入、需要動 garage/quests 客戶端，方案與時機待使用者拍板
+> （見文末待辦第 5 項）。以下保留原始風險分析供決策參考。
 
 - `tr_garage_coins`（金幣）、`tr_garage_owned`（擁有車皮）、`tr_quest_progress`（每日任務）、
   `tr_daily_streak`、`tr_achv_market`（Q 系列成就）、`tr_ad_coin_claims_*`（廣告金幣每日 2 次上限）、
@@ -51,9 +60,12 @@
   （封測 12 人）可忽略，正式上架後若 events 量大可加 materialized 快取，記錄不動。
 - `admin_stats(p_days)`：security definer + email 硬編碼閘門，非 admin 回 null 不留線索；p_days 有 1~90 夾擠。乾淨。
 - `log_event()`：白名單 + 欄位上限都在，但 **anon 可無限次呼叫**（每列 props 上限 2KB）→
-  惡意腳本可灌爆 events 表（免費方案 500MB）。90 天清理擋不住短時間灌入。封測期網址未公開、
-  攻擊動機低，接受；**正式上架後建議併反作弊 Phase B 加輕量節流**（如同 device_id 每分鐘上限，
-  或 Cloudflare WAF rate limit——後者零 SQL 改動，更省事）。
+  惡意腳本可灌爆 events 表（免費方案 500MB）。90 天清理擋不住短時間灌入。
+  **→ 2026-07-04 晚已修**（使用者不接受封測期擱置）：`migration_20260704b.sql` 加三層節流
+  （單 IP 60/分、全服 10,000/時、50,000/日；IP 取 cf-connecting-ip 優先、XFF 最後一節備援，
+  取不到時落 'unknown' 共用桶＝限流變嚴而非失效）+ props 上限 2048→512（實際 payload < 200B）。
+  殘餘風險：分散式（多 IP 輪替）灌 `rate_limits` 計數表本身，被每日清理 + 全服上限雙重封頂，
+  絕對膨脹上限 ≈ 25MB/天，構不成威脅。
 - `submit_daily_score` / `submit_classic_record`（Phase A 版）：欄位間物理一致性驗證 + 10s 冷卻 +
   經典關卡白名單，全部靜默拒絕。上線前已拿線上真實資料回測（27+12 筆，0 誤殺），
   公式與設計文件的偏差及理由見 `migration_20260704.sql` 檔頭。
@@ -74,12 +86,15 @@
 - **分享圖卡**：離屏 canvas 自繪 + navigator.share，無外部資源注入面。
 - **AdSense 載入**（未啟用）：pub ID 寫死空字串，`loadAdSense` 目前死碼；啟用時 src 由常數組成，無注入面。
 
-### 第二輪待辦彙整
+### 第二輪待辦彙整（2026-07-04 晚更新：使用者指示「不留到上架」，能修的當晚全修）
 
-1. **使用者**：Supabase SQL Editor 跑 `supabase/migration_20260704.sql`（反作弊 Phase A）。
-2. **使用者**：確認 keystore + 密碼已雲端備份（首輪 🔴，仍未確認）。
-3. **P 系列 IAP 動工時**：擁有權驗證必須伺服器端（本輪最重要的前瞻性結論）。
-4. **正式上架後**：log_event 節流（併 Phase B）、CSP `_headers`、每日次數上限搬 DB（Phase B）。
+1. ✅ `migration_20260704.sql`（反作弊 Phase A）——使用者已跑，真機驗證成績正常上榜。
+2. **使用者**：Supabase SQL Editor 跑 **`migration_20260704b.sql`**（log_event 節流 + cleanup 收權）。
+3. **使用者**：cron-job.org 上呼叫 `cleanup_old_scores_if_needed` 的排程**可以刪了**（收權後會開始回權限錯誤；keepalive ping 排程保留不動）。
+4. **使用者**：部署後真機/桌機玩一輪＋登入，開 DevTools console 看有無 `Content-Security-Policy-Report-Only` 違規訊息；乾淨的話回報，把 `_headers` 的 CSP 改名轉正式執法。
+5. **待使用者拍板**：localStorage 金幣/擁有清單搬伺服器端的方案與時機（🟠 待決策項）＋每日 5 次上限搬 DB（Phase B）。
+6. **P 系列 IAP 動工時**：擁有權驗證必須伺服器端（前瞻性結論，與第 5 項同一套伺服器錢包可一起解）。
+7. keystore：密碼已確認兩地留存；檔案本體備份使用者暫緩（Play App Signing 保底），不再追蹤為 🔴。
 
 ---
 

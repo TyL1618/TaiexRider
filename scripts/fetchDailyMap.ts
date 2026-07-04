@@ -267,6 +267,15 @@ async function main() {
   });
   console.log(evDel.ok ? "events 90 天前舊事件已清理" : "events 清理跳過（RPC 尚未建立）");
 
+  // daily_scores 容量護欄（DB > 400MB 才刪 90 天前成績）。
+  // 2026-07-04 起 RPC 收權（migration_20260704b.sql），anon 不能再呼叫，改由這裡帶 service key 每日呼叫。
+  const scDel = await fetch(`${SUPABASE_URL}/rest/v1/rpc/cleanup_old_scores_if_needed`, {
+    method: "POST",
+    headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, "Content-Type": "application/json" },
+    body: "{}",
+  });
+  console.log(scDel.ok ? "daily_scores 容量檢查完成" : "daily_scores 清理呼叫失敗（無妨，下次再試）");
+
   console.log("✅ 完成");
 }
 

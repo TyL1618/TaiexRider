@@ -1,0 +1,16 @@
+# Cloudflare Pages 安全 headers（SECURITY_REVIEW 2026-07-04 第二輪）
+# CSP 先上 Report-Only：只在瀏覽器 console 記違規、不真的擋，確認 Google 登入/Supabase/
+# 分享圖卡全流程無違規後，把最後一行的 Content-Security-Policy-Report-Only 改名為
+# Content-Security-Policy 轉正式執法（改這個檔 push 即可，無其他步驟）。
+#
+# 來源清單依據：GSI 登入 accounts.google.com（script/frame/connect）、Supabase REST/auth
+# *.supabase.co（connect）、分享圖卡 canvas blob:（img）、Google 頭像 *.googleusercontent.com（img）。
+# ⚠️ 未來加新外部服務（AdSense pagead2.googlesyndication.com 等）記得同步補進 CSP。
+# Permissions-Policy 刻意不禁 payment：TWA 未來接 Play Billing 的 Digital Goods API 會用到。
+
+/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), usb=(), serial=()
+  Content-Security-Policy-Report-Only: default-src 'self'; script-src 'self' https://accounts.google.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.googleusercontent.com; connect-src 'self' https://*.supabase.co https://accounts.google.com; frame-src https://accounts.google.com; worker-src 'self'; manifest-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; frame-ancestors 'none'
