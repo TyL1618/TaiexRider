@@ -90,17 +90,22 @@
      「如要透過這款應用程式營利，請設定商家帳戶」——建立有價格的應用程式內產品前，
      必須先設定 Google 商家帳戶（Payments profile，含金流/稅務/收款帳戶資訊），這步驟
      使用者尚未完成，待處理。
-  3. **Google Cloud 服務帳號**：✅ 已啟用 Google Play Android Developer API（2026-07-06
-     確認畫面正確）。已建立服務帳號，目前帳號 email：
+  3. [x] **Google Cloud 服務帳號**：✅ 已啟用 Google Play Android Developer API。已建立服務
+     帳號並下載 JSON 金鑰，帳號 email：
      **`taiexrider-iap-verify-237@tokyo-dispatch-426713-t8.iam.gserviceaccount.com`**
-     （另有一個重複建立、尚未生過金鑰的 `taiexrider-iap-verify@...`（無 -237 後綴），
-     建議之後清理掉避免搞混，只留一個）。**⚠️ 還沒下載 JSON 金鑰**，也還沒把這個 email
-     加進 Play Console「使用者和權限」授權（要有查看財務資料/訂單的權限，否則 API 呼叫
-     會 403）——這兩步待做。
-  4. **部署 Edge Function**：`npx supabase login` → `npx supabase link --project-ref <ref>`
-     → `npx supabase secrets set GOOGLE_SERVICE_ACCOUNT_EMAIL=... GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY="..."`
-     → `npx supabase functions deploy verify-iap-purchase`。**尚未部署**（需要上面金鑰才能設定
-     secrets）。
+     （另有一個重複建立、從未生過金鑰的 `taiexrider-iap-verify@...`（無 -237 後綴）——
+     **仍待使用者手動去 Google Cloud 清理掉**，避免之後搞混）。
+     **⚠️ 還沒把這個 email 加進 Play Console「使用者和權限」授權**（要有查看財務資料/訂單
+     的權限）——這步還沒做，代表就算 Play Console 商品建好，實際驗證購買時 Google API
+     呼叫仍會 403，待補。
+  4. [x] **部署 Edge Function 已完成**（2026-07-06，Claude 直接操作）：JSON 金鑰內容取出
+     `client_email`/`private_key` 寫進**專案資料夾外**的暫存檔（scratchpad，非 repo），
+     用使用者提供的 Supabase 個人存取權杖（用完即建議撤銷）跑
+     `supabase link --project-ref cjnwwtrpveejhbwalncy` → `supabase secrets set --env-file`
+     → `supabase functions deploy verify-iap-purchase`，皆成功。已用 curl 打實際部署好的
+     function URL 驗證：未帶真實使用者 session 時正確回 `{"ok":false,"error":"not authenticated"}`，
+     代表程式碼邏輯真的在雲端跑，不是空殼。暫存 secrets 檔已刪除，**JSON 金鑰原始檔仍在使用者
+     `Downloads` 資料夾，建議之後自行移到 repo 以外的安全位置保管或刪除**。
   5. **🔴 最容易漏掉的一步——Android 原生專案本身要改**：Digital Goods API 光靠網頁端程式碼
      不會生效，TWA 的 Android 專案要加 androidbrowserhelper 的 Play Billing 橋接（依賴 +
      manifest 設定），這是原生層改動，套用「android/ push 無效」規則——要在 Android Studio
