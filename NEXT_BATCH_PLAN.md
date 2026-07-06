@@ -85,14 +85,16 @@
   （對現有封測玩家零影響，因為偵測不到就不顯示按鈕）：**
   1. [x] **Supabase SQL Editor 跑 `migration_20260706c.sql`**（`iap_purchases` 表 + RPC）
      ——2026-07-06 使用者確認已跑，REST API 驗證兩者皆存在（回 42501 permission denied）。
-  2. [ ] **Google Play Console** 建立商品：路徑是「透過 Google Play 營利 → 產品 → **單次
-     產品**」（介面改版過，不是文件原本寫的「應用程式內產品」這個名稱，2026-07-06 使用者
-     實際找到的正確路徑）。SKU id 要跟上面三個一致。
-     **✅ 2026-07-06 定價已拍板**：
+  2. [x] **Google Play Console 建立商品 ✅ 2026-07-06 全部完成**：路徑是「透過 Google Play
+     營利 → 產品 → **單次產品**」（介面改版過，不是文件原本寫的「應用程式內產品」這個
+     名稱）。四個 SKU 皆已建立、設好購買選項（`<sku>-default`）、批次定價（Set prices
+     工具設 TWD 基準價，全球 173 個國家/地區自動換算）、上傳 Claude 生成的圖示（512×512
+     PNG，四張視覺不同：鑽石小/中/大包 + 去廣告盾牌），狀態皆顯示「有效」：
      - `diamonds_100`（消耗型）→ NT$30
      - `diamonds_350`（消耗型）→ NT$90
      - `diamonds_1200`（消耗型）→ NT$270
-     - `remove_ads_forever`（**非消耗型/受管理商品**，注意類型不要選錯）→ **NT$69**
+     - `remove_ads_forever`（非消耗型/受管理商品）→ NT$69
+     **Play Console 端設定至此全部完工**（剩下的真機測試見下方第 6 點）。
      **✅ 前置阻礙已全部解除**：
      - 商家帳戶（Payments profile）稅務資訊✅已核准（未登記稅籍個人）；付款方式（電匯至
        合作金庫帳戶 ••••7662，戶名 TSAI,YUN-LUNG）✅ **2026-07-06 已收到 Google Payments
