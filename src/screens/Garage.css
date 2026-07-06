@@ -11,6 +11,14 @@
 
 .garage-diamonds {
   color: #c9a8ff;
+  margin-bottom: 0.3rem;
+}
+
+.garage-collection {
+  text-align: center;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--neon-cyan);
   margin-bottom: 0.5rem;
 }
 

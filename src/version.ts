@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.12.28";
+export const APP_VERSION = "0.12.29";
 
 export interface ChangelogEntry {
   date: string;
@@ -6,6 +6,15 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    date: "2026-07-06 (v0.12.29)",
+    notes: [
+      "新增「狂暴盤日」：前次收盤大盤振幅 ≥2.5% 時首頁公告，當日任務獎勵 ×2",
+      "新增股票圖鑑：自選/長征模式騎過的個股會被收集，車庫頁顯示「N / 總數 支已收集」",
+      "新增週任務：每週 3 個較大目標任務，每日排名賽頁面顯示進度（跟每日任務並存）",
+      "經典模式排行從「每關 1 位保持者」改成「每關前 3 名」，卡片顯示 🥇🥈🥉",
+    ],
+  },
   {
     date: "2026-07-04 (v0.12.28)",
     notes: [

@@ -13,6 +13,8 @@ const fmtMs = (ms: number) => {
   return `${Math.floor(s / 60)}:${(s % 60).toFixed(3).padStart(6, "0")}`;
 };
 
+const RANK_ICON = ["🥇", "🥈", "🥉"];
+
 export default function ClassicSelect({
   user,
   onPick,
@@ -22,7 +24,7 @@ export default function ClassicSelect({
   onPick: (t: TrackData) => void;
   onBack: () => void;
 }) {
-  const [records, setRecords] = useState<Map<string, ClassicRecord>>(new Map());
+  const [records, setRecords] = useState<Map<string, ClassicRecord[]>>(new Map());
 
   useEffect(() => {
     let alive = true;
@@ -34,7 +36,7 @@ export default function ClassicSelect({
     <div className="select-screen">
       <button className="back-btn" onClick={onBack}>‹ 返回</button>
       <h1 className="select-title">經典模式</h1>
-      <p className="classic-intro">歷史上著名的股市盤勢，化成賽道。每關只留一位紀錄保持者。</p>
+      <p className="classic-intro">歷史上著名的股市盤勢，化成賽道。每關留前 3 名紀錄。</p>
 
       {!user && (
         <div className="classic-login">
@@ -47,7 +49,7 @@ export default function ClassicSelect({
 
       <div className="track-list">
         {CLASSICS.map((c) => {
-          const rec = records.get(c.id);
+          const recs = records.get(c.id) ?? [];
           const pb = classicPb(c.id);
           const medal = medalFor(pb);
           const next = nextMedalTarget(pb);
@@ -68,8 +70,12 @@ export default function ClassicSelect({
                 {!next && <span className="cm-next gold">・全獎牌達成！</span>}
               </div>
               <div className="classic-record">
-                {rec ? (
-                  <>🏆 <span className="cr-name">{rec.player_name}</span>・{rec.score} 分・{fmtMs(rec.time_ms)}</>
+                {recs.length > 0 ? (
+                  recs.map((r, i) => (
+                    <div key={i} className="classic-record-row">
+                      {RANK_ICON[i]} <span className="cr-name">{r.player_name}</span>・{r.score} 分・{fmtMs(r.time_ms)}
+                    </div>
+                  ))
                 ) : (
                   <span className="cr-empty">🏁 尚無紀錄・搶頭香</span>
                 )}

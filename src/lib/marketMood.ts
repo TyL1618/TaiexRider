@@ -11,9 +11,14 @@ export interface MarketMood {
   mood: Mood;
   changePct: number;
   dateStr: string; // "7/2"
+  isRage: boolean; // 狂暴盤：|漲跌|≥ RAGE_THRESHOLD，當日任務獎勵 ×2（伺服器 wallet_earn/claim_weekly_quest 各自重算，這裡只供顯示用）
 }
 
 const THRESHOLD = 0.01; // ±1% 大漲/大跌門檻，之後可依實際資料分布微調
+// 狂暴盤門檻：2026-07-06 用 TAIEX 近 2 年（482 交易日）實測資料校準，2% 出現機率
+// 14.9%（約每 6.7 個交易日一次，等於幾乎每週都來，太常見無法構成「特殊事件」），
+// 2.5% 出現機率 10.0%（約每 10 個交易日一次，兩週一次），使用者拍板選 2.5%。
+const RAGE_THRESHOLD = 0.025;
 
 export async function resolveMarketMood(): Promise<MarketMood | null> {
   const date = dailyKey();
@@ -28,5 +33,6 @@ export async function resolveMarketMood(): Promise<MarketMood | null> {
   const changePct = (last - first) / first;
   const mood: Mood = changePct > THRESHOLD ? "up" : changePct < -THRESHOLD ? "down" : "flat";
   const dateStr = `${displayDate.getUTCMonth() + 1}/${displayDate.getUTCDate()}`;
-  return { mood, changePct, dateStr };
+  const isRage = Math.abs(changePct) >= RAGE_THRESHOLD;
+  return { mood, changePct, dateStr, isRage };
 }

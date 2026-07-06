@@ -18,6 +18,7 @@
 import { supabase } from "./supabase";
 import { writeAchievementsCache, resetAchievementsCache } from "./achievements";
 import { writeStreakCache, resetStreakCache } from "./streak";
+import { writeCollectionCache, resetCollectionCache } from "./collection";
 
 export interface BikeSkin {
   id: string;
@@ -102,7 +103,7 @@ async function getUid(): Promise<string | null> {
 }
 
 // 把伺服器回應寫進本地快取（覆寫，不是疊加——伺服器永遠是最新真相）
-function writeCoinsCache(n: number): void {
+export function writeCoinsCache(n: number): void {
   try { localStorage.setItem(COINS_KEY, String(Math.max(0, n))); } catch { /* 靜默 */ }
 }
 function writeDiamondsCache(n: number): void {
@@ -125,16 +126,18 @@ export async function syncWalletFromServer(): Promise<void> {
     coins: number; diamonds: number; owned: string[];
     bull_finishes: number; bear_finishes: number;
     streak_count: number; last_session_key: string | null;
+    collection: string[];
   };
   writeCoinsCache(row.coins);
   writeDiamondsCache(row.diamonds);
   writeOwnedCache(row.owned);
   writeAchievementsCache(row.bull_finishes, row.bear_finishes);
   writeStreakCache(row.last_session_key, row.streak_count);
+  writeCollectionCache(row.collection ?? []);
 }
 
-// 登出時呼叫：把錢包/成就/streak 快取全部歸零成訪客預設值，避免下一個登入的帳號
-// （或登出後的訪客畫面）看到上一個帳號的金幣/鑽石/車皮/成就殘影。
+// 登出時呼叫：把錢包/成就/streak/圖鑑快取全部歸零成訪客預設值，避免下一個登入的帳號
+// （或登出後的訪客畫面）看到上一個帳號的金幣/鑽石/車皮/成就/收集殘影。
 export function resetWalletCache(): void {
   writeCoinsCache(0);
   writeDiamondsCache(0);
@@ -142,6 +145,7 @@ export function resetWalletCache(): void {
   try { localStorage.setItem(ACTIVE_KEY, "default"); } catch { /* 靜默 */ }
   resetAchievementsCache();
   resetStreakCache();
+  resetCollectionCache();
 }
 
 // 完賽時呼叫（App.tsx，僅已登入玩家；未登入走 achievements.ts 本地 recordFinish）。

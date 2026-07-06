@@ -1,4 +1,5 @@
-// 經典模式紀錄保持者（每關只一位）。讀取走 PostgREST，提交走 RPC（需 Google 登入）。
+// 經典模式紀錄榜（每關前 3 名，2026-07-06 從「每關 1 位保持者」改版）。
+// 讀取走 PostgREST，提交走 RPC（需 Google 登入）。
 const URL = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
 
@@ -20,10 +21,11 @@ function anonHeaders(): Record<string, string> {
   return { apikey: KEY!, Authorization: `Bearer ${KEY!}` };
 }
 
-let _cache: Promise<Map<string, ClassicRecord>> | null = null;
+let _cache: Promise<Map<string, ClassicRecord[]>> | null = null;
 
-// 一次撈全部保持者（整表 ~12 列），回傳 level_id → 紀錄 的 Map。promise 快取。
-export function fetchClassicRecords(): Promise<Map<string, ClassicRecord>> {
+// 一次撈全部前三名（整表天生封頂在「關卡數 × 3」列），回傳 level_id → 前三名陣列
+// （已依分數高→時間短排序）的 Map。promise 快取。
+export function fetchClassicRecords(): Promise<Map<string, ClassicRecord[]>> {
   if (!_cache) _cache = _fetch();
   return _cache;
 }
@@ -32,17 +34,22 @@ export function invalidateClassicRecords() {
   _cache = null;
 }
 
-async function _fetch(): Promise<Map<string, ClassicRecord>> {
-  const out = new Map<string, ClassicRecord>();
+async function _fetch(): Promise<Map<string, ClassicRecord[]>> {
+  const out = new Map<string, ClassicRecord[]>();
   if (!isClassicRecordsConfigured) return out;
   try {
     const r = await fetch(
-      `${URL}/rest/v1/classic_records?select=level_id,player_name,score,time_ms`,
+      `${URL}/rest/v1/classic_records?select=level_id,player_name,score,time_ms` +
+      `&order=level_id.asc,score.desc,time_ms.asc`,
       { headers: anonHeaders() },
     );
     if (!r.ok) return out;
     const rows = (await r.json()) as ClassicRecord[];
-    for (const row of rows) out.set(row.level_id, row);
+    for (const row of rows) {
+      const list = out.get(row.level_id) ?? [];
+      list.push(row);
+      out.set(row.level_id, list);
+    }
     return out;
   } catch {
     return out;

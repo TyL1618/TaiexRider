@@ -9,6 +9,7 @@ import { getAttempts, incrementAttempts, consumeAttemptServer, MAX_ATTEMPTS, FRE
 import { recordStreak, getStreak, playedThisSession, writeStreakCache } from "../lib/streak";
 import { fetchDeathHeatmap, type HeatBucket } from "../lib/deathHeatmap";
 import { getDailyQuests } from "../lib/quests";
+import { getWeeklyQuests, syncWeeklyFromServer, weekKey, type WeeklyQuestView } from "../lib/weeklyQuests";
 import CoinIcon from "../components/CoinIcon";
 import type { TrackData } from "../data/tracks";
 import "./DailyChallenge.css";
@@ -60,12 +61,21 @@ export default function DailyChallenge({
   const [streakLive, setStreakLive] = useState(false); // 本期已參賽（🔥 實心）或待延續（提示）
   const [heat, setHeat] = useState<HeatBucket[]>([]); // 今日全服死亡熱點（20 等分）
   const [quests] = useState(() => getDailyQuests(dailyKey())); // 每日任務（裝置本地日曆日，跨模式共用）
+  const [weeklyQuests, setWeeklyQuests] = useState<WeeklyQuestView[]>([]); // 本週任務（ISO 週別，已登入才有伺服器權威進度）
 
   useEffect(() => {
     let alive = true;
     fetchDeathHeatmap().then((rows) => { if (alive) setHeat(rows); });
     return () => { alive = false; };
   }, []);
+
+  // 已登入時先跟伺服器同步一次本週進度，避免顯示同步前的舊本地快取
+  useEffect(() => {
+    let alive = true;
+    const week = weekKey();
+    syncWeeklyFromServer(week).then(() => { if (alive) setWeeklyQuests(getWeeklyQuests(week)); });
+    return () => { alive = false; };
+  }, [user]);
 
   useEffect(() => {
     let alive = true;
@@ -161,6 +171,17 @@ export default function DailyChallenge({
         <div className="daily-quests">
           <div className="daily-quests-title">📋 今日任務</div>
           {quests.map((q) => (
+            <div key={q.id} className={`quest-item${q.done ? " done" : ""}`}>
+              <span className="quest-check">{q.done ? "✅" : "⬜"}</span>
+              <span className="quest-title">{q.title}</span>
+              <span className="quest-progress">{q.progress}/{q.target}・+{q.reward}<CoinIcon size={11} /></span>
+            </div>
+          ))}
+        </div>
+
+        <div className="weekly-quests">
+          <div className="weekly-quests-title">🗓️ 本週任務</div>
+          {weeklyQuests.map((q) => (
             <div key={q.id} className={`quest-item${q.done ? " done" : ""}`}>
               <span className="quest-check">{q.done ? "✅" : "⬜"}</span>
               <span className="quest-title">{q.title}</span>

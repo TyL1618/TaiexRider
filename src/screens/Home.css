@@ -68,6 +68,26 @@
   opacity: 0.85;
 }
 
+.market-mood-caption:has(+ .rage-day-banner) {
+  margin-bottom: 0.4rem;
+}
+
+/* 狂暴盤日事件：前次收盤 |漲跌| ≥ 2.5%，任務獎勵 ×2（伺服器端已加倍，這裡只是公告） */
+.rage-day-banner {
+  margin: 0 0 1.6rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: #ffd23f;
+  text-shadow: 0 0 8px rgba(255, 210, 63, 0.55);
+  animation: rageDayPulse 1.8s ease-in-out infinite;
+}
+
+@keyframes rageDayPulse {
+  0%, 100% { opacity: 0.85; }
+  50%      { opacity: 1; }
+}
+
 /* 首頁車皮展示框：目前裝備車款的高解析大圖，點擊直接進車庫換車 */
 .bike-showcase {
   width: 100%;

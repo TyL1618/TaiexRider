@@ -20,8 +20,10 @@ import { getPlayerName } from "./lib/playerId";
 import { dailyKey } from "./data/pick";
 import { setPlaying } from "./pwa";
 import { logEvent, type AnalyticsMode } from "./lib/analytics";
-import { addCoins, earnCoins, syncWalletFromServer, grantDevWallet, recordMarketFinish } from "./lib/garage";
+import { addCoins, earnCoins, syncWalletFromServer, grantDevWallet, recordMarketFinish, writeCoinsCache } from "./lib/garage";
 import { recordRun } from "./lib/quests";
+import { recordWeeklyRun, claimWeeklyQuest, weekKey } from "./lib/weeklyQuests";
+import { collectStock } from "./lib/collection";
 import { resolveMarketMood, type MarketMood } from "./lib/marketMood";
 import { recordFinish } from "./lib/achievements";
 
@@ -195,11 +197,32 @@ export default function App() {
     // 背景呼叫伺服器 RPC 覆寫成真實餘額（含每日上限），未登入時 earnCoins 直接略過。
     addCoins(stats.finished ? 10 : 3);
     earnCoins(stats.finished ? "finish" : "crash");
+    // 狂暴盤日（|漲跌|≥2.5%）任務獎勵 ×2：已登入時伺服器 wallet_earn/claim_weekly_quest
+    // 各自重算當期漲跌決定是否加倍（不信任前端），這裡的倍率只影響未登入玩家的本地樂觀值。
+    const rageMultiplier = marketMood?.isRage ? 2 : 1;
     // 每日任務：用裝置本地日曆日累計，跨模式共用同一組任務池
     const newlyDone = recordRun(dailyKey(), {
       score: stats.score, flips: stats.flips, perfect: stats.perfect, timeMs: stats.timeMs,
     });
-    for (const q of newlyDone) { addCoins(q.reward); earnCoins("quest"); }
+    for (const q of newlyDone) { addCoins(q.reward * rageMultiplier); earnCoins("quest"); }
+    // 週任務：仿每日任務，但用 ISO 週別累計，需登入才有伺服器權威進度（詳見 weeklyQuests.ts）
+    const week = weekKey();
+    recordWeeklyRun(week, {
+      score: stats.score, flips: stats.flips, perfect: stats.perfect, timeMs: stats.timeMs,
+    }).then(async (newlyDoneWeekly) => {
+      for (const q of newlyDoneWeekly) {
+        const result = await claimWeeklyQuest(week, q.id);
+        if (result.coins !== null) writeCoinsCache(result.coins);
+        else addCoins(q.reward * rageMultiplier);
+      }
+    });
+    // 股票圖鑑：自選/長征模式騎過的個股才算（kind==='stock'，daily/classic 排除在外）；
+    // 長征一次串 5 支，代號放在 subtitle（換行分隔）。跟哪一天的盤勢無關，同一支重複騎不重複計。
+    const t = trackRef.current;
+    if (t?.kind === "stock") {
+      const codes = t.mode === "long" ? (t.subtitle?.split("\n") ?? []) : [t.label];
+      for (const code of codes) { if (code) collectStock(code); }
+    }
     // Q 系列成就：完賽才算，依當期大盤漲跌累計。已登入時改由伺服器 record_market_finish
     // RPC 自己重算當期 TAIEX 漲跌（不信任前端傳的 mood），未登入才用本地 recordFinish()。
     if (stats.finished) {

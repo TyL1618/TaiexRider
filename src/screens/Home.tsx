@@ -100,6 +100,9 @@ export default function Home({
           今日盤勢為 {marketMood.dateStr} 之盤勢，{MOOD_LABEL[marketMood.mood]}
         </p>
       )}
+      {marketMood?.isRage && (
+        <p className="rage-day-banner">⚡ 狂暴盤：今日任務獎勵 ×2</p>
+      )}
 
       <button className="bike-showcase" onClick={() => onNav("garage")}>
         <img

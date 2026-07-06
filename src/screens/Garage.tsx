@@ -4,7 +4,8 @@ import { requestRewardedCoins } from "../lib/ads";
 import { AD_COIN_REWARD, MAX_AD_COIN_CLAIMS_PER_DAY, getAdCoinClaims, incrementAdCoinClaims } from "../lib/adRewards";
 import { getAchievementBikes, type AchvBikeView } from "../lib/achievements";
 import { getStreak } from "../lib/streak";
-import { resolveSessionDate } from "../lib/dailyMap";
+import { resolveSessionDate, fetchDailyMapList } from "../lib/dailyMap";
+import { getCollectedCount } from "../lib/collection";
 import { dailyKey } from "../data/pick";
 import CoinIcon from "../components/CoinIcon";
 import "../TrackSelect.css";
@@ -26,7 +27,16 @@ export default function Garage({ onBack }: { onBack: () => void }) {
   const [watchingAd, setWatchingAd] = useState(false);
   const [adClaims, setAdClaims] = useState(() => getAdCoinClaims(dailyKey()));
   const [achvBikes, setAchvBikes] = useState<AchvBikeView[]>(() => getAchievementBikes(0));
+  const [collectedCount, setCollectedCount] = useState(() => getCollectedCount());
+  const [totalStocks, setTotalStocks] = useState<number | null>(null);
   const [, forceRender] = useState(0);
+
+  // 圖鑑分母：目前市場總股票數（跟 TrackSelect 自選賽道同一份清單，~1090 支）
+  useEffect(() => {
+    let alive = true;
+    fetchDailyMapList(dailyKey()).then((list) => { if (alive && list.length > 0) setTotalStocks(list.length); });
+    return () => { alive = false; };
+  }, []);
 
   // Q 系列 streak 進度依「目前這一期」session key 讀（連假整段算同一期，跟 DailyChallenge 同源）
   const refreshAchvBikes = async (checkAlive: () => boolean) => {
@@ -49,6 +59,7 @@ export default function Garage({ onBack }: { onBack: () => void }) {
       if (!alive) return;
       setCoins(getCoins());
       setDiamonds(getDiamonds());
+      setCollectedCount(getCollectedCount());
       await refreshAchvBikes(() => alive);
       if (alive) forceRender((n) => n + 1);
     });
@@ -146,6 +157,7 @@ export default function Garage({ onBack }: { onBack: () => void }) {
       <h1 className="select-title">車庫</h1>
       <p className="garage-coins"><CoinIcon size={22} /> 金幣 {coins}</p>
       <p className="garage-coins garage-diamonds">💎 鑽石 {diamonds}</p>
+      <p className="garage-collection">📖 圖鑑 {collectedCount}{totalStocks ? ` / ${totalStocks}` : ""} 支已收集</p>
       <p className="garage-intro">完賽/摔車與每日任務都能賺金幣，解鎖車皮換上場</p>
       <button
         className="garage-ad-btn"

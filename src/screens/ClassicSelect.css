@@ -51,9 +51,11 @@
   margin-top: 0.15rem;
   padding-top: 0.4rem;
   border-top: 1px solid rgba(45, 226, 230, 0.15);
-  font-size: 0.78rem;
+  font-size: 0.74rem;
   text-align: right;
   color: var(--neon-amber);
+}
+.classic-record-row {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
