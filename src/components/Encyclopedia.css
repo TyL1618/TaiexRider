@@ -1,0 +1,101 @@
+.encyclopedia-panel { width: min(94vw, 460px); }
+
+.encyclopedia-summary {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  letter-spacing: 0.04em;
+}
+
+.encyclopedia-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 0.5rem;
+}
+
+.ency-sort-btn {
+  flex: 0 0 auto;
+  padding: 0.35rem 0.7rem;
+  font-size: 0.76rem;
+  letter-spacing: 0.04em;
+  color: var(--text);
+  background: rgba(45, 226, 230, 0.08);
+  border: 1px solid rgba(45, 226, 230, 0.3);
+  border-radius: 8px;
+  cursor: pointer;
+}
+.ency-sort-btn:active { transform: scale(0.96); }
+
+.ency-filter-group { display: flex; gap: 0.3rem; }
+
+.ency-filter-btn {
+  padding: 0.35rem 0.6rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.03em;
+  color: var(--text-dim);
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  cursor: pointer;
+}
+.ency-filter-btn.active {
+  color: #05080f;
+  background: var(--neon-cyan);
+  border-color: var(--neon-cyan);
+  font-weight: 700;
+}
+
+.encyclopedia-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.ency-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.6rem 0.4rem;
+  font-size: 0.84rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--text-dim);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+}
+
+.ency-card.collected {
+  color: var(--neon-amber);
+  background: rgba(255, 179, 0, 0.08);
+  border-color: rgba(255, 179, 0, 0.4);
+}
+
+.ency-card.delisted { opacity: 0.5; }
+
+.ency-star {
+  position: absolute;
+  top: 3px;
+  left: 6px;
+  font-size: 0.68rem;
+}
+
+.ency-delisted-tag {
+  position: absolute;
+  bottom: 2px;
+  right: 6px;
+  font-size: 0.56rem;
+  letter-spacing: 0.02em;
+  color: var(--text-dim);
+}
+
+.ency-empty {
+  grid-column: 1 / -1;
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 0.8rem;
+  padding: 1rem 0;
+}

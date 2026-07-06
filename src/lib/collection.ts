@@ -11,6 +11,40 @@ import { supabase } from "./supabase";
 
 const KEY = "tr_collection";
 
+// 圖鑑登記表（絕版制，見 migration_20260707.sql）：公開讀取，不需要登入，
+// 走原生 fetch 直接打 PostgREST（同 dailyMap.ts/leaderboard.ts 的慣例），
+// 不透過 supabase-js（避免已登入時夾帶 session token 改變 RLS 角色，這裡本來就該是 anon 讀）。
+const SUPA_URL = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+const SUPA_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+
+export interface RegistryEntry {
+  stock_code: string;
+  stock_name: string;
+  delisted: boolean;
+}
+
+let _registryCache: Promise<RegistryEntry[]> | null = null;
+
+// 圖鑑全部代號（含絕版），依代號排序。promise 快取，同一次 session 只打一次。
+export function fetchStockRegistry(): Promise<RegistryEntry[]> {
+  if (!_registryCache) _registryCache = _fetchRegistry();
+  return _registryCache;
+}
+
+async function _fetchRegistry(): Promise<RegistryEntry[]> {
+  if (!SUPA_URL || !SUPA_ANON_KEY) return [];
+  try {
+    const r = await fetch(
+      `${SUPA_URL}/rest/v1/stock_registry?select=stock_code,stock_name,delisted&order=stock_code.asc`,
+      { headers: { apikey: SUPA_ANON_KEY, Authorization: `Bearer ${SUPA_ANON_KEY}` } },
+    );
+    if (!r.ok) return [];
+    return (await r.json()) as RegistryEntry[];
+  } catch {
+    return [];
+  }
+}
+
 function load(): string[] {
   try {
     const raw = localStorage.getItem(KEY);

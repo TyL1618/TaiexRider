@@ -171,6 +171,38 @@ async function fetchTaiexSession(): Promise<{ date: string; prices: number[] } |
   return null;
 }
 
+// 股票圖鑑登記表（絕版制，見 migration_20260707.sql）：把今天抓到的官方上市清單
+// 順手 upsert 進 stock_registry（保留 first_seen 不被覆蓋，只更新 last_seen/名稱），
+// 再呼叫 mark_delisted_stocks RPC 用同一份清單判定誰下市了。放在抓完清單、開始
+// 逐支慢速抓 Yahoo 資料之前執行，不需要等整個流程跑完。
+async function upsertStockRegistry(stocks: { code: string; name: string }[]): Promise<void> {
+  if (stocks.length === 0) return;
+  const today = new Date(Date.now() + 8 * 3600 * 1000).toISOString().slice(0, 10);
+  const rows = stocks.map(s => ({ stock_code: s.code, stock_name: s.name, last_seen: today }));
+
+  for (let i = 0; i < rows.length; i += BATCH_SIZE) {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/stock_registry`, {
+      method: "POST",
+      headers: {
+        apikey: SUPABASE_KEY,
+        Authorization: `Bearer ${SUPABASE_KEY}`,
+        "Content-Type": "application/json",
+        Prefer: "resolution=merge-duplicates",
+      },
+      body: JSON.stringify(rows.slice(i, i + BATCH_SIZE)),
+    });
+    if (!r.ok) { console.error("  stock_registry upsert 失敗：", await r.text()); return; }
+  }
+  console.log(`  股票圖鑑登記表已更新（${rows.length} 支）`);
+
+  const markRes = await fetch(`${SUPABASE_URL}/rest/v1/rpc/mark_delisted_stocks`, {
+    method: "POST",
+    headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ p_active_codes: stocks.map(s => s.code) }),
+  });
+  console.log(markRes.ok ? "  絕版狀態已更新" : "  絕版狀態更新跳過（RPC 尚未建立/呼叫失敗）");
+}
+
 // 批次 upsert
 async function upsertBatch(rows: StockRow[]): Promise<void> {
   const r = await fetch(`${SUPABASE_URL}/rest/v1/daily_map`, {
@@ -215,6 +247,7 @@ async function main() {
   console.log("取得上市股票清單...");
   const stocks = await fetchAllListedStocks();
   console.log(`共 ${stocks.length} 支，預估 ${Math.round(stocks.length * DELAY_MS / 60000)} 分鐘`);
+  await upsertStockRegistry(stocks);
 
   let ok = 0, fail = 0;
   for (let i = 0; i < stocks.length; i++) {

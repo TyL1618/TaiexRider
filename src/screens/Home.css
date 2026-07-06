@@ -31,11 +31,18 @@
   color: var(--text-dim);
 }
 
+.home-entry-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  margin-bottom: 1.1rem;
+}
+
 .garage-entry-btn {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  margin-bottom: 1.1rem;
   padding: 0.4rem 1rem;
   background: rgba(255, 179, 0, 0.06);
   border: 1px solid rgba(255, 179, 0, 0.4);
@@ -44,6 +51,24 @@
   cursor: pointer;
 }
 .garage-entry-btn:active { transform: scale(0.96); }
+
+/* 圖鑑入口：跟收藏車庫同一行並排，省垂直空間（青色系跟車庫的琥珀色系區隔） */
+.ency-entry-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.9rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--text);
+  background: rgba(45, 226, 230, 0.06);
+  border: 1px solid rgba(45, 226, 230, 0.4);
+  border-radius: 999px;
+  box-shadow: 0 0 16px rgba(45, 226, 230, 0.18);
+  cursor: pointer;
+}
+.ency-entry-btn:active { transform: scale(0.96); }
 .garage-entry-coins {
   font-size: 1rem;
   font-weight: 800;

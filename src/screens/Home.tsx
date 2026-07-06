@@ -8,6 +8,7 @@ import { getCoins, getActiveBikeSkin } from "../lib/garage";
 import CoinIcon from "../components/CoinIcon";
 import type { MarketMood } from "../lib/marketMood";
 import StatsScreen from "./StatsScreen";
+import Encyclopedia from "../components/Encyclopedia";
 import "./Home.css";
 
 export type Screen = "home" | "custom" | "random" | "daily" | "classic" | "garage";
@@ -35,6 +36,7 @@ export default function Home({
   const [logoutConfirm, setLogoutConfirm] = useState(false);
   const [volume, setVolumeState]        = useState(() => Math.round(getVolume() * 100));
   const [showStats, setShowStats]       = useState(false);
+  const [showEncyclopedia, setShowEncyclopedia] = useState(false);
   // 隱藏統計頁入口：3 秒內連點版本號 5 下（權限門鎖在後端 admin RPC，這只是入口）。
   // 用 ref 同步計數（state 在快速連點時會讀到舊值）。
   const tapRef = useRef({ n: 0, t: 0 });
@@ -90,11 +92,17 @@ export default function Home({
       <h1 className="home-title">TAIEX&shy;RIDER</h1>
       <p className="home-sub">把台股走勢騎成霓虹賽道</p>
 
-      <button className="garage-entry-btn" onClick={() => onNav("garage")}>
-        <CoinIcon size={22} />
-        <span className="garage-entry-coins">{getCoins()}</span>
-        <span className="garage-entry-label">收藏車庫</span>
-      </button>
+      <div className="home-entry-row">
+        <button className="garage-entry-btn" onClick={() => onNav("garage")}>
+          <CoinIcon size={22} />
+          <span className="garage-entry-coins">{getCoins()}</span>
+          <span className="garage-entry-label">收藏車庫</span>
+        </button>
+        <button className="ency-entry-btn" onClick={() => setShowEncyclopedia(true)}>
+          📖 <span className="ency-entry-label">圖鑑</span>
+        </button>
+      </div>
+      {showEncyclopedia && <Encyclopedia onClose={() => setShowEncyclopedia(false)} />}
       {marketMood && (
         <p className="market-mood-caption">
           今日盤勢為 {marketMood.dateStr} 之盤勢，{MOOD_LABEL[marketMood.mood]}
