@@ -37,6 +37,9 @@ dependencies {
     implementation(libs.appcompat)
     implementation(libs.material)
     implementation("com.google.androidbrowserhelper:androidbrowserhelper:2.7.1")
+    // Digital Goods API / Play Billing 橋接（鑽石購買+永久去廣告 IAP 用），
+    // 版本號已查證 dl.google.com/dl/android/maven2 官方 Maven repo 確認為目前最新穩定版
+    implementation("com.google.androidbrowserhelper:billing:1.1.0")
     testImplementation(libs.junit)
     androidTestImplementation(libs.espresso.core)
     androidTestImplementation(libs.ext.junit)

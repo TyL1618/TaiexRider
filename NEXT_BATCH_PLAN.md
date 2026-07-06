@@ -132,6 +132,17 @@
      Android 原生加 `com.android.vending.BILLING` 權限 + Billing 橋接 → 上傳新 AAB →
      Google 處理過新版本後 → 才能建立單次產品（步驟 2 要排在這之後，不是原本以為的
      可以先做）。
+     **✅ 2026-07-06 已在 repo 的 `android/` 資料夾內完成兩處程式碼改動**（Claude 直接查證
+     [dl.google.com/dl/android/maven2](https://dl.google.com/dl/android/maven2) 官方 Maven repo
+     確認版本號，不是用猜的）：
+     - `android/app/build.gradle.kts` 新增 `implementation("com.google.androidbrowserhelper:billing:1.1.0")`
+       （查證這是目前 Google 官方發布的最新穩定版）。
+     - `android/app/src/main/AndroidManifest.xml` 新增 `<uses-permission android:name="com.android.vending.BILLING" />`。
+     **⚠️ 使用者待辦**：把這兩處改動複製到 Android Studio 專案（同「android/ push 無效」
+     慣例）→ Gradle Sync → 在 Android Studio 的「Merged Manifest」分頁確認 billing 函式庫
+     有沒有自動帶入額外的 component 宣告（多數 Google 函式庫會自動合併，但 Claude
+     沒有實機驗證過這個特定函式庫的行為，建議 sync 後檢查一次，若有紅字/合併衝突再回頭
+     處理）→ **versionCode +1** → Generate Signed Bundle → 上傳 Play Console。
   6. 全部完成後才建議真機測試一次完整購買流程（測試卡付款，Play Console 有測試身分機制）。
 
 - [x] **永久去除廣告 IAP 骨架** 已完成（2026-07-06，v0.12.32）。使用者要求範圍：復活、
