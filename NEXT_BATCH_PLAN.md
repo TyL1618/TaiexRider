@@ -90,14 +90,15 @@
      「如要透過這款應用程式營利，請設定商家帳戶」——建立有價格的應用程式內產品前，
      必須先設定 Google 商家帳戶（Payments profile，含金流/稅務/收款帳戶資訊），這步驟
      使用者尚未完成，待處理。
-  3. [x] **Google Cloud 服務帳號**：✅ 已啟用 Google Play Android Developer API。已建立服務
-     帳號並下載 JSON 金鑰，帳號 email：
+  3. [x] **Google Cloud 服務帳號 + Play Console 授權，皆已完成**：✅ 已啟用 Google Play
+     Android Developer API；已建立服務帳號並下載 JSON 金鑰，帳號 email：
      **`taiexrider-iap-verify-237@tokyo-dispatch-426713-t8.iam.gserviceaccount.com`**
      （另有一個重複建立、從未生過金鑰的 `taiexrider-iap-verify@...`（無 -237 後綴）——
-     **仍待使用者手動去 Google Cloud 清理掉**，避免之後搞混）。
-     **⚠️ 還沒把這個 email 加進 Play Console「使用者和權限」授權**（要有查看財務資料/訂單
-     的權限）——這步還沒做，代表就算 Play Console 商品建好，實際驗證購買時 Google API
-     呼叫仍會 403，待補。
+     **仍待使用者手動去 Google Cloud 清理掉**，避免之後搞混，不影響功能）。
+     ✅ **2026-07-06 已在 Play Console「使用者和權限」建立「IAP 驗證服務帳號」權限群組**
+     （應用程式存取權：查看應用程式資訊(唯讀) + 查看財務資料 + 管理訂單和訂閱項目，
+     範圍限定 TAIEX RIDER），並邀請這個服務帳號 email 加入群組，狀態顯示「有效」——
+     Google API 403 的權限問題已解決。
   4. [x] **部署 Edge Function 已完成**（2026-07-06，Claude 直接操作）：JSON 金鑰內容取出
      `client_email`/`private_key` 寫進**專案資料夾外**的暫存檔（scratchpad，非 repo），
      用使用者提供的 Supabase 個人存取權杖（用完即建議撤銷）跑
