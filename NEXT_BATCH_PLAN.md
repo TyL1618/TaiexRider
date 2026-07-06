@@ -93,14 +93,13 @@
      - `diamonds_350`（消耗型）→ NT$90
      - `diamonds_1200`（消耗型）→ NT$270
      - `remove_ads_forever`（**非消耗型/受管理商品**，注意類型不要選錯）→ **NT$69**
-     **⚠️ 前置阻礙進度**：
+     **✅ 前置阻礙已全部解除**：
      - 商家帳戶（Payments profile）稅務資訊✅已核准（未登記稅籍個人）；付款方式（電匯至
-       合作金庫帳戶 ••••7662，戶名 TSAI,YUN-LUNG）已送出，**目前「審查中」，等 Google 審核
-       銀行帳戶（通常需數個工作天）**。
-     - **⚠️ 2026-07-06 新發現**：就算商家帳戶審核過了，「單次產品」頁面本身還會擋——
-       實測畫面顯示「應用程式目前沒有一次性產品，如要新增一次性產品，請為 APK 新增
-       BILLING 權限」，**代表要先完成下面第 5 點的 Android 原生 Billing 橋接、上傳新 AAB，
-       Google 處理過新版本後，才有辦法建立商品目錄**，順序比原本規劃的更嚴格。
+       合作金庫帳戶 ••••7662，戶名 TSAI,YUN-LUNG）✅ **2026-07-06 已收到 Google Payments
+       通知「您的銀行帳戶已通過驗證」**，審查完成。
+     - Android 原生 Billing 橋接（見下面第 5 點）✅ 已完成，vc11 AAB ✅ 已上傳並審核通過上線。
+     - **理論上「單次產品」頁面現在應該已解鎖**，待使用者回去確認並實際建立四個 SKU
+       （見上方定價表）——這是批次 4 剩下唯一還沒打勾的步驟。
   3. [x] **Google Cloud 服務帳號 + Play Console 授權，皆已完成**：✅ 已啟用 Google Play
      Android Developer API；已建立服務帳號並下載 JSON 金鑰，帳號 email：
      **`taiexrider-iap-verify-237@tokyo-dispatch-426713-t8.iam.gserviceaccount.com`**
@@ -138,11 +137,14 @@
      - `android/app/build.gradle.kts` 新增 `implementation("com.google.androidbrowserhelper:billing:1.1.0")`
        （查證這是目前 Google 官方發布的最新穩定版）。
      - `android/app/src/main/AndroidManifest.xml` 新增 `<uses-permission android:name="com.android.vending.BILLING" />`。
-     **⚠️ 使用者待辦**：把這兩處改動複製到 Android Studio 專案（同「android/ push 無效」
-     慣例）→ Gradle Sync → 在 Android Studio 的「Merged Manifest」分頁確認 billing 函式庫
-     有沒有自動帶入額外的 component 宣告（多數 Google 函式庫會自動合併，但 Claude
-     沒有實機驗證過這個特定函式庫的行為，建議 sync 後檢查一次，若有紅字/合併衝突再回頭
-     處理）→ **versionCode +1** → Generate Signed Bundle → 上傳 Play Console。
+     **✅ 2026-07-06 全部完成**：Claude 直接把改動同步進使用者的 Android Studio 專案
+     （`C:\Users\tyl16\AndroidStudioProjects\TaiexRider`）並實際跑 `./gradlew :app:processDebugManifest`
+     + `./gradlew :app:assembleDebug` 驗證——merged manifest 確認 billing 函式庫**自動合併**
+     了自己需要的所有元件（Billing Library 7.1.1、`ProxyBillingActivity`/`ProxyBillingActivityV2`、
+     Android 11+ 套件可見性 `<queries>`），完全沒有手動額外宣告的必要，`assembleDebug`
+     `BUILD SUCCESSFUL`。versionCode 10→11／versionName "1.10"→"1.11"（repo `android/` 與
+     AS 專案已同步）。使用者已 Generate Signed Bundle 上傳封閉測試軌道，**2026-07-06
+     確認 AAB 審核通過，vc11 已正式上線**。
   6. 全部完成後才建議真機測試一次完整購買流程（測試卡付款，Play Console 有測試身分機制）。
 
 - [x] **永久去除廣告 IAP 骨架** 已完成（2026-07-06，v0.12.32）。使用者要求範圍：復活、
