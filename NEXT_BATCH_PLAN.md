@@ -6,13 +6,18 @@
 
 ---
 
-## 批次 1 — 錢包收尾（最急，2026-07-04 晚剛做完 migration 但還沒生效/驗證）
+## 批次 1 — 錢包收尾（2026-07-06 上午確認：兩份 migration 皆已在 Supabase 跑過）
 
-- [ ] Supabase SQL Editor 跑 **`supabase/migration_20260705.sql`**（`player_wallet` 等三表 + 六個 RPC）。
-      跑之前已登入玩家的購買/發幣/次數限制 RPC 呼叫會靜默失敗（不影響遊戲，但也還沒有伺服器保護）。
-- [ ] 跑完後用真實 Google 帳號（`tyl161803@gmail.com`）登入真機/桌機驗證一輪：
+- [x] Supabase SQL Editor 已跑 **`supabase/migration_20260705.sql`**（`player_wallet` 等三表 + 六個 RPC）
+      **與 `supabase/migration_20260706.sql`**（`player_achievements`/`player_streak` + 改造版 RPC）。
+      **2026-07-06 用公司電腦的 anon key 直接打 Supabase REST API 驗證**：所有表/RPC 皆回應
+      `42501 permission denied`（= 存在但只開放 `authenticated` 角色呼叫，設計如此）而非
+      `PGRST202 找不到函式`，證實兩份 migration 都已生效，不是只有 commit 沒有真的執行。
+- [ ] **仍待辦**：用真實 Google 帳號（`tyl161803@gmail.com`）登入真機/桌機驗證一輪，這件事
+      無法從 schema 存在與否反推，只能實際操作確認：
       買車扣款是否正確、完賽/摔車/任務/看廣告是否有進帳、清 localStorage 後擁有清單還在、
-      每日排名賽第 6 次挑戰是否被伺服器擋下。
+      每日排名賽第 6 次挑戰是否被伺服器擋下；另外 migration_20260706 的帳號分離也要
+      **兩個帳號交叉驗證**（見下方 ⚠️ 段落）。
 - [x] **修登出沒清快取的 bug + 帳號污染三合一修復** 已完成（2026-07-06，migration_20260706.sql）。
       背景：2026-07-05 晚發現不只是「登出沒清快取」，而是暱稱（`taiex_player_name`）、
       Q 系列成就（`tr_achv_market`）、streak（`tr_daily_streak`）三個裝置共用 key
@@ -35,12 +40,10 @@
       **⚠️ 已登入路徑（暱稱同步/成就解鎖/streak/開發者帳號灌值）preview 無法測（需真實
       Google OAuth），需使用者真機/桌機用兩個帳號交叉驗證：A 帳號改暱稱→登出→B 帳號登入
       暱稱應顯示 B 自己的、不會看到 A 的殘留；A/B 互換都不會看到對方的 Q 車款解鎖進度。**
-      **⚠️ 待使用者在 Supabase SQL Editor 手動跑 `supabase/migration_20260706.sql`**（新
-      RPC/表不存在前，暱稱/成就/streak 維持舊的純本地行為，不影響遊戲能不能玩，但污染
-      問題不會被修好）。
-      **⚠️ 另有一次性資料清零 SQL**（使用者要求：不確定封測期間有沒有測試者已經在玩，
-      要把除了 tyl161803@gmail.com 以外所有玩家的金幣/鑽石/車庫/成就歸零)，見對話紀錄
-      /當次 commit 訊息附的 SQL，跑一次即可、不進 migration 檔案（一次性操作不需要留存重跑）。
+      **✅ migration_20260706.sql 已確認跑過**（見上方批次 1 開頭 2026-07-06 驗證結果）。
+      **這裡指的一次性清零 SQL（僅金幣/鑽石/車庫/成就，因 tommyisboy08 污染事件而起）是否已跑
+      仍未確認**——待確認是否已執行過，或直接等批次 8 正式上架當天的全面清零一次做掉即可
+      （批次 8 範圍更大，含排行榜+經典成績，2026-07-06 使用者已補充確認）。
 
 ## 批次 2 — 其他資安收尾（優先度中）
 
