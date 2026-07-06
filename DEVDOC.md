@@ -90,20 +90,21 @@ insert into public.keep_alive values (1, now()) on conflict (id) do nothing;
 
 cron-job.org 定期 ping，避免 Supabase 免費方案休眠。
 
-### 2.4 `classic_records` — 經典模式紀錄保持者
+### 2.4 `classic_records` — 經典模式前三名（2026-07-06 從「單一保持者」改版）
 
 ```sql
 create table if not exists public.classic_records (
-  level_id     text primary key,          -- 每關只一列 = 保持者
+  level_id     text not null,
   player_id    text not null,
   player_name  text not null,
   score        int  not null,
   time_ms      int  not null,
-  updated_at   timestamptz not null default now()
+  updated_at   timestamptz not null default now(),
+  primary key (level_id, player_id)   -- 複合鍵，每關可多列（前 3 名）
 );
 ```
 
-經典關卡是固定地形，適合永久排行榜。提交走 RPC `submit_classic_record(p_level,p_name,p_score,p_time)`（security definer，需登入；分數高優先、同分時間短才覆蓋）。前端 `src/lib/classicRecords.ts` 讀取（整表 ~12 列、Map 快取）+ 提交。⚠️ 改 schema 後 push 不會更新，要手動在 Supabase SQL Editor 跑建表 + `create or replace function`。
+經典關卡是固定地形，適合永久排行榜。原本每關只留 1 位保持者，2026-07-06 使用者拍板簡化成「每關前 3 名，不算百分位」（比原規劃的「Top N + 百分位排名」省成本，不需要存全部玩家成績）。提交走 RPC `submit_classic_record(p_level,p_name,p_score,p_time)`（security definer，需登入）：先 upsert 玩家自己那筆（分數更高，或同分時間更短才覆蓋自己的舊紀錄），再 `delete` 裁剪到該關前 3 名（依分數降冪、時間升冪取前 3，其餘刪除）。**表大小天生封頂在「關卡數 × 3」**（目前 12 關＝36 列上限），不隨玩家數增長。前端 `src/lib/classicRecords.ts` 讀取（`select` 依 `level_id,score,time_ms` 排序、client 端 group 成 `Map<level_id, ClassicRecord[]>`）+ 提交，`ClassicSelect.tsx` 顯示 🥇🥈🥉。schema 見 `supabase/migration_20260706b.sql`。⚠️ 改 schema 後 push 不會更新，要手動在 Supabase SQL Editor 跑。
 
 ### 2.5 帳號相關資料（錢包/成就/streak/暱稱）— 伺服器端權威
 
@@ -122,6 +123,16 @@ create table if not exists public.classic_records (
 （2026-07-05 事故，見 CLAUDE.md 待辦 1b）。之後任何「解鎖/發獎勵」類 RPC 新增時，
 都應該讓伺服器自己查權威資料判斷資格，不要只信任客戶端傳的「我達標了」。
 
+### 2.6 留存規劃第二批（2026-07-06/07，`migration_20260706b.sql` + `migration_20260707.sql`）
+
+**狂暴盤日事件**：`public.taiex_change_pct()` 共用函式（抽出自 `record_market_finish()`）算出當期 TAIEX 漲跌幅；`|漲跌| ≥ 2.5%` 時 `wallet_earn('quest')`／`claim_weekly_quest()` 自動把任務獎勵面額 ×2。門檻用 TAIEX 近 2 年 482 交易日實測資料校準（2% 出現機率 14.9%／約每週一次太常見，2.5% 出現機率 10.0%／約兩週一次）。前端 `src/lib/marketMood.ts` 的 `MarketMood.isRage` 只負責首頁公告顯示，實際加倍判定在伺服器端，不信任前端。
+
+**股票圖鑑**：`player_collection(player_id pk, codes text[])`——每人一列存已收集股票代號（陣列去重），天生封頂在股票池總數（~1090），不隨玩家數爆炸，永久不清除。`collect_stock(p_code)` RPC 寫入；`wallet_get()` 一併帶回 `collection` 欄位（沿用既有登入同步呼叫點）。App.tsx `handleGameOver` 依 `track.kind==='stock'` 收集（長征模式一次收 5 支，代號來自 `subtitle` 換行分隔）。
+
+**圖鑑分母（絕版制）**：`stock_registry(stock_code pk, stock_name, first_seen, last_seen, delisted)`——任何人可讀（不需登入）。`scripts/fetchDailyMap.ts` 的 `upsertStockRegistry()` 每天把已經在抓的 TWSE 官方上市清單順手 upsert 進來（`Prefer: resolution=merge-duplicates`，只送 `stock_code/stock_name/last_seen`，`first_seen` 靠 DEFAULT 只在新列生效、不會覆蓋舊值），再呼叫 `mark_delisted_stocks(p_active_codes text[])` RPC 用同一份清單比對出下市名單。**安全防呆**：`p_active_codes` 長度 < 500（代表 TWSE 抓取失敗/不完整）就直接不執行標記，避免把全部股票誤判下市。設計理由：分母只增不減（下市股票標記絕版但不消失），避免「圖鑑總數自己變少」的詭異體感，見 RETENTION_PLAN.md。
+
+**週任務**：`player_weekly_quest(player_id, week_key, perfect_sum, flips_sum, max_score, max_survive_sec, play_count, claimed[])`，複合鍵 `(player_id, week_key)`。`week_key` 用 ISO 8601 週別（`YYYY-Www`，`src/lib/weeklyQuests.ts` 的 `weekKey()` 本地時區實作，非 UTC）。`record_weekly_run()` 累加進度、`claim_weekly_quest()` 驗證＋發獎（含狂暴盤 ×2），`get_weekly_quest()` 純讀取。任務池仿每日任務放大成週尺度，3 選其一 seeded。清理：`cleanup_old_wallet_logs()`（已被 CI 每日呼叫）順便清 8 週前的列，`week_key` 用 `to_char(..., 'IYYY-"W"IW')` 字串比較。
+
 ---
 
 ## 3. 資料管線（Data Pipeline）
@@ -137,6 +148,7 @@ create table if not exists public.classic_records (
 3. 對每支股票抓當日盤中走勢：Yahoo `{code}.TW`（5 分 K、`range=1d`），降採樣至 ~110 點。
 4. 計算 `difficulty`（盤中最大單步漲跌幅）。
 5. Upsert 至 Supabase `daily_map`（`Prefer: resolution=merge-duplicates`，衝突鍵 `(map_date, stock_code)`），清除舊資料。⚠️ **cutoff 錨定剛寫入的 `mapDate − 7 天`，不可錨「執行當下 now − 7 天」**：長連假（過年/長颱風假 > 7 天）map_date 凍住但 now 一直走，用 now-7 會追過當前唯一在用的 map_date 把它刪掉（甚至同一次跑剛寫又刪）→ 掉回靜態盤。錨 mapDate 則任意長度連假當前盤永遠保留。
+6. **股票圖鑑登記表**（2026-07-07 新增）：拿第 2 步已經抓到的官方上市清單，`upsertStockRegistry()` 順手 upsert 進 `stock_registry`（不重複打一次 TWSE API），再呼叫 `mark_delisted_stocks()` RPC 比對維護「絕版」狀態，詳見 §2.6。
 
 > 每日約 ~1090 支股票，失敗容錯繼續（不中斷整批）。連假/休市時 Yahoo `range=1d` 自動回最後交易日 → sessionDate 不變 → 持續顯示最後交易日的盤（正確）。
 
@@ -308,16 +320,19 @@ src/
 │   ├── quests.ts             # 每日任務池（seeded by 裝置本地日曆日）
 │   ├── streak.ts             # 每日排名賽連續參賽天數
 │   ├── medals.ts             # 經典模式獎牌門檻（銅/銀/金，由 PB 推導）
-│   ├── marketMood.ts         # 全站盤勢主題氛圍（大漲/大跌/平盤 CSS 變數）
+│   ├── marketMood.ts         # 全站盤勢主題氛圍（大漲/大跌/平盤 CSS 變數 + 狂暴盤 isRage 判定）
 │   ├── deathHeatmap.ts       # 全服死亡熱點（daily_death_heatmap RPC）
 │   ├── shareCard.ts          # 分享成績圖卡（離屏 canvas 生圖）
 │   ├── haptics.ts            # 全域按鈕震動回饋
 │   ├── wakeLock.ts           # 遊戲畫面螢幕常亮
 │   ├── analytics.ts          # events 打點（run_start/death/finish/revive）
-│   └── adminStats.ts         # 隱藏統計頁資料（admin_stats RPC，email 綁權限）
+│   ├── adminStats.ts         # 隱藏統計頁資料（admin_stats RPC，email 綁權限）
+│   ├── collection.ts         # 股票圖鑑：已收集代號（player_collection，已登入→伺服器權威）+ 圖鑑登記表讀取（stock_registry，公開）
+│   └── weeklyQuests.ts       # 週任務池（ISO 週別 seeded，player_weekly_quest 已登入權威）
 ├── components/
 │   ├── Sparkline.tsx      # 折線圖元件
-│   └── CoinIcon.tsx       # 金幣圖示 SVG
+│   ├── CoinIcon.tsx       # 金幣圖示 SVG
+│   └── Encyclopedia.tsx   # 股票圖鑑彈窗（兩欄卡片+排序+篩選+已收集打星星）
 ├── version.ts             # APP_VERSION + CHANGELOG（遊戲內更新日誌）
 └── App.tsx                # 路由：home / daily / random / custom / classic / garage / game
 ```

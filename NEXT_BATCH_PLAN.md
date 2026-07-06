@@ -126,12 +126,13 @@
 - [x] `collection.ts` 新增 `fetchStockRegistry()`：公開讀取（不需登入），走原生 fetch 直接打
       PostgREST（同 `dailyMap.ts` 慣例，不透過 supabase-js 避免已登入時角色跑掉）。
 
-**⚠️ 使用者待辦**：Supabase SQL Editor 跑 **`supabase/migration_20260707.sql`**（`stock_registry`
-表 + `mark_delisted_stocks` RPC）。**跑之前圖鑑彈窗會顯示「已收集 0 / 0 支」**（registry 是空的，
-preview 已驗證這個空狀態不會報錯，只是沒資料可看）——跑完 migration 後，**還要等下一次
-`fetchDailyMap.ts` 排程執行過一次**（每天台灣 16:00），登記表才會真正填入資料，圖鑑才會顯示
-股票清單。preview 已驗證訪客路徑（開圖鑑/排序/篩選）零 console error，已登入路徑（星星標記
-是否對應到真的收集清單）待使用者真機驗證。
+**✅ `migration_20260707.sql` 已跑（2026-07-07 使用者確認）**——用 anon key 直接打 REST API
+驗證：`stock_registry` 表可讀（回傳 `[]`，0 筆，`Content-Range: */0`）、`mark_delisted_stocks`
+RPC 存在（回 `42501 permission denied` 而非「找不到函式」，符合預期——這支只給 service_role
+呼叫）。**還要等下一次 `fetchDailyMap.ts` 排程執行過一次**（每天台灣 16:00），登記表才會真正
+填入股票資料，圖鑑才會顯示清單（目前仍是空的，這是正常過渡狀態，不是壞掉）。preview 已驗證
+訪客路徑（開圖鑑/排序/篩選）零 console error，已登入路徑（星星標記是否對應到真的收集清單）
+待使用者真機驗證。
 
 **migration_20260706b.sql 已跑**（圖鑑換裝置/經典前三名皆已真機驗證運作正常，代表伺服器端
 schema 已生效）。**剩餘待驗證**：狂暴盤加倍（等實際遇到 ≥2.5% 交易日）、週任務（尚未回報）。
