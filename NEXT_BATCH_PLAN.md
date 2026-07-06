@@ -85,11 +85,17 @@
   （對現有封測玩家零影響，因為偵測不到就不顯示按鈕）：**
   1. [x] **Supabase SQL Editor 跑 `migration_20260706c.sql`**（`iap_purchases` 表 + RPC）
      ——2026-07-06 使用者確認已跑，REST API 驗證兩者皆存在（回 42501 permission denied）。
-  2. [ ] **Google Play Console** 建立「應用程式內產品」：SKU id 要跟上面三個一致，設定價格。
-     **⚠️ 2026-07-06 發現前置阻礙**：Play Console「透過 Google Play 營利」頁面顯示
-     「如要透過這款應用程式營利，請設定商家帳戶」——建立有價格的應用程式內產品前，
-     必須先設定 Google 商家帳戶（Payments profile，含金流/稅務/收款帳戶資訊），這步驟
-     使用者尚未完成，待處理。
+  2. [ ] **Google Play Console** 建立商品：路徑是「透過 Google Play 營利 → 產品 → **單次
+     產品**」（介面改版過，不是文件原本寫的「應用程式內產品」這個名稱，2026-07-06 使用者
+     實際找到的正確路徑）。SKU id 要跟上面三個一致，設定價格。
+     **⚠️ 前置阻礙進度**：
+     - 商家帳戶（Payments profile）稅務資訊✅已核准（未登記稅籍個人）；付款方式（電匯至
+       合作金庫帳戶 ••••7662，戶名 TSAI,YUN-LUNG）已送出，**目前「審查中」，等 Google 審核
+       銀行帳戶（通常需數個工作天）**。
+     - **⚠️ 2026-07-06 新發現**：就算商家帳戶審核過了，「單次產品」頁面本身還會擋——
+       實測畫面顯示「應用程式目前沒有一次性產品，如要新增一次性產品，請為 APK 新增
+       BILLING 權限」，**代表要先完成下面第 5 點的 Android 原生 Billing 橋接、上傳新 AAB，
+       Google 處理過新版本後，才有辦法建立商品目錄**，順序比原本規劃的更嚴格。
   3. [x] **Google Cloud 服務帳號 + Play Console 授權，皆已完成**：✅ 已啟用 Google Play
      Android Developer API；已建立服務帳號並下載 JSON 金鑰，帳號 email：
      **`taiexrider-iap-verify-237@tokyo-dispatch-426713-t8.iam.gserviceaccount.com`**
@@ -113,6 +119,14 @@
      加好、**versionCode +1**、重新 Generate Signed Bundle、上傳 Play Console 新版本才會生效。
      **在這之前，就算前 4 步都做完，現有封測 APK 一樣偵測不到 Digital Goods API，購買區塊
      不會出現，完全不影響目前的封測**。
+     **⚠️ 2026-07-06 發現：這一步的順序比預期更早卡關**——使用者實際點進 Play Console
+     「透過 Google Play 營利 → 產品 → 單次產品」（這就是我們要建鑽石 SKU 的地方，路徑跟
+     文件內原本寫的「應用程式內產品」不同，介面改版過），畫面直接顯示「應用程式目前沒有
+     一次性產品，如要新增一次性產品，請為 APK 新增 BILLING 權限」——**代表 Play Console
+     連「建立商品目錄」這一步都會擋，不是只擋「實際購買流程」**。所以正確順序是：
+     Android 原生加 `com.android.vending.BILLING` 權限 + Billing 橋接 → 上傳新 AAB →
+     Google 處理過新版本後 → 才能建立單次產品（步驟 2 要排在這之後，不是原本以為的
+     可以先做）。
   6. 全部完成後才建議真機測試一次完整購買流程（測試卡付款，Play Console 有測試身分機制）。
 
 - [ ] P3~P5 三台鑽石車款生圖 + 登記進 `wallet_spend_skin` 白名單（同時更新 `garage.ts` 的
