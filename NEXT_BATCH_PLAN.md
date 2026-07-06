@@ -42,16 +42,23 @@
       仍未確認**——待確認是否已執行過，或直接等批次 8 正式上架當天的全面清零一次做掉即可
       （批次 8 範圍更大，含排行榜+經典成績，2026-07-06 使用者已補充確認）。
 
-## 批次 2 — 其他資安收尾（優先度中）
+## 批次 2 — 其他資安收尾（2026-07-06 盤點：可 code 處理的項目已確認完成）
 
-- [ ] 確認 `taiexrider-release.jks` 檔案本體已備份雲端（密碼已確認兩地備份，檔案本體之前暫緩）。
+- [x] `taiexrider-release.jks` 雲端備份——**使用者已連續確認一週完成，本清單先前重複列成待辦是
+      文件沒同步更新，2026-07-06 更正**。之後不再列入待辦。
+- [x] `daily_scores`/`classic_records`/`daily_map`/`keep_alive` 的 RLS SELECT policy 補
+      `to anon, authenticated`——**查證後發現這件事其實早在 `migration_20260702.sql`
+      就已經做過**（policy 改名 `read scores`/`read classic`/`read daily_map`/`read keepalive`，
+      四張表 policy 皆含 `to anon, authenticated`），而該份 migration 已於 2026-07-02 確認執行過
+      （2026-07-06 用 REST API 打 `events`/`user_profiles` 驗證存在）。本清單這一項是舊的
+      SECURITY_REVIEW.md 建議與後續 migration 重複記錄，2026-07-06 確認後結案，不需要新 migration。
 - [ ] Play Console 上架前目視確認：手機截圖用新版地形（v0.12.x）重截、資料安全性表單補
       「App 互動資料（匿名遊玩統計）」聲明（見 [LAUNCH_CHECKLIST.md](LAUNCH_CHECKLIST.md)）。
-- [ ] `daily_scores`/`classic_records`/`daily_map`/`keep_alive` 的 RLS SELECT policy 補
-      `to anon, authenticated`（目前只授 `anon`，靠 VIEW 繞過沒壞，但屬脆弱設計）。
+      **需要使用者手動在 Play Console 操作，非 code 任務，Claude 無法代做**。
 - [ ] dev 依賴 esbuild/vite 2 個已知漏洞升級（需 vite@8 breaking change，只影響本機
-      `npm run dev`，非上架風險，排正式上架後）。
-- [ ] `daily_death_heatmap` RPC 效能：正式上架玩家多了之後評估要不要加 materialized view 快取。
+      `npm run dev`，非上架風險，**已決定排正式上架後**，本批次不動）。
+- [ ] `daily_death_heatmap` RPC 效能：**已決定等正式上架玩家量上來再評估**，本批次不動
+      （目前沒有效能問題可測，貿然加 materialized view 是過度工程）。
 
 ## 批次 3 — 反作弊 Phase B/C（工程量大，建議正式上架後）
 
