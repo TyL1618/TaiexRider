@@ -377,9 +377,10 @@ src/
 | Phase 6 | ✅ v0.8–0.9 | 音效（Web Audio API）、夜景城市背景、難度星等 HUD、爆炸粒子強化 |
 | Phase 7 | 🟡 封測中 | TWA 打包上架（手動 Android Studio）；全螢幕 immersive ✅ 已完成；Google Play **封閉測試**（門檻：12 名測試者 + 連續 14 天，2026-06-25 起算，7/8 滿 14 天） |
 | Phase 8 | ✅ | v0.9.4 連假讀取/排行榜跨連假同榜修正（`max(map_date ≤ 今天)`）；**v0.10 經典模式**（12 條歷史盤勢靜態關卡）；**v0.11 經典紀錄保持者**（`classic_records`，每關單一保持者）、返回離開改「再按一次返回鍵」、暱稱顯示寬度限長（12 寬）、每日長征 5 股預覽圖、開機深色霓虹 splash；**v0.12.0~6 懸空公平計時 + 每日排名賽每日 5 次上限 + 死後原地復活 + App 捷徑/splash 品牌圖/預測性返回（vc10，已真機驗證）** |
-| Phase 9 | ✅ | **v0.12.7~28 留存批次**：完美落地計分定案、PB 突破/streak、經典獎牌制、分享圖卡、全服死亡熱點（漸層線視覺）、隱藏統計頁、卡縫脫困 watchdog、**車庫系統**（金幣/鑽石雙通貨+B/Q/鑽石車款共 7 台正式車皮上線，P3~P5 待生圖+Billing）、**伺服器端錢包**（v0.12.28，`migration_20260705.sql`，已登入玩家金幣/鑽石/擁有清單改以伺服器為權威，待使用者跑 migration 生效）、每日任務、全站盤勢主題氛圍、看廣告拿金幣（stub，每日 2 次+20 金幣）、Q 系列成就進度自動解鎖裝備 |
+| Phase 9 | ✅ | **v0.12.7~28 留存批次**：完美落地計分定案、PB 突破/streak、經典獎牌制、分享圖卡、全服死亡熱點（漸層線視覺）、隱藏統計頁、卡縫脫困 watchdog、**車庫系統**（金幣/鑽石雙通貨+B/Q/鑽石車款共 7 台正式車皮上線，P3~P5 待生圖）、**伺服器端錢包**（`migration_20260705.sql`）、每日任務、全站盤勢主題氛圍、看廣告拿金幣（stub）、Q 系列成就進度自動解鎖裝備 |
+| Phase 10 | ✅ | **v0.12.29~32（2026-07-06）**：留存規劃第二批（狂暴盤日事件、股票圖鑑+絕版制彈窗、週任務、經典模式前三名取代單一保持者）；反作弊 Phase A（`migration_20260704.sql`）；帳號污染修復（暱稱/成就/streak 搬 DB）；ETF/字母尾代號涵蓋範圍修正（`/^\d{4,6}[A-Z]?$/`，修正前濾掉 20% 股票）；**鑽石購買 + 永久去除廣告 IAP 全面上線**（Digital Goods API + 本專案第一支 Edge Function `verify-iap-purchase` + Google Play Billing 原生橋接，四個 SKU 已在 Play Console 建立啟用：`diamonds_100/350/1200` 消耗型、`remove_ads_forever` 非消耗型）；Android versionCode 10→11 |
 
-> **🟠 待辦（正式上架後）**：反作弊機制完全未實作（見 [ANTICHEAT_DESIGN.md](ANTICHEAT_DESIGN.md)，2026-07-03 已拍板要做，Fable 5 負責）；廣告 AdMob/AdSense 真實串接；鑽石車款 P3~P5（需美術+Google Play Billing+鑽石購買頁）；殼版本更新提示（v0.9.5b 設計，明確延後）；**清空伺服器所有玩家遊戲數據**（daily_scores/classic_records/events，但保留已註冊 Google 帳號，2026-07-04 使用者交代）。
+> **🟠 待辦（正式上架後）**：反作弊 Phase B/C 尚未實作（Phase A 已完成，見 [ANTICHEAT_DESIGN.md](ANTICHEAT_DESIGN.md)）；廣告 AdMob/AdSense 真實串接（IAP 的「永久去除廣告」已上架但目前無真廣告可移除，屬已知且使用者接受的暫時狀態）；鑽石車款 P3~P5（需美術，Billing/購買頁已完成）；殼版本更新提示（v0.9.5b 設計，明確延後）；**清空伺服器所有玩家遊戲數據**（daily_scores/daily_scores_ranked/classic_records/events，但保留已註冊 Google 帳號，2026-07-04 使用者交代，上架當天才執行）。
 
 ---
 
