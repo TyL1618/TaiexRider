@@ -36,3 +36,6 @@ sim-build/
 
 # 2026-07-04：車皮原始圖檔（Grok_Original/For_Lobby/For_Gaming）改為進版控，
 # 不再 gitignore——先前 public/bikes/raw/ 沒進版控，遺失後無法復原過。
+
+# Supabase CLI 本機快取（supabase link 產生，純本機中繼資料，非 secrets 但不用進版控）
+supabase/.temp/

@@ -152,7 +152,9 @@ create table if not exists public.classic_records (
 
 **流程**：
 1. 先抓 TAIEX：Yahoo `^TWII`（5 分 K、`range=1d`），從回傳 timestamp 讀出**實際交易日 sessionDate**，`map_date = sessionDate + 1`。
-2. 抓 TWSE `STOCK_DAY_ALL` 取**上市股票清單**（代號+名稱），過濾 `/^\d{4}$/`（純 4 位數字，排除 ETF 字母尾）。
+2. 抓 TWSE `STOCK_DAY_ALL` 取**上市股票清單**（代號+名稱），過濾 `/^\d{4,6}[A-Z]?$/`（2026-07-06
+   拉真實資料驗證：1368 支裡有 278 支非純 4 位數——ETF 4/5/6 位數、槓桿反向 K/L/R/T/U 字母尾、
+   多幣別計價 A~I 字母尾，舊版 `/^\d{4}$/` 全部濾掉；新 regex 僅 1 支特別股例外「2887Z1」不處理）。
 3. 對每支股票抓當日盤中走勢：Yahoo `{code}.TW`（5 分 K、`range=1d`），降採樣至 ~110 點。
 4. 計算 `difficulty`（盤中最大單步漲跌幅）。
 5. Upsert 至 Supabase `daily_map`（`Prefer: resolution=merge-duplicates`，衝突鍵 `(map_date, stock_code)`），清除舊資料。⚠️ **cutoff 錨定剛寫入的 `mapDate − 7 天`，不可錨「執行當下 now − 7 天」**：長連假（過年/長颱風假 > 7 天）map_date 凍住但 now 一直走，用 now-7 會追過當前唯一在用的 map_date 把它刪掉（甚至同一次跑剛寫又刪）→ 掉回靜態盤。錨 mapDate 則任意長度連假當前盤永遠保留。
@@ -481,7 +483,6 @@ AndroidManifest 的 activity name 改為 `.MainActivity`。
 
 ## 10. 未來待辦
 
-- **ETF 含字母代號**：腳本 filter 從 `/^\d{4}$/` 改 `/^\d{4}[A-Z]?$/` 即可納入 00981A 等
 - **AdMob 廣告（Phase 7 後段）**：
   - 方案 B（Native SDK）：在 Android 專案加 Gradle dependency + JS Bridge
   - 死亡後「看廣告復活？」→ `window.AdBridge.showRewardedAd()` → 回調復活

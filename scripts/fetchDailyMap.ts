@@ -68,6 +68,12 @@ const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
 // 取得全部上市股票代號 + 名稱（TWSE STOCK_DAY_ALL，一次拿全部）
 // TWSE 偶爾忽略 response=json 回傳 CSV；先拿 text，嘗試 JSON，失敗則 CSV fallback。
+//
+// 代號格式：2026-07-06 拉真實資料驗證過，1368 支裡有 278 支（~20%）不是純 4 位數字——
+// ETF 代號有 4/5/6 位數，槓桿/反向/多幣別 ETF 還會加一個字母尾（A~I 為多幣別計價，
+// K/L/R/T/U 為槓桿反向），舊版 /^\d{4}$/ 把這些全濾掉了。改成 /^\d{4,6}[A-Z]?$/
+// 涵蓋以上所有情況，唯一驗證時發現的例外是特別股代號「2887Z1」（數字+字母+數字），
+// 極端個案不特別處理。
 async function fetchAllListedStocks(): Promise<{ code: string; name: string }[]> {
   const url = "https://www.twse.com.tw/exchangeReport/STOCK_DAY_ALL?response=json";
   try {
@@ -80,7 +86,7 @@ async function fetchAllListedStocks(): Promise<{ code: string; name: string }[]>
       const ni = j.fields.indexOf("證券名稱");
       return j.data
         .map(r => ({ code: r[ci].trim(), name: r[ni].trim() }))
-        .filter(s => /^\d{4}$/.test(s.code));
+        .filter(s => /^\d{4,6}[A-Z]?$/.test(s.code));
     } catch {
       // --- CSV fallback（TWSE 偶發回傳原始 CSV）---
       console.warn("  STOCK_DAY_ALL 回傳非 JSON，改用 CSV 解析");
@@ -95,7 +101,7 @@ async function fetchAllListedStocks(): Promise<{ code: string; name: string }[]>
           const cols = line.split(",");
           return { code: (cols[ci] ?? "").trim().replace(/"/g, ""), name: (cols[ni] ?? "").trim().replace(/"/g, "") };
         })
-        .filter(s => /^\d{4}$/.test(s.code));
+        .filter(s => /^\d{4,6}[A-Z]?$/.test(s.code));
     }
   } catch (e) {
     console.error("  fetchAllListedStocks 失敗：", e);
