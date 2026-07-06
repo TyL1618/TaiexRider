@@ -52,9 +52,9 @@
       四張表 policy 皆含 `to anon, authenticated`），而該份 migration 已於 2026-07-02 確認執行過
       （2026-07-06 用 REST API 打 `events`/`user_profiles` 驗證存在）。本清單這一項是舊的
       SECURITY_REVIEW.md 建議與後續 migration 重複記錄，2026-07-06 確認後結案，不需要新 migration。
-- [ ] Play Console 上架前目視確認：手機截圖用新版地形（v0.12.x）重截、資料安全性表單補
+- [x] Play Console 上架前目視確認：手機截圖用新版地形（v0.12.x）重截、資料安全性表單補
       「App 互動資料（匿名遊玩統計）」聲明（見 [LAUNCH_CHECKLIST.md](LAUNCH_CHECKLIST.md)）。
-      **需要使用者手動在 Play Console 操作，非 code 任務，Claude 無法代做**。
+      **使用者已處理完成（2026-07-07 確認）**。
 - [ ] dev 依賴 esbuild/vite 2 個已知漏洞升級（需 vite@8 breaking change，只影響本機
       `npm run dev`，非上架風險，**已決定排正式上架後**，本批次不動）。
 - [ ] `daily_death_heatmap` RPC 效能：**已決定等正式上架玩家量上來再評估**，本批次不動

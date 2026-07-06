@@ -105,6 +105,20 @@ red/orange). Embodiment of a raging, prosperous bull market.
 
 ### 每次都先貼這段「共用規格」，再貼對應那台車的 STYLE 段落，並附上 `public/bike.png` 當範例圖
 
+> **⚠️ 已知限制（2026-07-07 使用者回報）：目前為止 7 台全部生出來都帶車底陰影**，即使
+> prompt 早就寫了「NO ground shadow or reflection」。這是圖像生成模型的通病——訓練資料
+> 幾乎全是「有光影的實拍照片」，模型會自動幫物體加「接地陰影」讓畫面看起來更真實，
+> 純文字否定很難 100% 蓋掉這個傾向；且陰影常常跟輪胎同色系（灰/黑），去背時色塊法很難
+> 把陰影跟輪胎邊緣切乾淨。下面已經把否定句改寫得更具體（描述「陰影長什麼樣子」而不是
+> 只講「不要陰影」，理論上能降低出現機率），但**心理預期上仍要抓「大機率還是會有，去背
+> 時照舊流程手動處理」**，不要因為又出現陰影就以為 prompt 沒改對。
+>
+> **另一個容易被忽略的衝突**：凡是要求車輪「完全不能被任何東西遮住」的規則，如果同一段
+> STYLE 又要求側箱/長軸距車殼「蓋在後輪上方」，兩者會互相打架（Q1 多頭鬥牛就是因為這樣
+> 重生兩次才成功）。這條規則已經從只放在 Q1 那台，搬進下面「共用規格」讓每一台都套用，
+> **貼 STYLE 段落前自己检查一下該台的描述有沒有讓車殼/側箱蓋到輪胎**（P3 黃金大亨的
+> 「saddle-bag humps」已經預先改成不擋輪，其餘車款若之後想加類似配件也要注意）。
+
 ```
 Use the attached image as an EXACT composition template. Generate a new
 motorcycle in the SAME framing:
@@ -116,6 +130,11 @@ motorcycle in the SAME framing:
   the reference — rear wheel center at 15.6% of image width, front wheel
   center at 84.4% of image width, both at 71% of image height, wheel
   diameter ≈ 28% of image width. Do not move, resize, or tilt the wheels.
+- Both wheels must be FULLY exposed and unobstructed — no bodywork,
+  fender, saddlebag, luggage case, or accessory of any kind may cover or
+  overlap any part of either wheel. A viewer must be able to trace the
+  complete circular rim and tire of both wheels with nothing in front of
+  or behind them.
 - Same flat-vector / cel-shaded sticker art style as the reference: bold
   clean shapes, crisp dark outlines, smooth gradients, glowing neon rim
   accents on both wheels.
@@ -125,11 +144,17 @@ motorcycle in the SAME framing:
   seat, and proportions should follow that bike's own STYLE description
   below.
 - STRICTLY EXCLUDE anything beyond the motorcycle itself: NO motion/speed
-  lines, NO exhaust flames or smoke, NO ground shadow or reflection, NO
-  particles, sparks, or glow trails floating off the bike. The motorcycle
-  silhouette is the only thing allowed to touch the canvas edges of
-  content — everything else stays pure white.
-- Plain pure-white background, nothing else in frame. No text, no logo,
+  lines, NO exhaust flames or smoke, NO particles, sparks, or glow trails
+  floating off the bike.
+- ABSOLUTELY NO ground contact shadow of any kind: do NOT render a dark
+  ellipse, blurred gray/black patch, gradient, or any darkening of the
+  white background directly beneath either tire. Treat the background as
+  a completely flat, shadeless white void — like a 2D vector sticker
+  cut out and placed on a blank canvas, not a photo of an object sitting
+  under a light source. The white area under and around the wheels must
+  be pixel-identical to the white area everywhere else in the background.
+- The motorcycle silhouette is the only thing allowed to touch the canvas
+  edges of content — everything else stays pure white. No text, no logo,
   no watermark, no background scenery.
 ```
 
@@ -226,7 +251,12 @@ glow shifting violet-to-cyan gradient. Ethereal, otherworldly, jewel-like.
 **P3 黃金大亨**
 ```
 VEHICLE TYPE: luxury touring bagger — long wheelbase, large front fairing
-with windscreen, saddle-bag humps over the rear wheel, plush wide seat.
+with windscreen, plush wide seat. The bodywork between the seat and the
+rear wheel may bulge outward for a saddlebag-like silhouette, but this
+bulge must stay entirely ABOVE the rear wheel's horizontal centerline and
+must not extend down over, in front of, or behind the wheel itself —
+both wheels stay fully round and unobstructed, same rule as every other
+bike in this set.
 STYLE: An opulent black-and-24k-gold luxury tourer. Piano-black bodywork
 with polished gold trim lines, gold-plated engine block and exhaust,
 subtle dollar/coin-pattern engraving on the side panel, diamond-stud

@@ -60,25 +60,40 @@ let _service: DigitalGoodsService | null = null;
 async function getService(): Promise<DigitalGoodsService | null> {
   if (_service) return _service;
   const w = window as WindowWithDigitalGoods;
-  if (!w.getDigitalGoodsService) return null;
+  if (!w.getDigitalGoodsService) {
+    console.warn("[billing] getDigitalGoodsService 不存在於 window（瀏覽器/TWA 不支援 Digital Goods API）");
+    return null;
+  }
   try {
     _service = await w.getDigitalGoodsService("https://play.google.com/billing");
     return _service;
-  } catch {
+  } catch (e) {
+    console.warn("[billing] getDigitalGoodsService() 呼叫失敗：", e);
     return null;
   }
 }
 
 // 向 Google Play 查任意 SKU 清單的實際定價（顯示用；扣款金額由 Google 那邊決定，這裡不寫死）。
 // 查不到（Play Console 商品尚未建立/網路問題）回傳空 Map，UI 應顯示「暫無法查價」。
+// 失敗原因一律印 console.warn（前綴 [billing]），方便真機用 chrome://inspect 遠端除錯——
+// 常見原因：商品剛建立還在生效中（可達數小時）／SKU id 打錯字／帳號未加入 Play Console
+// 「授權測試」名單（app 尚未正式上線到 Production 前，Billing API 通常只對授權測試名單內的
+// 帳號開放，即使該帳號能透過封測連結正常安裝遊玩）。
 export async function fetchPackPrices(skus: string[]): Promise<Map<string, string>> {
   const out = new Map<string, string>();
   const service = await getService();
   if (!service) return out;
   try {
     const details = await service.getDetails(skus);
+    console.info(`[billing] getDetails(${JSON.stringify(skus)}) 回傳 ${details.length} 筆：`, details);
     for (const d of details) out.set(d.itemId, `${d.price.currency} ${d.price.value}`);
-  } catch { /* 靜默，UI 略過價格顯示 */ }
+    const missing = skus.filter((s) => !out.has(s));
+    if (missing.length > 0) {
+      console.warn(`[billing] 以下 SKU 查無定價（Play Console 商品未生效／id 打錯／帳號非授權測試名單）：${missing.join(", ")}`);
+    }
+  } catch (e) {
+    console.warn("[billing] service.getDetails() 拋出例外：", e);
+  }
   return out;
 }
 
