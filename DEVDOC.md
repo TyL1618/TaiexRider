@@ -380,7 +380,7 @@ src/
 | Phase 9 | ✅ | **v0.12.7~28 留存批次**：完美落地計分定案、PB 突破/streak、經典獎牌制、分享圖卡、全服死亡熱點（漸層線視覺）、隱藏統計頁、卡縫脫困 watchdog、**車庫系統**（金幣/鑽石雙通貨+B/Q/鑽石車款共 7 台正式車皮上線，P3~P5 待生圖）、**伺服器端錢包**（`migration_20260705.sql`）、每日任務、全站盤勢主題氛圍、看廣告拿金幣（stub）、Q 系列成就進度自動解鎖裝備 |
 | Phase 10 | ✅ | **v0.12.29~32（2026-07-06）**：留存規劃第二批（狂暴盤日事件、股票圖鑑+絕版制彈窗、週任務、經典模式前三名取代單一保持者）；反作弊 Phase A（`migration_20260704.sql`）；帳號污染修復（暱稱/成就/streak 搬 DB）；ETF/字母尾代號涵蓋範圍修正（`/^\d{4,6}[A-Z]?$/`，修正前濾掉 20% 股票）；**鑽石購買 + 永久去除廣告 IAP 全面上線**（Digital Goods API + 本專案第一支 Edge Function `verify-iap-purchase` + Google Play Billing 原生橋接，四個 SKU 已在 Play Console 建立啟用：`diamonds_100/350/1200` 消耗型、`remove_ads_forever` 非消耗型）；Android versionCode 10→11 |
 
-> **🟠 待辦（正式上架後）**：反作弊 Phase B/C 尚未實作（Phase A 已完成，見 [ANTICHEAT_DESIGN.md](ANTICHEAT_DESIGN.md)）；廣告 AdMob/AdSense 真實串接（IAP 的「永久去除廣告」已上架但目前無真廣告可移除，屬已知且使用者接受的暫時狀態）；鑽石車款 P3~P5（需美術，Billing/購買頁已完成）；殼版本更新提示（v0.9.5b 設計，明確延後）；**清空伺服器所有玩家遊戲數據**（daily_scores/daily_scores_ranked/classic_records/events，但保留已註冊 Google 帳號，2026-07-04 使用者交代，上架當天才執行）。
+> **🟠 待辦（正式上架後）**：反作弊 Phase B/C 尚未實作（Phase A 已完成，見 [ANTICHEAT_DESIGN.md](ANTICHEAT_DESIGN.md)）；廣告 **AdMob 優先**（IAP 的「永久去除廣告」已上架但目前無真廣告可移除，屬已知且使用者接受的暫時狀態），AdSense（網頁版）2026-07-07 決定暫緩——目前不打算公開網址宣傳，網頁版只給少數認識的 iOS 朋友玩，等網頁玩家變多再加；鑽石車款 P3~P5（需美術，Billing/購買頁已完成）；殼版本更新提示（v0.9.5b 設計，2026-07-07 決定不單獨重包，等下次任何原因需要重包 AAB 時順便一起做）；**清空伺服器所有玩家遊戲數據**（daily_scores/daily_scores_ranked/classic_records/events，但保留已註冊 Google 帳號，2026-07-04 使用者交代，上架當天才執行）。
 
 ---
 
@@ -476,6 +476,8 @@ AndroidManifest 的 activity name 改為 `.MainActivity`。
 **方案 B（正式做法，長期）**：接 Google Play In-App Updates API（Play Core），原生對話框，甚至可原地下載不用離開 app。要動 `android/` 原生 code，工程量較大，適合日後有大改殼版本時再做。
 
 **為何現在不做**：封測期間 app 的 `DEFAULT_URL` 只有封測名單看得到（未公開宣傳），殼版本更新頻率低、影響範圍小，優先度排在其他項目後面。**正式上架後**若殼版本更新頻率提高，優先做方案 A（成本低、Supabase 一個表就搞定）。
+
+**2026-07-07 決策更新**：不再等「正式上架後」這個時間點觸發，改成**「下次不管什麼原因需要重包 AAB 時，順便一起做」**——因為方案 A 需要改 `AndroidManifest.xml` 的 `DEFAULT_URL`，本身就要走一次完整重包流程（versionCode+1、Generate Signed Bundle、上傳 Play Console），單獨為此重包一次不划算；但下次如果有別的原生層改動（例如 AdMob SDK 串接通常需要動 `android/`）要重包，就把這個一起包進去，成本趨近於零。
 
 ### 9.6 Google Play 帳號
 
