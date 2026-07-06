@@ -10,6 +10,7 @@ import { recordStreak, getStreak, playedThisSession, writeStreakCache } from "..
 import { fetchDeathHeatmap, type HeatBucket } from "../lib/deathHeatmap";
 import { getDailyQuests } from "../lib/quests";
 import { getWeeklyQuests, syncWeeklyFromServer, weekKey, type WeeklyQuestView } from "../lib/weeklyQuests";
+import { getAdsRemoved } from "../lib/garage";
 import CoinIcon from "../components/CoinIcon";
 import type { TrackData } from "../data/tracks";
 import "./DailyChallenge.css";
@@ -61,6 +62,7 @@ export default function DailyChallenge({
   const [streakLive, setStreakLive] = useState(false); // 本期已參賽（🔥 實心）或待延續（提示）
   const [heat, setHeat] = useState<HeatBucket[]>([]); // 今日全服死亡熱點（20 等分）
   const [quests] = useState(() => getDailyQuests(dailyKey())); // 每日任務（裝置本地日曆日，跨模式共用）
+  const [adsRemoved] = useState(() => getAdsRemoved()); // 永久去廣告：第 3~5 次挑戰不再顯示「看廣告」標籤
   const [weeklyQuests, setWeeklyQuests] = useState<WeeklyQuestView[]>([]); // 本週任務（ISO 週別，已登入才有伺服器權威進度）
 
   useEffect(() => {
@@ -205,7 +207,7 @@ export default function DailyChallenge({
 
         {(() => {
           const canPlay = attempts < MAX_ATTEMPTS && !serverMaxed;
-          const showAd  = attempts >= FREE_ATTEMPTS;
+          const showAd  = !adsRemoved && attempts >= FREE_ATTEMPTS;
           const num     = attempts + 1; // 即將進行的第幾次
           // 已登入玩家先問伺服器 consume_attempt()（真正把關，清 localStorage 也繞不過）；
           // 未登入/RPC 尚未建立時直接回 true，維持現行純前端計數行為不變。

@@ -96,6 +96,7 @@ const COINS_KEY = "tr_garage_coins";
 const DIAMONDS_KEY = "tr_garage_diamonds";
 const OWNED_KEY = "tr_garage_owned";
 const ACTIVE_KEY = "tr_garage_active";
+const ADS_REMOVED_KEY = "tr_ads_removed";
 
 async function getUid(): Promise<string | null> {
   const { data: { session } } = await supabase.auth.getSession();
@@ -106,11 +107,21 @@ async function getUid(): Promise<string | null> {
 export function writeCoinsCache(n: number): void {
   try { localStorage.setItem(COINS_KEY, String(Math.max(0, n))); } catch { /* 靜默 */ }
 }
-function writeDiamondsCache(n: number): void {
+export function writeDiamondsCache(n: number): void {
   try { localStorage.setItem(DIAMONDS_KEY, String(Math.max(0, n))); } catch { /* 靜默 */ }
 }
 function writeOwnedCache(owned: string[]): void {
   try { localStorage.setItem(OWNED_KEY, JSON.stringify(owned)); } catch { /* 靜默 */ }
+}
+function writeAdsRemovedCache(v: boolean): void {
+  try { localStorage.setItem(ADS_REMOVED_KEY, v ? "1" : "0"); } catch { /* 靜默 */ }
+}
+
+// 永久去廣告：復活廣告/每日拿金幣廣告/每日排名賽後 3 次挑戰的廣告標籤，購買後全部跳過
+// （見 App.tsx/GameCanvas.tsx/Garage.tsx/DailyChallenge.tsx 的判斷點）。未登入一律 false
+// （去廣告是真錢購買，只有已登入玩家能買，訪客沒有這個狀態）。
+export function getAdsRemoved(): boolean {
+  try { return localStorage.getItem(ADS_REMOVED_KEY) === "1"; } catch { return false; }
 }
 
 // 已登入時把伺服器錢包（金幣/鑽石/擁有清單/成就進度/streak）同步進本地快取；
@@ -126,7 +137,7 @@ export async function syncWalletFromServer(): Promise<void> {
     coins: number; diamonds: number; owned: string[];
     bull_finishes: number; bear_finishes: number;
     streak_count: number; last_session_key: string | null;
-    collection: string[];
+    collection: string[]; ads_removed: boolean;
   };
   writeCoinsCache(row.coins);
   writeDiamondsCache(row.diamonds);
@@ -134,6 +145,12 @@ export async function syncWalletFromServer(): Promise<void> {
   writeAchievementsCache(row.bull_finishes, row.bear_finishes);
   writeStreakCache(row.last_session_key, row.streak_count);
   writeCollectionCache(row.collection ?? []);
+  writeAdsRemovedCache(row.ads_removed ?? false);
+}
+
+// 購買永久去廣告成功後呼叫（garage.ts 以外的地方買完直接寫快取，不用整包重新同步）。
+export function markAdsRemoved(): void {
+  writeAdsRemovedCache(true);
 }
 
 // 登出時呼叫：把錢包/成就/streak/圖鑑快取全部歸零成訪客預設值，避免下一個登入的帳號
@@ -146,6 +163,7 @@ export function resetWalletCache(): void {
   resetAchievementsCache();
   resetStreakCache();
   resetCollectionCache();
+  writeAdsRemovedCache(false);
 }
 
 // 完賽時呼叫（App.tsx，僅已登入玩家；未登入走 achievements.ts 本地 recordFinish）。

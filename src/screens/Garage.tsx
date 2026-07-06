@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
-import { BIKE_SKINS, getCoins, getDiamonds, isOwned, getActiveSkinId, purchaseSkin, setActiveSkin, addCoins, earnCoins, unlockAchievementSkin, syncWalletFromServer, type BikeSkin } from "../lib/garage";
+import { BIKE_SKINS, getCoins, getDiamonds, isOwned, getActiveSkinId, purchaseSkin, setActiveSkin, addCoins, earnCoins, unlockAchievementSkin, syncWalletFromServer, writeDiamondsCache, getAdsRemoved, markAdsRemoved, type BikeSkin } from "../lib/garage";
 import { requestRewardedCoins } from "../lib/ads";
 import { AD_COIN_REWARD, MAX_AD_COIN_CLAIMS_PER_DAY, getAdCoinClaims, incrementAdCoinClaims } from "../lib/adRewards";
 import { getAchievementBikes, type AchvBikeView } from "../lib/achievements";
 import { getStreak } from "../lib/streak";
 import { resolveSessionDate, fetchDailyMapList } from "../lib/dailyMap";
 import { getCollectedCount } from "../lib/collection";
-import { isBillingAvailable, fetchPackPrices, purchaseDiamondPack, DIAMOND_PACKS } from "../lib/billing";
+import { isBillingAvailable, fetchPackPrices, purchaseDiamondPack, purchaseRemoveAds, DIAMOND_PACKS, REMOVE_ADS_SKU } from "../lib/billing";
 import { dailyKey } from "../data/pick";
 import CoinIcon from "../components/CoinIcon";
 import "../TrackSelect.css";
@@ -33,14 +33,19 @@ export default function Garage({ onBack }: { onBack: () => void }) {
   const [billingAvailable] = useState(() => isBillingAvailable());
   const [packPrices, setPackPrices] = useState<Map<string, string>>(new Map());
   const [purchasingSku, setPurchasingSku] = useState<string | null>(null);
+  const [adsRemoved, setAdsRemoved] = useState(() => getAdsRemoved());
+  const [purchasingAdsRemoval, setPurchasingAdsRemoval] = useState(false);
   const [, forceRender] = useState(0);
 
-  // 鑽石購買：只有 Android TWA + 瀏覽器支援 Digital Goods API 才顯示（網頁版不開放購買）。
-  // 就算兩者都成立，Play Console 商品尚未建立前查價也會失敗，卡片會顯示「暫無法購買」。
+  // 鑽石購買 + 永久去廣告：只有 Android TWA + 瀏覽器支援 Digital Goods API 才顯示
+  // （網頁版不開放購買）。就算兩者都成立，Play Console 商品尚未建立前查價也會失敗，
+  // 卡片會顯示「暫無法購買」。
   useEffect(() => {
     if (!billingAvailable) return;
     let alive = true;
-    fetchPackPrices().then((m) => { if (alive) setPackPrices(m); });
+    fetchPackPrices([...DIAMOND_PACKS.map((p) => p.sku), REMOVE_ADS_SKU]).then((m) => {
+      if (alive) setPackPrices(m);
+    });
     return () => { alive = false; };
   }, [billingAvailable]);
 
@@ -49,7 +54,15 @@ export default function Garage({ onBack }: { onBack: () => void }) {
     setPurchasingSku(sku);
     const result = await purchaseDiamondPack(sku);
     setPurchasingSku(null);
-    if (result !== null) setDiamonds(result);
+    if (result !== null) { writeDiamondsCache(result); setDiamonds(result); }
+  };
+
+  const handleBuyRemoveAds = async () => {
+    if (purchasingAdsRemoval || adsRemoved) return;
+    setPurchasingAdsRemoval(true);
+    const ok = await purchaseRemoveAds();
+    setPurchasingAdsRemoval(false);
+    if (ok) { markAdsRemoved(); setAdsRemoved(true); }
   };
 
   // 圖鑑分母：目前市場總股票數（跟 TrackSelect 自選賽道同一份清單，~1090 支）
@@ -81,6 +94,7 @@ export default function Garage({ onBack }: { onBack: () => void }) {
       setCoins(getCoins());
       setDiamonds(getDiamonds());
       setCollectedCount(getCollectedCount());
+      setAdsRemoved(getAdsRemoved());
       await refreshAchvBikes(() => alive);
       if (alive) forceRender((n) => n + 1);
     });
@@ -180,23 +194,25 @@ export default function Garage({ onBack }: { onBack: () => void }) {
       <p className="garage-coins garage-diamonds">💎 鑽石 {diamonds}</p>
       <p className="garage-collection">📖 圖鑑 {collectedCount}{totalStocks ? ` / ${totalStocks}` : ""} 支已收集</p>
       <p className="garage-intro">完賽/摔車與每日任務都能賺金幣，解鎖車皮換上場</p>
-      <button
-        className="garage-ad-btn"
-        disabled={watchingAd || adClaims >= MAX_AD_COIN_CLAIMS_PER_DAY}
-        onClick={handleWatchAd}
-      >
-        {watchingAd
-          ? "廣告播放中…"
-          : adClaims >= MAX_AD_COIN_CLAIMS_PER_DAY
-            ? "今日已達上限"
-            : `📺 看廣告 +${AD_COIN_REWARD} 金幣 (${adClaims}/${MAX_AD_COIN_CLAIMS_PER_DAY})`}
-      </button>
+      {!adsRemoved && (
+        <button
+          className="garage-ad-btn"
+          disabled={watchingAd || adClaims >= MAX_AD_COIN_CLAIMS_PER_DAY}
+          onClick={handleWatchAd}
+        >
+          {watchingAd
+            ? "廣告播放中…"
+            : adClaims >= MAX_AD_COIN_CLAIMS_PER_DAY
+              ? "今日已達上限"
+              : `📺 看廣告 +${AD_COIN_REWARD} 金幣 (${adClaims}/${MAX_AD_COIN_CLAIMS_PER_DAY})`}
+        </button>
+      )}
 
       <div className="garage-list">
         {BIKE_SKINS.filter((s) => !s.locked && s.currency !== "diamond").map(renderSkinCard)}
       </div>
 
-      <h2 className="garage-section-title">🎯 任務解鎖車款</h2>
+      <h2 className="garage-section-title">🎯 成就車款</h2>
       <div className="garage-list">
         {achvBikes.map((a) => {
           const skin = BIKE_SKINS.find((s) => s.id === a.id);
@@ -219,6 +235,23 @@ export default function Garage({ onBack }: { onBack: () => void }) {
             </div>
           );
         })}
+      </div>
+
+      <h2 className="garage-section-title">💎 鑽石車款</h2>
+      <div className="garage-list">
+        {BIKE_SKINS.filter((s) => s.currency === "diamond").map(renderSkinCard)}
+        {PAID_BIKES_COMING_SOON.map((p) => (
+          <div key={p.id} className="garage-card locked">
+            <div className="garage-preview garage-preview-locked">
+              <span className="garage-lock-icon">💎</span>
+            </div>
+            <div className="garage-card-body">
+              <div className="garage-card-name">{p.name}</div>
+              <div className="garage-card-desc">{p.desc}</div>
+              <button className="garage-btn disabled" disabled>敬請期待</button>
+            </div>
+          </div>
+        ))}
       </div>
 
       {billingAvailable && (
@@ -244,25 +277,31 @@ export default function Garage({ onBack }: { onBack: () => void }) {
               );
             })}
           </div>
-        </>
-      )}
 
-      <h2 className="garage-section-title">💎 鑽石車款</h2>
-      <div className="garage-list">
-        {BIKE_SKINS.filter((s) => s.currency === "diamond").map(renderSkinCard)}
-        {PAID_BIKES_COMING_SOON.map((p) => (
-          <div key={p.id} className="garage-card locked">
-            <div className="garage-preview garage-preview-locked">
-              <span className="garage-lock-icon">💎</span>
-            </div>
-            <div className="garage-card-body">
-              <div className="garage-card-name">{p.name}</div>
-              <div className="garage-card-desc">{p.desc}</div>
-              <button className="garage-btn disabled" disabled>敬請期待</button>
+          <h2 className="garage-section-title">🚫 永久去除廣告</h2>
+          <div className="garage-list">
+            <div className="garage-card diamond-pack-card">
+              <div className="garage-card-body">
+                <div className="garage-card-name">🚫 永久去除廣告</div>
+                <div className="garage-card-desc">
+                  一次購買終身有效：復活、每日拿金幣、每日排名賽額外挑戰機會，全部不再需要看廣告
+                </div>
+                {adsRemoved ? (
+                  <button className="garage-btn disabled" disabled>已購買</button>
+                ) : (
+                  <button
+                    className={`garage-btn buy-diamond${!packPrices.get(REMOVE_ADS_SKU) ? " disabled" : ""}`}
+                    disabled={!packPrices.get(REMOVE_ADS_SKU) || purchasingAdsRemoval}
+                    onClick={handleBuyRemoveAds}
+                  >
+                    {purchasingAdsRemoval ? "處理中…" : packPrices.get(REMOVE_ADS_SKU) ?? "暫無法購買"}
+                  </button>
+                )}
+              </div>
             </div>
           </div>
-        ))}
-      </div>
+        </>
+      )}
     </div>
   );
 }

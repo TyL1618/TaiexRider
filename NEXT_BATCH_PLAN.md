@@ -129,6 +129,31 @@
      可以先做）。
   6. 全部完成後才建議真機測試一次完整購買流程（測試卡付款，Play Console 有測試身分機制）。
 
+- [x] **永久去除廣告 IAP 骨架** 已完成（2026-07-06，v0.12.32）。使用者要求範圍：復活、
+      每日拿金幣、每日排名賽後 3 次挑戰，「任何會出現廣告的地方」購買後全部跳過。
+      設計：非消耗型商品（買一次終身有效），跟鑽石消耗型不同，Google 端要呼叫
+      `:acknowledge` 而不是 `:consume`（`consume` 會讓非消耗型商品變成可重複購買）。
+      - `supabase/migration_20260706d.sql`：`player_wallet` 加 `ads_removed` 欄位，新增
+        `grant_remove_ads()` RPC（只給 service_role），`wallet_get()` 一併回傳。
+      - `verify-iap-purchase` Edge Function 依 SKU 類型分流（鑽石→consume，去廣告→acknowledge）。
+      - `src/lib/billing.ts` 新增 `REMOVE_ADS_SKU`("remove_ads_forever") + `purchaseRemoveAds()`，
+        `fetchPackPrices()` 改通用化（可查任意 SKU 清單，不只鑽石）。
+      - `garage.ts` 新增 `getAdsRemoved()`/`markAdsRemoved()`，`syncWalletFromServer()`/
+        `resetWalletCache()` 一併處理。
+      - 三個廣告觸點依 `ads_removed` 調整：`GameCanvas.tsx` 復活按鈕（已購買時標籤從
+        「看廣告復活」變「復活」，本來就沒有真的擋廣告，只改文字）＋ 結算畫面/`Garage.tsx`
+        的「看廣告拿金幣」按鈕（已購買時整個隱藏，不是變免費，因為整組「看廣告拿獎勵」
+        機制的存在前提就是有廣告）＋ `DailyChallenge.tsx` 第 3~5 次挑戰（已購買時 `showAd`
+        永遠 false，一律顯示「開始挑戰」不顯示「看廣告開始」，5 次額度不變）。
+      - `Garage.tsx` 版面同時調整：「💰 購買鑽石」搬到頁面最底部（原本夾在成就車款跟
+        鑽石車款中間）、新增「🚫 永久去除廣告」區塊接在購買鑽石後面、「🎯 任務解鎖車款」
+        改名「🎯 成就車款」。
+      **⚠️ 使用者待辦**：SQL Editor 跑 `migration_20260706d.sql`；Play Console 要多建一個
+      SKU **`remove_ads_forever`**（非消耗型／受管理商品，不是消耗型，記得選對類型）；
+      跟鑽石一樣卡在同一組前置阻礙（商家帳戶審核中 + Android 原生 Billing 橋接），詳見
+      上面鑽石購買那條的第 5 點。preview 驗證：訪客路徑零 console error，手動模擬
+      `localStorage.tr_ads_removed=1` 確認「看廣告拿金幣」按鈕正確隱藏。
+
 - [ ] P3~P5 三台鑽石車款生圖 + 登記進 `wallet_spend_skin` 白名單（同時更新 `garage.ts` 的
       `BIKE_SKINS`）。**使用者稍後處理 Grok 生圖**。
 - [ ] 廣告真實串接（AdMob Rewarded / AdSense Interstitial），取代現在直接發幣的 stub

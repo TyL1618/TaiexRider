@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.12.31";
+export const APP_VERSION = "0.12.32";
 
 export interface ChangelogEntry {
   date: string;
@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    date: "2026-07-06 (v0.12.32)",
+    notes: [
+      "車庫版面調整：購買鑽石移到頁面最底部，「任務解鎖車款」改名「成就車款」",
+      "內部：新增「永久去除廣告」IAP 骨架 — 復活/每日拿金幣/每日排名賽額外挑戰的廣告標籤購買後跳過，跟鑽石購買頁一樣尚未接上 Play Console 商品，一般玩家完全無感",
+    ],
+  },
   {
     date: "2026-07-06 (v0.12.31)",
     notes: [

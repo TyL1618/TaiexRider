@@ -7,9 +7,10 @@
 // verify-iap-purchase Edge Function（supabase/functions/）向 Google Play Developer API
 // 驗證是真的付款 → 驗證通過才發鑽石，不信任前端。
 //
-// ⚠️ 這裡的 SKU 清單目前是暫定佔位（鑽石數對照 supabase/migration_20260707b.sql 的
-// grant_iap_diamonds() 白名單，兩邊要同步）。真實定價由使用者在 Play Console 建立
-// 商品時決定，這裡不寫死價格，改用 fetchPackPrices() 向 Google 動態查詢顯示。
+// ⚠️ 這裡的 SKU 清單目前是暫定佔位（鑽石數對照 supabase/migration_20260706c.sql 的
+// grant_iap_diamonds() 白名單、去廣告對照 migration_20260706d.sql 的 grant_remove_ads()，
+// 兩邊要同步）。真實定價由使用者在 Play Console 建立商品時決定，這裡不寫死價格，
+// 改用 fetchPackPrices() 向 Google 動態查詢顯示。
 // ⚠️ 部署前置作業（Play Console 商品/Google Cloud 服務帳號/Edge Function 部署）
 // 尚未完成前，isBillingAvailable() 就算在 TWA 裡也會因為 Play Console 沒有對應商品
 // 而讓 getDetails()/purchase 失敗，購買按鈕應處理好這個「查價失敗」的降級顯示。
@@ -28,6 +29,11 @@ export const DIAMOND_PACKS: DiamondPack[] = [
   { sku: "diamonds_350",  diamonds: 350,  label: "中包" },
   { sku: "diamonds_1200", diamonds: 1200, label: "大包" },
 ];
+
+// 永久去除廣告（非消耗型，買一次終身有效）：復活廣告、每日拿金幣廣告、每日排名賽
+// 後 3 次挑戰的廣告標籤，購買後全部跳過（見 App.tsx/GameCanvas.tsx/Garage.tsx/
+// DailyChallenge.tsx 讀 garage.ts getAdsRemoved() 的判斷點）。
+export const REMOVE_ADS_SKU = "remove_ads_forever";
 
 interface DigitalGoodsService {
   getDetails(itemIds: string[]): Promise<{ itemId: string; price: { currency: string; value: string } }[]>;
@@ -63,29 +69,29 @@ async function getService(): Promise<DigitalGoodsService | null> {
   }
 }
 
-// 向 Google Play 查各 SKU 的實際定價（顯示用；扣款金額由 Google 那邊決定，這裡不寫死）。
+// 向 Google Play 查任意 SKU 清單的實際定價（顯示用；扣款金額由 Google 那邊決定，這裡不寫死）。
 // 查不到（Play Console 商品尚未建立/網路問題）回傳空 Map，UI 應顯示「暫無法查價」。
-export async function fetchPackPrices(): Promise<Map<string, string>> {
+export async function fetchPackPrices(skus: string[]): Promise<Map<string, string>> {
   const out = new Map<string, string>();
   const service = await getService();
   if (!service) return out;
   try {
-    const details = await service.getDetails(DIAMOND_PACKS.map((p) => p.sku));
+    const details = await service.getDetails(skus);
     for (const d of details) out.set(d.itemId, `${d.price.currency} ${d.price.value}`);
   } catch { /* 靜默，UI 略過價格顯示 */ }
   return out;
 }
 
-// 購買一包鑽石。回傳最新鑽石餘額；null 代表使用者取消/失敗（不用特別跳錯誤，
-// 靜默返回讓 UI 恢復成可再按一次的狀態即可）。
-export async function purchaseDiamondPack(sku: string): Promise<number | null> {
+// 共用購買流程：觸發 PaymentRequest 付款 → 拿 purchase_token → 呼叫 Edge Function 驗證。
+// 回傳 Edge Function 的完整回應（null 代表使用者取消/失敗），呼叫端各自取需要的欄位。
+async function runPurchaseFlow(sku: string, label: string): Promise<Record<string, unknown> | null> {
   const w = window as WindowWithDigitalGoods;
   if (!isBillingAvailable() || !w.PaymentRequest) return null;
 
   try {
     const request = new w.PaymentRequest(
       [{ supportedMethods: "https://play.google.com/billing", data: { sku } }],
-      { total: { label: "鑽石", amount: { currency: "TWD", value: "0" } } },
+      { total: { label, amount: { currency: "TWD", value: "0" } } },
     );
     const response = await request.show();
     const purchaseToken = response.details.purchaseToken;
@@ -98,8 +104,21 @@ export async function purchaseDiamondPack(sku: string): Promise<number | null> {
       body: { sku_id: sku, purchase_token: purchaseToken },
     });
     if (error || !data?.ok) return null;
-    return data.diamonds as number;
+    return data as Record<string, unknown>;
   } catch {
     return null;
   }
+}
+
+// 購買一包鑽石。回傳最新鑽石餘額；null 代表使用者取消/失敗（不用特別跳錯誤，
+// 靜默返回讓 UI 恢復成可再按一次的狀態即可）。
+export async function purchaseDiamondPack(sku: string): Promise<number | null> {
+  const data = await runPurchaseFlow(sku, "鑽石");
+  return data ? (data.diamonds as number) : null;
+}
+
+// 購買永久去廣告。回傳是否成功；不需要餘額（布林旗標而非數值）。
+export async function purchaseRemoveAds(): Promise<boolean> {
+  const data = await runPurchaseFlow(REMOVE_ADS_SKU, "永久去除廣告");
+  return data ? Boolean(data.adsRemoved) : false;
 }

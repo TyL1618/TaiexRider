@@ -10,7 +10,7 @@ import { logEvent } from "../lib/analytics";
 import { haptics } from "../lib/haptics";
 import { fetchDeathHeatmap } from "../lib/deathHeatmap";
 import { startWakeLock } from "../lib/wakeLock";
-import { getActiveBikeSkin, addCoins, earnCoins } from "../lib/garage";
+import { getActiveBikeSkin, addCoins, earnCoins, getAdsRemoved } from "../lib/garage";
 import { requestRewardedCoins } from "../lib/ads";
 import { AD_COIN_REWARD, MAX_AD_COIN_CLAIMS_PER_DAY, getAdCoinClaims, incrementAdCoinClaims } from "../lib/adRewards";
 import { dailyKey } from "../data/pick";
@@ -177,6 +177,8 @@ export default function GameCanvas({ prices, label, name, subtitle, onExit, onGa
   const [confirmExit, setConfirmExit] = useState(false); // 返回主選單確認
   const [showStartPrompt, setShowStartPrompt] = useState(true); // 觸碰才開始計時
   const [revivalUsed, setRevivalUsed] = useState(false); // 每局限復活一次
+  // 永久去廣告（IAP）：已購買者跳過所有「看廣告」標籤/流程，見 garage.ts getAdsRemoved()
+  const [adsRemoved] = useState(() => getAdsRemoved());
   const [newPb, setNewPb] = useState(false); // 本局打破個人最佳（結算徽章）
   const [adCoinsState, setAdCoinsState] = useState<"idle" | "watching" | "claimed">("idle"); // 結算畫面看廣告拿金幣，每局限一次
   // 每日次數上限跟車庫頁「看廣告拿金幣」共用同一組計數（見 lib/adRewards.ts），
@@ -1582,7 +1584,7 @@ let crashTimer = 0;
             <div className="overlay-stats">
               翻轉 {hud.totalFlips} 圈 ・ 完美落地 {hud.perfectLandings} 次
             </div>
-            {adCoinsState !== "claimed" && (
+            {!adsRemoved && adCoinsState !== "claimed" && (
               <button
                 className="overlay-ad-coins-btn"
                 disabled={adCoinsState === "watching" || adClaimsToday >= MAX_AD_COIN_CLAIMS_PER_DAY}
@@ -1614,7 +1616,7 @@ let crashTimer = 0;
               <>
                 {crashed && !revivalUsed && (
                   <button className="overlay-btn ad-btn" onClick={() => { setRevivalUsed(true); requestRevive(); }}>
-                    看廣告復活
+                    {adsRemoved ? "復活" : "看廣告復活"}
                   </button>
                 )}
                 <button className="overlay-btn share-btn" onClick={shareScore}>📤 分享成績</button>

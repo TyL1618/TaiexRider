@@ -1,12 +1,18 @@
-// 鑽石購買驗證（Google Play Billing，僅 Android TWA 呼叫，網頁版不開放購買）。
+// IAP 購買驗證（Google Play Billing，僅 Android TWA 呼叫，網頁版不開放購買）。
+// 支援兩種商品類型：
+//   - 消耗型（鑽石包）：可重複購買，驗證後呼叫 grant_iap_diamonds()，並向 Google
+//     呼叫 :consume 讓玩家能再次購買同一個 SKU。
+//   - 非消耗型（永久去除廣告）：買一次終身有效，驗證後呼叫 grant_remove_ads()，
+//     並向 Google 呼叫 :acknowledge（**不能呼叫 consume**，consume 會讓這個「一次性」
+//     商品變成可以重複購買，跟消耗型商品搞混）。
 //
 // 流程：前端走 Digital Goods API 完成付款拿到 purchase_token → 呼叫這支 Edge Function
 // （帶使用者的 Supabase JWT + sku_id + purchase_token）→ 這裡向 Google Play Developer API
-// 驗證這筆付款是真的、還沒被消費過 → 驗證通過才用 service role 呼叫 grant_iap_diamonds()
-// RPC 發鑽石 → 通知 Google 這筆已消費（消耗型商品才能再次購買同一個 SKU）。
+// 驗證這筆付款是真的、還沒被處理過 → 驗證通過才用 service role 呼叫對應的 grant RPC →
+// 依商品類型呼叫 Google 的 consume 或 acknowledge。
 //
-// 不能讓前端直接呼叫 grant_iap_diamonds()：那樣任何人偽造一個假 purchase_token 就能騙鑽石，
-// 驗證這一步是整個安全設計的核心，不可省略。
+// 不能讓前端直接呼叫 grant_iap_diamonds()/grant_remove_ads()：那樣任何人偽造一個假
+// purchase_token 就能騙鑽石/騙去廣告權，驗證這一步是整個安全設計的核心，不可省略。
 //
 // ── 部署前需要設定的 Supabase secrets（supabase secrets set 指令，見 NEXT_BATCH_PLAN.md）──
 //   GOOGLE_SERVICE_ACCOUNT_EMAIL      服務帳號 email（Google Cloud 建立）
@@ -23,6 +29,11 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const PACKAGE_NAME = "com.tylapp.taiexrider"; // android/app/build.gradle.kts applicationId
+
+// SKU 分類：消耗型（鑽石）vs 非消耗型（永久去廣告）。兩邊都要跟
+// src/lib/billing.ts / supabase/migration_20260706c.sql,20260706d.sql 同步。
+const DIAMOND_SKUS = new Set(["diamonds_100", "diamonds_350", "diamonds_1200"]);
+const REMOVE_ADS_SKU = "remove_ads_forever";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -101,6 +112,13 @@ async function consumePurchase(productId: string, token: string, accessToken: st
   await fetch(url, { method: "POST", headers: { Authorization: `Bearer ${accessToken}` } }).catch(() => {});
 }
 
+// 非消耗型商品（去廣告）用 acknowledge，不能用 consume——consume 會讓這個「買一次終身有效」
+// 的商品變成可以重複購買，跟消耗型商品的語意搞混。
+async function acknowledgePurchase(productId: string, token: string, accessToken: string): Promise<void> {
+  const url = `https://androidpublisher.googleapis.com/androidpublisher/v3/applications/${PACKAGE_NAME}/purchases/products/${productId}/tokens/${token}:acknowledge`;
+  await fetch(url, { method: "POST", headers: { Authorization: `Bearer ${accessToken}` } }).catch(() => {});
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS_HEADERS });
 
@@ -126,6 +144,11 @@ Deno.serve(async (req) => {
         { status: 401, headers: CORS_HEADERS });
     }
 
+    if (!DIAMOND_SKUS.has(sku_id) && sku_id !== REMOVE_ADS_SKU) {
+      return new Response(JSON.stringify({ ok: false, error: "unknown sku" }),
+        { status: 400, headers: CORS_HEADERS });
+    }
+
     // 跟 Google Play 驗證這筆付款是真的、狀態正確
     const accessToken = await getGoogleAccessToken();
     const purchase = await verifyPurchase(sku_id, purchase_token, accessToken);
@@ -134,25 +157,40 @@ Deno.serve(async (req) => {
         { status: 400, headers: CORS_HEADERS });
     }
 
-    // 驗證通過才用 service role 呼叫資料庫發鑽石
-    // （RPC 內有 SKU 白名單 + purchase_token 防重放，這裡不需要再檢查一次）
     const adminClient = createClient(supabaseUrl, serviceKey);
-    const { data, error } = await adminClient.rpc("grant_iap_diamonds", {
+
+    if (DIAMOND_SKUS.has(sku_id)) {
+      // 消耗型：驗證通過才用 service role 呼叫資料庫發鑽石
+      // （RPC 內有 SKU 白名單 + purchase_token 防重放，這裡不需要再檢查一次）
+      const { data, error } = await adminClient.rpc("grant_iap_diamonds", {
+        p_player_id: user.id,
+        p_sku_id: sku_id,
+        p_purchase_token: purchase_token,
+      });
+      if (error || !data || !data[0]?.ok) {
+        return new Response(JSON.stringify({ ok: false, error: "grant failed" }),
+          { status: 400, headers: CORS_HEADERS });
+      }
+      // 消耗型商品，消費後玩家才能再次購買同一個 SKU
+      if (purchase.consumptionState === 0) {
+        await consumePurchase(sku_id, purchase_token, accessToken);
+      }
+      return new Response(JSON.stringify({ ok: true, diamonds: data[0].diamonds }),
+        { headers: { ...CORS_HEADERS, "Content-Type": "application/json" } });
+    }
+
+    // 非消耗型（永久去廣告）
+    const { data, error } = await adminClient.rpc("grant_remove_ads", {
       p_player_id: user.id,
-      p_sku_id: sku_id,
       p_purchase_token: purchase_token,
     });
     if (error || !data || !data[0]?.ok) {
       return new Response(JSON.stringify({ ok: false, error: "grant failed" }),
         { status: 400, headers: CORS_HEADERS });
     }
-
-    // 通知 Google 這筆已消費（消耗型商品，消費後玩家才能再次購買同一個 SKU）
-    if (purchase.consumptionState === 0) {
-      await consumePurchase(sku_id, purchase_token, accessToken);
-    }
-
-    return new Response(JSON.stringify({ ok: true, diamonds: data[0].diamonds }),
+    // 非消耗型商品用 acknowledge，不能用 consume（見上方函式註解）
+    await acknowledgePurchase(sku_id, purchase_token, accessToken);
+    return new Response(JSON.stringify({ ok: true, adsRemoved: data[0].ads_removed }),
       { headers: { ...CORS_HEADERS, "Content-Type": "application/json" } });
   } catch (e) {
     return new Response(JSON.stringify({ ok: false, error: String(e) }),
