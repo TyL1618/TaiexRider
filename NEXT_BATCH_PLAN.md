@@ -83,13 +83,24 @@
 
   **⚠️ 這是純程式碼骨架，離「真的能購買」還差好幾個外部手動設定，且缺一項就完全不會啟用
   （對現有封測玩家零影響，因為偵測不到就不顯示按鈕）：**
-  1. **Supabase SQL Editor 跑 `migration_20260706c.sql`**（`iap_purchases` 表 + RPC）。
-  2. **Google Play Console** 建立「應用程式內產品」：SKU id 要跟上面三個一致，設定價格。
-  3. **Google Cloud**：建一個服務帳號並啟用 Android Publisher API，把服務帳號 email 加進
-     Play Console「使用者和權限」（要有查看財務資料/訂單的權限，否則 API 呼叫會 403）。
+  1. [x] **Supabase SQL Editor 跑 `migration_20260706c.sql`**（`iap_purchases` 表 + RPC）
+     ——2026-07-06 使用者確認已跑，REST API 驗證兩者皆存在（回 42501 permission denied）。
+  2. [ ] **Google Play Console** 建立「應用程式內產品」：SKU id 要跟上面三個一致，設定價格。
+     **⚠️ 2026-07-06 發現前置阻礙**：Play Console「透過 Google Play 營利」頁面顯示
+     「如要透過這款應用程式營利，請設定商家帳戶」——建立有價格的應用程式內產品前，
+     必須先設定 Google 商家帳戶（Payments profile，含金流/稅務/收款帳戶資訊），這步驟
+     使用者尚未完成，待處理。
+  3. **Google Cloud 服務帳號**：✅ 已啟用 Google Play Android Developer API（2026-07-06
+     確認畫面正確）。已建立服務帳號，目前帳號 email：
+     **`taiexrider-iap-verify-237@tokyo-dispatch-426713-t8.iam.gserviceaccount.com`**
+     （另有一個重複建立、尚未生過金鑰的 `taiexrider-iap-verify@...`（無 -237 後綴），
+     建議之後清理掉避免搞混，只留一個）。**⚠️ 還沒下載 JSON 金鑰**，也還沒把這個 email
+     加進 Play Console「使用者和權限」授權（要有查看財務資料/訂單的權限，否則 API 呼叫
+     會 403）——這兩步待做。
   4. **部署 Edge Function**：`npx supabase login` → `npx supabase link --project-ref <ref>`
      → `npx supabase secrets set GOOGLE_SERVICE_ACCOUNT_EMAIL=... GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY="..."`
-     → `npx supabase functions deploy verify-iap-purchase`。
+     → `npx supabase functions deploy verify-iap-purchase`。**尚未部署**（需要上面金鑰才能設定
+     secrets）。
   5. **🔴 最容易漏掉的一步——Android 原生專案本身要改**：Digital Goods API 光靠網頁端程式碼
      不會生效，TWA 的 Android 專案要加 androidbrowserhelper 的 Play Billing 橋接（依賴 +
      manifest 設定），這是原生層改動，套用「android/ push 無效」規則——要在 Android Studio
