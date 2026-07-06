@@ -133,6 +133,14 @@ create table if not exists public.classic_records (
 
 **週任務**：`player_weekly_quest(player_id, week_key, perfect_sum, flips_sum, max_score, max_survive_sec, play_count, claimed[])`，複合鍵 `(player_id, week_key)`。`week_key` 用 ISO 8601 週別（`YYYY-Www`，`src/lib/weeklyQuests.ts` 的 `weekKey()` 本地時區實作，非 UTC）。`record_weekly_run()` 累加進度、`claim_weekly_quest()` 驗證＋發獎（含狂暴盤 ×2），`get_weekly_quest()` 純讀取。任務池仿每日任務放大成週尺度，3 選其一 seeded。清理：`cleanup_old_wallet_logs()`（已被 CI 每日呼叫）順便清 8 週前的列，`week_key` 用 `to_char(..., 'IYYY-"W"IW')` 字串比較。
 
+### 2.7 鑽石購買（IAP，2026-07-06，`migration_20260706c.sql`）——本專案第一次用 Edge Function
+
+**設計**：前端走 **Digital Goods API**（僅 Android TWA 支援，網頁版不開放購買——`src/lib/billing.ts` 的 `isBillingAvailable()` 偵測不到就整塊隱藏）觸發 `PaymentRequest`（`https://play.google.com/billing` 付款方式）拿到 `purchase_token` → 呼叫 **`supabase/functions/verify-iap-purchase/index.ts`**（Deno Edge Function，本專案至今全部用 Postgres RPC，這是第一次需要對外呼叫 Google API 才引入 Edge Function）→ 用服務帳號 JWT bearer flow 換 access token，向 Google Play Developer API 驗證這筆付款是真的 → 驗證通過才用 **service role** 呼叫 `grant_iap_diamonds(p_player_id,p_sku_id,p_purchase_token)` RPC 發鑽石。
+
+**防重放**：`iap_purchases(purchase_token pk, player_id, sku_id, diamonds, created_at)` 記錄每筆已兌換的 purchase_token，同一筆不能重複發鑽石。`grant_iap_diamonds()` 內有 SKU 白名單（`diamonds_100`/`diamonds_350`/`diamonds_1200`，暫定鑽石數，實際定價在 Play Console 設定），**只給 service_role 呼叫**（`revoke ... from public, anon, authenticated`）——前端絕對不能直接呼叫這支，否則偽造 purchase_token 就能騙鑽石。
+
+**⚠️ 部署前置作業**（純程式碼骨架，還差這些外部手動設定才會真正啟用，缺一項就完全不會顯示購買按鈕，對現有玩家零影響）：① 跑 migration；② Play Console 建立應用程式內產品；③ Google Cloud 服務帳號 + Play Console 授權；④ `supabase functions deploy verify-iap-purchase`（需要 secrets：`GOOGLE_SERVICE_ACCOUNT_EMAIL`/`GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY`）；⑤ **Android 原生專案要加 androidbrowserhelper 的 Play Billing 橋接**（Digital Goods API 光靠網頁端程式碼不會生效），屬於「android/ push 無效」的原生層改動，要在 Android Studio 加好＋versionCode+1＋重新上傳簽名 AAB 才會真正啟用。詳細清單見 [NEXT_BATCH_PLAN.md](NEXT_BATCH_PLAN.md) 批次 4。
+
 ---
 
 ## 3. 資料管線（Data Pipeline）
@@ -328,7 +336,8 @@ src/
 │   ├── analytics.ts          # events 打點（run_start/death/finish/revive）
 │   ├── adminStats.ts         # 隱藏統計頁資料（admin_stats RPC，email 綁權限）
 │   ├── collection.ts         # 股票圖鑑：已收集代號（player_collection，已登入→伺服器權威）+ 圖鑑登記表讀取（stock_registry，公開）
-│   └── weeklyQuests.ts       # 週任務池（ISO 週別 seeded，player_weekly_quest 已登入權威）
+│   ├── weeklyQuests.ts       # 週任務池（ISO 週別 seeded，player_weekly_quest 已登入權威）
+│   └── billing.ts            # 鑽石購買（Digital Goods API，僅 TWA，呼叫 verify-iap-purchase Edge Function）
 ├── components/
 │   ├── Sparkline.tsx      # 折線圖元件
 │   ├── CoinIcon.tsx       # 金幣圖示 SVG

@@ -6,6 +6,7 @@ import { getAchievementBikes, type AchvBikeView } from "../lib/achievements";
 import { getStreak } from "../lib/streak";
 import { resolveSessionDate, fetchDailyMapList } from "../lib/dailyMap";
 import { getCollectedCount } from "../lib/collection";
+import { isBillingAvailable, fetchPackPrices, purchaseDiamondPack, DIAMOND_PACKS } from "../lib/billing";
 import { dailyKey } from "../data/pick";
 import CoinIcon from "../components/CoinIcon";
 import "../TrackSelect.css";
@@ -29,7 +30,27 @@ export default function Garage({ onBack }: { onBack: () => void }) {
   const [achvBikes, setAchvBikes] = useState<AchvBikeView[]>(() => getAchievementBikes(0));
   const [collectedCount, setCollectedCount] = useState(() => getCollectedCount());
   const [totalStocks, setTotalStocks] = useState<number | null>(null);
+  const [billingAvailable] = useState(() => isBillingAvailable());
+  const [packPrices, setPackPrices] = useState<Map<string, string>>(new Map());
+  const [purchasingSku, setPurchasingSku] = useState<string | null>(null);
   const [, forceRender] = useState(0);
+
+  // 鑽石購買：只有 Android TWA + 瀏覽器支援 Digital Goods API 才顯示（網頁版不開放購買）。
+  // 就算兩者都成立，Play Console 商品尚未建立前查價也會失敗，卡片會顯示「暫無法購買」。
+  useEffect(() => {
+    if (!billingAvailable) return;
+    let alive = true;
+    fetchPackPrices().then((m) => { if (alive) setPackPrices(m); });
+    return () => { alive = false; };
+  }, [billingAvailable]);
+
+  const handleBuyDiamonds = async (sku: string) => {
+    if (purchasingSku) return;
+    setPurchasingSku(sku);
+    const result = await purchaseDiamondPack(sku);
+    setPurchasingSku(null);
+    if (result !== null) setDiamonds(result);
+  };
 
   // 圖鑑分母：目前市場總股票數（跟 TrackSelect 自選賽道同一份清單，~1090 支）
   useEffect(() => {
@@ -199,6 +220,32 @@ export default function Garage({ onBack }: { onBack: () => void }) {
           );
         })}
       </div>
+
+      {billingAvailable && (
+        <>
+          <h2 className="garage-section-title">💰 購買鑽石</h2>
+          <div className="garage-list">
+            {DIAMOND_PACKS.map((p) => {
+              const price = packPrices.get(p.sku);
+              return (
+                <div key={p.sku} className="garage-card diamond-pack-card">
+                  <div className="garage-card-body">
+                    <div className="garage-card-name">💎 {p.diamonds} 鑽石</div>
+                    <div className="garage-card-desc">{p.label}</div>
+                    <button
+                      className={`garage-btn buy-diamond${!price ? " disabled" : ""}`}
+                      disabled={!price || purchasingSku !== null}
+                      onClick={() => handleBuyDiamonds(p.sku)}
+                    >
+                      {purchasingSku === p.sku ? "處理中…" : price ?? "暫無法購買"}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
 
       <h2 className="garage-section-title">💎 鑽石車款</h2>
       <div className="garage-list">

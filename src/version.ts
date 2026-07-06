@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.12.30";
+export const APP_VERSION = "0.12.31";
 
 export interface ChangelogEntry {
   date: string;
@@ -7,7 +7,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    date: "2026-07-07 (v0.12.30)",
+    date: "2026-07-06 (v0.12.31)",
+    notes: [
+      "內部：鑽石購買頁骨架（Google Play Billing）— 尚未接上 Play Console 商品/Android 原生橋接，一般玩家完全無感",
+    ],
+  },
+  {
+    date: "2026-07-06 (v0.12.30)",
     notes: [
       "圖鑑升級成完整彈窗：首頁「收藏車庫」旁新增「📖 圖鑑」按鈕，點開可看所有出現過的股票",
       "圖鑑支援依代號排序（高↔低）、篩選未收集/已收集/全部，已收集卡片打星星標記",

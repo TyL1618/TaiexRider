@@ -68,11 +68,38 @@
 
 ## 批次 4 — 車庫/商業化
 
-- [ ] 鑽石購買頁（花台幣分別買鑽石/金幣，兩個獨立按鈕）。
-- [ ] Google Play Billing（IAP）真串接，含購買憑證伺服器端驗證（現在的鑽石扣款機制本身
-      不是真錢驗證，只防「改本地數字」，見 SECURITY_REVIEW.md 對應段落）。
+- [x] **鑽石購買頁骨架 + Google Play Billing 串接** 已完成程式碼（2026-07-06，v0.12.31，
+      使用者確認「網頁版不開放購買」，只做 Android TWA）。設計：前端走 **Digital Goods API**
+      （TWA 專用的網頁層 Billing 介面）觸發 `PaymentRequest`（`https://play.google.com/billing`
+      付款方式）→ 拿到 `purchase_token` → 呼叫新的 **Supabase Edge Function**
+      `verify-iap-purchase`（`supabase/functions/verify-iap-purchase/index.ts`，這個專案第一次
+      用 Edge Function，之前都是純 Postgres RPC）→ 用服務帳號向 **Google Play Developer API**
+      驗證這筆付款是真的 → 驗證通過才用 service role 呼叫 `grant_iap_diamonds()` RPC 發鑽石
+      （`supabase/migration_20260706c.sql`：新增 `iap_purchases` 表防重放 + RPC 只給
+      service_role 呼叫，前端無法直接騙鑽石）。前端 `src/lib/billing.ts` + `Garage.tsx`
+      新增「💰 購買鑽石」區塊（`isBillingAvailable()` 偵測不到就整塊不顯示，網頁版/一般瀏覽器
+      看不到，也不影響任何現有功能）。SKU 暫定：`diamonds_100`(100 鑽)／`diamonds_350`
+      (350 鑽)／`diamonds_1200`(1200 鑽)，實際定價由 Play Console 決定。
+
+  **⚠️ 這是純程式碼骨架，離「真的能購買」還差好幾個外部手動設定，且缺一項就完全不會啟用
+  （對現有封測玩家零影響，因為偵測不到就不顯示按鈕）：**
+  1. **Supabase SQL Editor 跑 `migration_20260706c.sql`**（`iap_purchases` 表 + RPC）。
+  2. **Google Play Console** 建立「應用程式內產品」：SKU id 要跟上面三個一致，設定價格。
+  3. **Google Cloud**：建一個服務帳號並啟用 Android Publisher API，把服務帳號 email 加進
+     Play Console「使用者和權限」（要有查看財務資料/訂單的權限，否則 API 呼叫會 403）。
+  4. **部署 Edge Function**：`npx supabase login` → `npx supabase link --project-ref <ref>`
+     → `npx supabase secrets set GOOGLE_SERVICE_ACCOUNT_EMAIL=... GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY="..."`
+     → `npx supabase functions deploy verify-iap-purchase`。
+  5. **🔴 最容易漏掉的一步——Android 原生專案本身要改**：Digital Goods API 光靠網頁端程式碼
+     不會生效，TWA 的 Android 專案要加 androidbrowserhelper 的 Play Billing 橋接（依賴 +
+     manifest 設定），這是原生層改動，套用「android/ push 無效」規則——要在 Android Studio
+     加好、**versionCode +1**、重新 Generate Signed Bundle、上傳 Play Console 新版本才會生效。
+     **在這之前，就算前 4 步都做完，現有封測 APK 一樣偵測不到 Digital Goods API，購買區塊
+     不會出現，完全不影響目前的封測**。
+  6. 全部完成後才建議真機測試一次完整購買流程（測試卡付款，Play Console 有測試身分機制）。
+
 - [ ] P3~P5 三台鑽石車款生圖 + 登記進 `wallet_spend_skin` 白名單（同時更新 `garage.ts` 的
-      `BIKE_SKINS`）。
+      `BIKE_SKINS`）。**使用者稍後處理 Grok 生圖**。
 - [ ] 廣告真實串接（AdMob Rewarded / AdSense Interstitial），取代現在直接發幣的 stub
       （`ads.ts` 的 `requestRewardedCoins()`）。
 
