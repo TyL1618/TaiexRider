@@ -31,6 +31,7 @@ export async function consumeAttemptServer(): Promise<ConsumeAttemptResult> {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) return { ok: true, streak: null, lastSessionKey: null };
   const { data, error } = await supabase.rpc("consume_attempt");
+  if (error) console.error("[wallet] consume_attempt 失敗，streak 沒有更新到", error);
   if (error || !data || !data[0]) return { ok: true, streak: null, lastSessionKey: null };
   const row = data[0] as { ok: boolean; streak_count: number; last_session_key: string | null };
   return { ok: row.ok, streak: row.streak_count, lastSessionKey: row.last_session_key };

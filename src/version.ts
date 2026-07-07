@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.12.40";
+export const APP_VERSION = "0.12.41";
 
 export interface ChangelogEntry {
   date: string;
@@ -6,6 +6,12 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    date: "2026-07-09 (v0.12.41)",
+    notes: [
+      "金幣歸零問題仍未解決：加上診斷 log，下次重現時可看到 Supabase 實際錯誤原因",
+    ],
+  },
   {
     date: "2026-07-09 (v0.12.40)",
     notes: [

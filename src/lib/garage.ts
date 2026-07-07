@@ -149,6 +149,7 @@ export async function syncWalletFromServer(): Promise<void> {
   const uid = await getUid();
   if (!uid) return;
   const { data, error } = await supabase.rpc("wallet_get");
+  if (error) console.error("[wallet] wallet_get 失敗，本地快取沿用舊值", error);
   if (error || !data || !data[0]) return; // RPC 尚未建立/未登入/網路失敗：本地快取先頂著
   const row = data[0] as {
     coins: number; diamonds: number; owned: string[];
@@ -241,6 +242,7 @@ export async function earnCoins(
   const uid = await getUid();
   if (!uid) return; // 未登入：addCoins() 樂觀更新已經是最終結果，不用再校正
   const { data, error } = await supabase.rpc("wallet_earn", { p_kind: kind, p_amount: amount ?? null });
+  if (error) console.error(`[wallet] wallet_earn(${kind}) 失敗，伺服器沒有記到這筆`, error);
   if (error || !data || !data[0]) return; // RPC 尚未建立/網路失敗：樂觀值先頂著
   const row = data[0] as { coins: number; diamonds: number };
   writeCoinsCache(row.coins);
