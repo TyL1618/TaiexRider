@@ -156,6 +156,11 @@ export default function GameCanvas({ prices, label, name, subtitle, onExit, onGa
   const stars = difficultyStars(calcDifficulty(prices));
   const cityBuildings = generateCity(prices.length * 31 + Math.round((prices[0] || 0) * 100));
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  // 結算畫面滾動動畫的真正終點分數（見下方 useEffect）：hud.points 每 5 幀才節流同步一次
+  // （效能考量，遊玩中不用每幀 setState），車速快時終點/摔車瞬間 hud.points 可能落後真實分數
+  // 1~4 幀，導致動畫終點抓到偏低的舊值（2026-07-08 使用者實測回報：衝線瞬間顯示 96 分，
+  // 減速後 98 分，皆非真正最終分）。這個 ref 每個物理步都同步（不節流），永遠是真正最終分。
+  const finalScoreRef = useRef(0);
   const [hud, setHud] = useState<Hud>({
     distance: 0,
     points: 0,
@@ -229,10 +234,13 @@ export default function GameCanvas({ prices, label, name, subtitle, onExit, onGa
     return () => clearTimeout(t);
   }, [crashed, finished]);
 
-  // 結算分數滾動動畫：0 → hud.points，ease-out 約 550ms（原生感 juice）
+  // 結算分數滾動動畫：0 → 真正最終分，ease-out 約 550ms（原生感 juice）
+  // 終點讀 finalScoreRef（每步同步、不節流），不能讀 hud.points——那是每 5 幀才
+  // 節流同步一次的顯示用值，衝線/摔車瞬間可能落後真實分數，車速越快落差越大
+  // （2026-07-08 使用者實測：衝線瞬間顯示 96 分、減速後 98 分，皆非真正最終分）。
   useEffect(() => {
     if (!crashed && !finished) { setDisplayScore(0); return; }
-    const target = hud.points;
+    const target = finalScoreRef.current;
     const t0 = performance.now();
     const DUR = 550;
     let raf = 0;
@@ -244,7 +252,6 @@ export default function GameCanvas({ prices, label, name, subtitle, onExit, onGa
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [crashed, finished]);
 
   // 分享成績：優先產生「成績圖卡」走 navigator.share files（手機原生面板，圖+文轉發效果最好）；
@@ -533,6 +540,7 @@ let crashTimer = 0;
       airborneSteps = 0;
       crashTimer = 0;
       points = 0;
+      finalScoreRef.current = 0;
       bonusPoints = 0;
       maxDistScore = 0;
       totalFlips = 0;
@@ -794,6 +802,7 @@ let crashTimer = 0;
       const distScore = Math.min(1000, Math.round((traveled / (track.finishX - track.startX)) * 1000));
       if (distScore > maxDistScore) maxDistScore = distScore;
       points = bonusPoints + maxDistScore;
+      finalScoreRef.current = points; // 不節流，隨時是真正的最終分（供結算動畫抓終點用）
 
       // 死亡判定（懸空等待觸碰期間完全略過：static 車身 velocity=0、雙輪離地，
       // 否則 stuckMidAir 會把「等待中」誤判成卡死 → 開場立刻爆炸）
@@ -860,6 +869,7 @@ let crashTimer = 0;
           settleFlip(airRotation, airTime, c.angle, c.position.x);
           landingSettled = true;
           points = bonusPoints + maxDistScore;
+          finalScoreRef.current = points;
         }
         Body.setStatic(bike.chassis, true);
         Body.setStatic(bike.rearWheel, true);
