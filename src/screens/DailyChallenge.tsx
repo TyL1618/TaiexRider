@@ -10,7 +10,8 @@ import { recordStreak, getStreak, playedThisSession, writeStreakCache } from "..
 import { fetchDeathHeatmap, type HeatBucket } from "../lib/deathHeatmap";
 import { getDailyQuests } from "../lib/quests";
 import { getWeeklyQuests, syncWeeklyFromServer, weekKey, type WeeklyQuestView } from "../lib/weeklyQuests";
-import { getAdsRemoved } from "../lib/garage";
+import { getAdsRemoved, syncWalletFromServer } from "../lib/garage";
+import { checkPendingSettlement, ackSettlement, type PendingSettlement } from "../lib/dailyDiamondSettlement";
 import CoinIcon from "../components/CoinIcon";
 import type { TrackData } from "../data/tracks";
 import "./DailyChallenge.css";
@@ -64,6 +65,7 @@ export default function DailyChallenge({
   const [quests] = useState(() => getDailyQuests(dailyKey())); // 每日任務（裝置本地日曆日，跨模式共用）
   const [adsRemoved] = useState(() => getAdsRemoved()); // 永久去廣告：第 3~5 次挑戰不再顯示「看廣告」標籤
   const [weeklyQuests, setWeeklyQuests] = useState<WeeklyQuestView[]>([]); // 本週任務（ISO 週別，已登入才有伺服器權威進度）
+  const [pendingSettlement, setPendingSettlement] = useState<PendingSettlement | null>(null); // 前一期排行榜鑽石結算彈窗
 
   // 2026-07-07：同裝置切換帳號時，本地次數快取重新從「這個 uid」自己的 key 讀取
   // （見 challengeAttempts.ts 頂部說明），避免沿用前一個使用者當天用掉的次數；
@@ -86,6 +88,21 @@ export default function DailyChallenge({
     syncWeeklyFromServer(week).then(() => { if (alive) setWeeklyQuests(getWeeklyQuests(week)); });
     return () => { alive = false; };
   }, [user]);
+
+  // 前一期排行榜鑽石結算（參與+名次）：GitHub Actions 排程已在台灣 00:00 結算完，
+  // 這裡只查「還沒看過的結果」跳彈窗，看過後 ack 掉不再跳。
+  useEffect(() => {
+    let alive = true;
+    checkPendingSettlement().then((s) => { if (alive && s) setPendingSettlement(s); });
+    return () => { alive = false; };
+  }, [user]);
+
+  const handleAckSettlement = () => {
+    if (!pendingSettlement) return;
+    ackSettlement(pendingSettlement.challengeDate);
+    setPendingSettlement(null);
+    syncWalletFromServer(); // 重新讀取伺服器最新鑽石餘額（結算已經加過了，本地只是刷新顯示）
+  };
 
   useEffect(() => {
     let alive = true;
@@ -139,6 +156,22 @@ export default function DailyChallenge({
   return (
     <div className="daily-screen">
       <button className="back-btn" onClick={onBack}>‹ 返回</button>
+
+      {pendingSettlement && (
+        <div className="modal-overlay" onClick={handleAckSettlement}>
+          <div className="modal-panel" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-title">
+              {pendingSettlement.rank === 1 ? "🥇 前一日排行榜冠軍！"
+                : pendingSettlement.rank === 2 ? "🥈 前一日排行榜第 2 名！"
+                : pendingSettlement.rank !== null && pendingSettlement.rank <= 4 ? `🥉 前一日排行榜第 ${pendingSettlement.rank} 名！`
+                : pendingSettlement.rank !== null ? `🎖️ 前一日排行榜第 ${pendingSettlement.rank} 名！`
+                : "🎁 前一日參加獎"}
+            </div>
+            <div className="modal-item">💎 +{pendingSettlement.diamonds} 鑽石</div>
+            <button className="modal-btn" onClick={handleAckSettlement}>太棒了！</button>
+          </div>
+        </div>
+      )}
 
       <div className="daily-head">
         <div className="daily-tag">🏆 每日排名賽 ・ {dateStr}</div>

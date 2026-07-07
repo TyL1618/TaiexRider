@@ -1,0 +1,23 @@
+name: Settle Daily Rewards
+
+on:
+  schedule:
+    - cron: '0 16 * * *'  # 00:00 台灣時間（UTC+8）：排行榜前一期鑽石結算 + 經典模式週結算
+  workflow_dispatch:        # 允許手動觸發測試
+
+jobs:
+  settle:
+    runs-on: ubuntu-latest
+    steps:
+      # 供應鏈：pin 到 commit SHA（同 deploy.yml/fetch-daily-map.yml，tag 可被搬移，SHA 不行）
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+
+      - name: 結算排行榜鑽石 + 經典模式週鑽石
+        env:
+          SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: node scripts/settleDailyRewards.ts

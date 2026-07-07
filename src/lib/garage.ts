@@ -52,12 +52,12 @@ export const BIKE_SKINS: BikeSkin[] = [
   { id: "default", name: "原廠霓虹", desc: "出廠標準塗裝", price: 0, hueRotateDeg: 0 },
   {
     id: "b2-cafe-racer", name: "復古咖啡騎士", desc: "橘棕配色 + 皮革坐墊，復古跑車魂",
-    price: 200, hueRotateDeg: 0, src: "bikes/b2-cafe-racer.png",
+    price: 500, hueRotateDeg: 0, src: "bikes/b2-cafe-racer.png",
     spriteW: 75.3, spriteOffsetX: -0.3, spriteOffsetY: -5.6,
   },
   {
     id: "b1-street-white", name: "街頭通勤小白", desc: "簡潔白色速克達，親民出廠首選",
-    price: 150, hueRotateDeg: 0, src: "bikes/b1-street-white.png",
+    price: 500, hueRotateDeg: 0, src: "bikes/b1-street-white.png",
     spriteW: 83.8, spriteOffsetX: -1.1, spriteOffsetY: -8.3,
   },
   // Q 系列（任務解鎖，locked:true＝不自動擁有，靠 unlockAchievementSkin() 解鎖，
@@ -229,13 +229,18 @@ export function addDiamonds(n: number): number {
   return next;
 }
 
-// 發幣入口（完賽/摔車/任務/看廣告呼叫）：先用 addCoins() 本地樂觀更新（不管有沒有登入都
-// 立刻反映在畫面上，體感零延遲），已登入時再背景呼叫伺服器 RPC 覆寫成真實餘額——
+// 發幣入口（完賽/摔車/長征/任務/看廣告呼叫）：先用 addCoins() 本地樂觀更新（不管有沒有
+// 登入都立刻反映在畫面上，體感零延遲），已登入時再背景呼叫伺服器 RPC 覆寫成真實餘額——
 // 若伺服器判定當日該管道已達上限，樂觀加的量會被這次覆寫收回，不留竄改空間。
-export async function earnCoins(kind: "finish" | "crash" | "quest" | "ad"): Promise<void> {
+// p_amount 只有 kind==="long_crash" 才會用到（依行駛距離比例的變動金額，伺服器仍會
+// clamp 在 0~30，不信任前端傳的數字超出範圍）；其餘 kind 一律由伺服器決定固定面額。
+export async function earnCoins(
+  kind: "finish" | "crash" | "long_finish" | "long_crash" | "quest" | "ad",
+  amount?: number,
+): Promise<void> {
   const uid = await getUid();
   if (!uid) return; // 未登入：addCoins() 樂觀更新已經是最終結果，不用再校正
-  const { data, error } = await supabase.rpc("wallet_earn", { p_kind: kind });
+  const { data, error } = await supabase.rpc("wallet_earn", { p_kind: kind, p_amount: amount ?? null });
   if (error || !data || !data[0]) return; // RPC 尚未建立/網路失敗：樂觀值先頂著
   const row = data[0] as { coins: number; diamonds: number };
   writeCoinsCache(row.coins);

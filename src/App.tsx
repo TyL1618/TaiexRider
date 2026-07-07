@@ -26,7 +26,7 @@ import { recordWeeklyRun, claimWeeklyQuest, weekKey } from "./lib/weeklyQuests";
 import { collectStock } from "./lib/collection";
 import { resolveMarketMood, type MarketMood } from "./lib/marketMood";
 import { recordFinish } from "./lib/achievements";
-import { grantPlayReward } from "./lib/playRewards";
+import { grantPlayReward, computePlayReward } from "./lib/playRewards";
 
 export default function App() {
   const [screen, setScreen]         = useState<Screen>("home");
@@ -193,26 +193,39 @@ export default function App() {
     if (classicId && user) {
       submitClassicRecord(classicId, getPlayerName(), { score: stats.score, timeMs: stats.timeMs });
     }
-    // 車庫金幣：完賽/摔車都給小額基本獎勵，任何模式皆算（純個人習慣迴圈，見 RETENTION_PLAN.md）。
-    // 2026-07-07 調降+加日總量上限（避免刷短賽道無限賺幣）：完賽5/摔車2，兩者合計
-    // 單日 50 上限（playRewards.ts，跟看廣告/任務的各自每日上限彼此獨立）。
+    // 車庫金幣：完賽/摔車給小額基本獎勵，但排行榜賽事跟經典模式不給金幣——這兩個模式
+    // 2026-07-08 改成鑽石獎勵（排行榜：參與+名次分級／經典：每週前三名），避免金幣+鑽石
+    // 雙重發放。長征模式（5 支股票串成一趟）金幣公式跟一般模式不同，見 computePlayReward()。
+    // 單日總量上限 100（playRewards.ts，跟看廣告/任務的各自每日上限彼此獨立），看廣告
+    // 雙倍本局金幣也算在這桶內（GameCanvas.tsx 內自己再呼叫一次同一組函式）。
     // addCoins 做本地樂觀更新（不管有沒有登入都立刻反映在畫面上）；earnCoins 已登入時
-    // 背景呼叫伺服器 RPC 覆寫成真實餘額（伺服器端同一套 50 上限，見 wallet_earn()），
+    // 背景呼叫伺服器 RPC 覆寫成真實餘額（伺服器端同一套上限，見 wallet_earn()），
     // 未登入時 earnCoins 直接略過。
-    addCoins(grantPlayReward(dailyKey(), stats.finished ? 5 : 2));
-    earnCoins(stats.finished ? "finish" : "crash");
+    const mode = analyticsModeRef.current;
+    const coinEligible = mode !== "daily" && mode !== "classic";
+    if (coinEligible) {
+      const isLong = mode === "long";
+      const amount = computePlayReward(isLong, stats.finished, stats.progressPct);
+      addCoins(grantPlayReward(dailyKey(), amount));
+      const kind = isLong
+        ? (stats.finished ? "long_finish" : "long_crash")
+        : (stats.finished ? "finish" : "crash");
+      earnCoins(kind, kind === "long_crash" ? amount : undefined);
+    }
     // 狂暴盤日（|漲跌|≥2.5%）任務獎勵 ×2：已登入時伺服器 wallet_earn/claim_weekly_quest
     // 各自重算當期漲跌決定是否加倍（不信任前端），這裡的倍率只影響未登入玩家的本地樂觀值。
     const rageMultiplier = marketMood?.isRage ? 2 : 1;
     // 每日任務：用裝置本地日曆日累計，跨模式共用同一組任務池
     const newlyDone = recordRun(dailyKey(), {
       score: stats.score, flips: stats.flips, perfect: stats.perfect, timeMs: stats.timeMs,
+      finished: stats.finished, mode, marketMood: marketMood?.mood ?? null,
     });
     for (const q of newlyDone) { addCoins(q.reward * rageMultiplier); earnCoins("quest"); }
     // 週任務：仿每日任務，但用 ISO 週別累計，需登入才有伺服器權威進度（詳見 weeklyQuests.ts）
     const week = weekKey();
     recordWeeklyRun(week, {
       score: stats.score, flips: stats.flips, perfect: stats.perfect, timeMs: stats.timeMs,
+      finished: stats.finished, mode, marketMood: marketMood?.mood ?? null,
     }).then(async (newlyDoneWeekly) => {
       for (const q of newlyDoneWeekly) {
         const result = await claimWeeklyQuest(week, q.id);

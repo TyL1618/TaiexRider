@@ -12,11 +12,20 @@ interface DayProgress {
   maxScore: number;      // 今日單局最高分
   maxSurviveSec: number; // 今日單局最長存活秒數
   playCount: number;     // 今日已玩局數
+  finishCount: number;   // 今日完賽次數（不含摔車）
+  longFinish: boolean;   // 今日是否完賽過一場長征模式
+  classicFinish: boolean; // 今日是否完賽過一場經典模式
+  upDayFinish: boolean;   // 今日是否在「上漲盤」完賽過
+  downDayFinish: boolean; // 今日是否在「下跌盤」完賽過
   claimed: string[];     // 今日已領獎的任務 id
 }
 
 function emptyDay(day: string): DayProgress {
-  return { day, perfectSum: 0, flipsSum: 0, maxScore: 0, maxSurviveSec: 0, playCount: 0, claimed: [] };
+  return {
+    day, perfectSum: 0, flipsSum: 0, maxScore: 0, maxSurviveSec: 0, playCount: 0,
+    finishCount: 0, longFinish: false, classicFinish: false, upDayFinish: false, downDayFinish: false,
+    claimed: [],
+  };
 }
 
 function load(day: string): DayProgress {
@@ -24,7 +33,8 @@ function load(day: string): DayProgress {
     const raw = localStorage.getItem(PROGRESS_KEY);
     if (!raw) return emptyDay(day);
     const d = JSON.parse(raw) as DayProgress;
-    return d.day === day ? d : emptyDay(day); // 跨日重置
+    // 跨日重置；同日但欄位是舊格式（本次任務池擴充新增的欄位）就補預設值，避免 undefined
+    return d.day === day ? { ...emptyDay(day), ...d } : emptyDay(day);
   } catch {
     return emptyDay(day);
   }
@@ -44,13 +54,19 @@ interface QuestDef {
   reward: number; // 金幣
 }
 
-// 任務池：全部只依賴 GameOverStats 既有欄位，不需要股票分類等額外資料（v2 可擴充）
+// 任務池：2026-07-08 從 5 種擴充到 10 種（原本只有 5 種、久了同樣的任務會一直重複
+// 用不同組合出現），新增的幾種需要 recordRun() 多傳 mode/marketMood/finished 才算得出來。
 const POOL: QuestDef[] = [
   { id: "perfect2", title: "完美落地 2 次", target: 2, reward: 25, progress: (d) => d.perfectSum },
   { id: "score1200", title: "單局拿到 1200 分以上", target: 1, reward: 25, progress: (d) => (d.maxScore >= 1200 ? 1 : 0) },
   { id: "flips5", title: "翻轉總圈數達 5 圈", target: 5, reward: 25, progress: (d) => d.flipsSum },
   { id: "play1", title: "完成一場遊戲", target: 1, reward: 15, progress: (d) => (d.playCount >= 1 ? 1 : 0) },
   { id: "survive15", title: "單局撐過 15 秒", target: 1, reward: 20, progress: (d) => (d.maxSurviveSec >= 15 ? 1 : 0) },
+  { id: "finish3", title: "累計完賽 3 場", target: 3, reward: 25, progress: (d) => d.finishCount },
+  { id: "longFinish", title: "完賽一場長征模式", target: 1, reward: 30, progress: (d) => (d.longFinish ? 1 : 0) },
+  { id: "classicFinish", title: "完賽一場經典模式", target: 1, reward: 25, progress: (d) => (d.classicFinish ? 1 : 0) },
+  { id: "upDayFinish", title: "在今日上漲盤完賽一場", target: 1, reward: 20, progress: (d) => (d.upDayFinish ? 1 : 0) },
+  { id: "downDayFinish", title: "在今日下跌盤完賽一場", target: 1, reward: 20, progress: (d) => (d.downDayFinish ? 1 : 0) },
 ];
 
 // 依日期字串 seed 挑 3 個不重複任務，全服同一天看到同一組任務池（各自進度獨立）
@@ -95,9 +111,13 @@ export function getDailyQuests(day: string): QuestView[] {
 }
 
 // 每局結束呼叫：更新今日累計數據。回傳「這一局新完成、待自動領獎」的任務清單。
+// mode/marketMood 只在 finished 時才有意義（摔車不算「完賽」類任務的進度）。
 export function recordRun(
   day: string,
-  stats: { score: number; flips: number; perfect: number; timeMs: number },
+  stats: {
+    score: number; flips: number; perfect: number; timeMs: number;
+    finished?: boolean; mode?: string; marketMood?: "up" | "down" | "flat" | null;
+  },
 ): QuestDef[] {
   const d = load(day);
   d.perfectSum += stats.perfect;
@@ -105,6 +125,13 @@ export function recordRun(
   d.maxScore = Math.max(d.maxScore, stats.score);
   d.maxSurviveSec = Math.max(d.maxSurviveSec, stats.timeMs / 1000);
   d.playCount += 1;
+  if (stats.finished) {
+    d.finishCount += 1;
+    if (stats.mode === "long") d.longFinish = true;
+    if (stats.mode === "classic") d.classicFinish = true;
+    if (stats.marketMood === "up") d.upDayFinish = true;
+    if (stats.marketMood === "down") d.downDayFinish = true;
+  }
 
   const todays = pickToday(day);
   const newlyDone = todays.filter((q) => !d.claimed.includes(q.id) && q.progress(d) >= q.target);

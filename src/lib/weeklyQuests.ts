@@ -18,11 +18,20 @@ interface WeekProgress {
   maxScore: number;
   maxSurviveSec: number;
   playCount: number;
+  finishCount: number;        // 本週累計完賽次數
+  longFinishCount: number;    // 本週完賽長征模式次數
+  classicFinishCount: number; // 本週完賽經典模式次數
+  upDayFinishCount: number;   // 本週在上漲盤完賽次數
+  downDayFinishCount: number; // 本週在下跌盤完賽次數
   claimed: string[];
 }
 
 function emptyWeek(week: string): WeekProgress {
-  return { week, perfectSum: 0, flipsSum: 0, maxScore: 0, maxSurviveSec: 0, playCount: 0, claimed: [] };
+  return {
+    week, perfectSum: 0, flipsSum: 0, maxScore: 0, maxSurviveSec: 0, playCount: 0,
+    finishCount: 0, longFinishCount: 0, classicFinishCount: 0, upDayFinishCount: 0, downDayFinishCount: 0,
+    claimed: [],
+  };
 }
 
 function load(week: string): WeekProgress {
@@ -30,7 +39,8 @@ function load(week: string): WeekProgress {
     const raw = localStorage.getItem(PROGRESS_KEY);
     if (!raw) return emptyWeek(week);
     const d = JSON.parse(raw) as WeekProgress;
-    return d.week === week ? d : emptyWeek(week); // 跨週重置
+    // 跨週重置；同週但欄位是舊格式（本次任務池擴充新增的欄位）就補預設值，避免 undefined
+    return d.week === week ? { ...emptyWeek(week), ...d } : emptyWeek(week);
   } catch {
     return emptyWeek(week);
   }
@@ -54,6 +64,11 @@ const POOL: QuestDef[] = [
   { id: "w_score2000", title: "單局拿到 2000 分以上",     target: 1,  reward: 40, progress: (d) => (d.maxScore >= 2000 ? 1 : 0) },
   { id: "w_play10",    title: "本週完成 10 場遊戲",       target: 10, reward: 35, progress: (d) => d.playCount },
   { id: "w_survive25", title: "單局撐過 25 秒",           target: 1,  reward: 35, progress: (d) => (d.maxSurviveSec >= 25 ? 1 : 0) },
+  { id: "w_finish10",       title: "本週累計完賽 10 場",       target: 10, reward: 40, progress: (d) => d.finishCount },
+  { id: "w_longFinish3",    title: "本週完賽 3 場長征模式",    target: 3,  reward: 45, progress: (d) => d.longFinishCount },
+  { id: "w_classicFinish3", title: "本週完賽 3 場經典模式",    target: 3,  reward: 40, progress: (d) => d.classicFinishCount },
+  { id: "w_upDayFinish3",   title: "本週在上漲盤完賽 3 次",    target: 3,  reward: 35, progress: (d) => d.upDayFinishCount },
+  { id: "w_downDayFinish3", title: "本週在下跌盤完賽 3 次",    target: 3,  reward: 35, progress: (d) => d.downDayFinishCount },
 ];
 
 // 依週別 seed 挑 3 個不重複任務，全服同一週看到同一組任務池（各自進度獨立）
@@ -122,20 +137,28 @@ export async function syncWeeklyFromServer(week: string): Promise<void> {
   const { data, error } = await supabase.rpc("get_weekly_quest", { p_week: week });
   if (error || !data || !data[0]) return;
   const row = data[0] as {
-    perfect_sum: number; flips_sum: number; max_score: number;
-    max_survive_sec: number; play_count: number; claimed: string[];
+    perfect_sum: number; flips_sum: number; max_score: number; max_survive_sec: number; play_count: number;
+    finish_count: number; long_finish_count: number; classic_finish_count: number;
+    up_day_finish_count: number; down_day_finish_count: number; claimed: string[];
   };
   save({
     week, perfectSum: row.perfect_sum, flipsSum: row.flips_sum, maxScore: row.max_score,
-    maxSurviveSec: row.max_survive_sec, playCount: row.play_count, claimed: row.claimed ?? [],
+    maxSurviveSec: row.max_survive_sec, playCount: row.play_count,
+    finishCount: row.finish_count, longFinishCount: row.long_finish_count,
+    classicFinishCount: row.classic_finish_count, upDayFinishCount: row.up_day_finish_count,
+    downDayFinishCount: row.down_day_finish_count, claimed: row.claimed ?? [],
   });
 }
 
 // 每局結束呼叫：已登入時累加到伺服器（權威），未登入純本地。回傳「這一局新完成、
 // 待自動領獎」的任務清單（呼叫端逐一呼叫 claimWeeklyQuest 發獎）。
+// mode/marketMood 只在 finished 時才有意義（摔車不算「完賽」類任務的進度）。
 export async function recordWeeklyRun(
   week: string,
-  stats: { score: number; flips: number; perfect: number; timeMs: number },
+  stats: {
+    score: number; flips: number; perfect: number; timeMs: number;
+    finished?: boolean; mode?: string; marketMood?: "up" | "down" | "flat" | null;
+  },
 ): Promise<QuestDef[]> {
   const uid = await getUid();
   if (uid) {
@@ -145,15 +168,22 @@ export async function recordWeeklyRun(
       p_flips: stats.flips,
       p_perfect: stats.perfect,
       p_time_ms: Math.round(stats.timeMs),
+      p_finished: !!stats.finished,
+      p_mode: stats.mode ?? null,
+      p_market_mood: stats.marketMood ?? null,
     });
     if (!error && data && data[0]) {
       const row = data[0] as {
-        perfect_sum: number; flips_sum: number; max_score: number;
-        max_survive_sec: number; play_count: number; claimed: string[];
+        perfect_sum: number; flips_sum: number; max_score: number; max_survive_sec: number; play_count: number;
+        finish_count: number; long_finish_count: number; classic_finish_count: number;
+        up_day_finish_count: number; down_day_finish_count: number; claimed: string[];
       };
       const d: WeekProgress = {
         week, perfectSum: row.perfect_sum, flipsSum: row.flips_sum, maxScore: row.max_score,
-        maxSurviveSec: row.max_survive_sec, playCount: row.play_count, claimed: row.claimed ?? [],
+        maxSurviveSec: row.max_survive_sec, playCount: row.play_count,
+        finishCount: row.finish_count, longFinishCount: row.long_finish_count,
+        classicFinishCount: row.classic_finish_count, upDayFinishCount: row.up_day_finish_count,
+        downDayFinishCount: row.down_day_finish_count, claimed: row.claimed ?? [],
       };
       save(d);
       const todays = pickWeek(week);
@@ -167,6 +197,13 @@ export async function recordWeeklyRun(
   d.maxScore = Math.max(d.maxScore, stats.score);
   d.maxSurviveSec = Math.max(d.maxSurviveSec, stats.timeMs / 1000);
   d.playCount += 1;
+  if (stats.finished) {
+    d.finishCount += 1;
+    if (stats.mode === "long") d.longFinishCount += 1;
+    if (stats.mode === "classic") d.classicFinishCount += 1;
+    if (stats.marketMood === "up") d.upDayFinishCount += 1;
+    if (stats.marketMood === "down") d.downDayFinishCount += 1;
+  }
   const todays = pickWeek(week);
   const newlyDone = todays.filter((q) => !d.claimed.includes(q.id) && q.progress(d) >= q.target);
   for (const q of newlyDone) d.claimed.push(q.id);

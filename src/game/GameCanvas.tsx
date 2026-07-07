@@ -12,7 +12,7 @@ import { fetchDeathHeatmap } from "../lib/deathHeatmap";
 import { startWakeLock } from "../lib/wakeLock";
 import { getActiveBikeSkin, addCoins, earnCoins, getAdsRemoved } from "../lib/garage";
 import { requestRewardedCoins } from "../lib/ads";
-import { AD_COIN_REWARD, MAX_AD_COIN_CLAIMS_PER_DAY, getAdCoinClaims, incrementAdCoinClaims } from "../lib/adRewards";
+import { grantPlayReward, computePlayReward } from "../lib/playRewards";
 import { dailyKey } from "../data/pick";
 
 export interface GameOverStats {
@@ -21,6 +21,7 @@ export interface GameOverStats {
   flips: number;
   perfect: number;
   finished: boolean;
+  progressPct: number; // 0~1，完賽固定 1，摔車＝死亡當下跑到賽道的比例（長征金幣按比例用）
 }
 
 interface GameCanvasProps {
@@ -185,20 +186,25 @@ export default function GameCanvas({ prices, label, name, subtitle, onExit, onGa
   // 永久去廣告（IAP）：已購買者跳過所有「看廣告」標籤/流程，見 garage.ts getAdsRemoved()
   const [adsRemoved] = useState(() => getAdsRemoved());
   const [newPb, setNewPb] = useState(false); // 本局打破個人最佳（結算徽章）
-  const [adCoinsState, setAdCoinsState] = useState<"idle" | "watching" | "claimed">("idle"); // 結算畫面看廣告拿金幣，每局限一次
-  // 每日次數上限跟車庫頁「看廣告拿金幣」共用同一組計數（見 lib/adRewards.ts），
-  // 避免兩個入口各自能點滿次數、合計次數失控。
-  const [adClaimsToday, setAdClaimsToday] = useState(() => getAdCoinClaims(dailyKey()));
-  const handleWatchAdCoins = () => {
-    if (adCoinsState !== "idle" || adClaimsToday >= MAX_AD_COIN_CLAIMS_PER_DAY) return;
-    setAdCoinsState("watching");
+  // 結算畫面「看廣告雙倍本局金幣」，每局限一次（排行榜/經典模式沒有金幣可以雙倍，不顯示）。
+  // 摔車當下走到賽道的比例（0~1），長征模式摔車金幣按比例、雙倍時也照這個比例算。
+  const deathProgressRef = useRef(0);
+  const [adDoubleState, setAdDoubleState] = useState<"idle" | "watching" | "claimed">("idle");
+  const coinRewardEligible = analyticsMode !== "daily" && analyticsMode !== "classic";
+  const isLongMarch = analyticsMode === "long";
+  const handleWatchAdDouble = () => {
+    if (!coinRewardEligible || adDoubleState !== "idle") return;
+    setAdDoubleState("watching");
     requestRewardedCoins().then((ok) => {
-      setAdCoinsState(ok ? "claimed" : "idle");
+      setAdDoubleState(ok ? "claimed" : "idle");
       if (ok) {
-        incrementAdCoinClaims(dailyKey());
-        setAdClaimsToday(getAdCoinClaims(dailyKey()));
-        addCoins(AD_COIN_REWARD);
-        earnCoins("ad");
+        const progressPct = finished ? 1 : deathProgressRef.current;
+        const amount = computePlayReward(isLongMarch, finished, progressPct);
+        addCoins(grantPlayReward(dailyKey(), amount));
+        const kind = isLongMarch
+          ? (finished ? "long_finish" : "long_crash")
+          : (finished ? "finish" : "crash");
+        earnCoins(kind, kind === "long_crash" ? amount : undefined);
       }
     });
   };
@@ -833,10 +839,8 @@ let crashTimer = 0;
         setDying(true);
         playCrash(); stopEngine(); haptics.crash();
         crashTimer = 0;
-        logEvent("death", analyticsMode, {
-          cause: "topHit", label,
-          xr: Math.round(Math.max(0, Math.min(1, (c.position.x - track.startX) / (track.finishX - track.startX))) * 1000) / 1000,
-        });
+        deathProgressRef.current = Math.round(Math.max(0, Math.min(1, (c.position.x - track.startX) / (track.finishX - track.startX))) * 1000) / 1000;
+        logEvent("death", analyticsMode, { cause: "topHit", label, xr: deathProgressRef.current });
       } else if (stuckMidAir && !overRef.current) {
         // stuckMidAir 仍需計時確認（瞬間速度<0.5 可能是正常落地）
         crashTimer += dtMs / 1000;
@@ -845,10 +849,8 @@ let crashTimer = 0;
           Body.setStatic(bike.rearWheel, true);
           Body.setStatic(bike.frontWheel, true);
           spawnDeathParticles(bike.chassis.position.x, bike.chassis.position.y);
-          logEvent("death", analyticsMode, {
-            cause: "stuckMidAir", label,
-            xr: Math.round(Math.max(0, Math.min(1, (c.position.x - track.startX) / (track.finishX - track.startX))) * 1000) / 1000,
-          });
+          deathProgressRef.current = Math.round(Math.max(0, Math.min(1, (c.position.x - track.startX) / (track.finishX - track.startX))) * 1000) / 1000;
+          logEvent("death", analyticsMode, { cause: "stuckMidAir", label, xr: deathProgressRef.current });
           deathFlashAlpha = 1.0;
           deathShakeAmp = 8;
           deathElapsed = 0;
@@ -880,7 +882,7 @@ let crashTimer = 0;
           label, score: points, timeMs: Math.round(raceTimeMs), flips: totalFlips, perfect: perfectLandings,
         });
         checkPb(points);
-        onGameOverRef.current?.({ score: points, timeMs: raceTimeMs, flips: totalFlips, perfect: perfectLandings, finished: true });
+        onGameOverRef.current?.({ score: points, timeMs: raceTimeMs, flips: totalFlips, perfect: perfectLandings, finished: true, progressPct: 1 });
       }
       return { grounded: groundedNow, upright };
     };
@@ -1411,7 +1413,7 @@ let crashTimer = 0;
           setDying(false);
           setCrashed(true);
           checkPb(points);
-          onGameOverRef.current?.({ score: points, timeMs: raceTimeMs, flips: totalFlips, perfect: perfectLandings, finished: false });
+          onGameOverRef.current?.({ score: points, timeMs: raceTimeMs, flips: totalFlips, perfect: perfectLandings, finished: false, progressPct: deathProgressRef.current });
         }
       }
       // 鏡頭震動（暫時偏移，渲染後還原，不汙染 camX/camY 平滑狀態）
@@ -1594,17 +1596,15 @@ let crashTimer = 0;
             <div className="overlay-stats">
               翻轉 {hud.totalFlips} 圈 ・ 完美落地 {hud.perfectLandings} 次
             </div>
-            {!adsRemoved && adCoinsState !== "claimed" && (
+            {!adsRemoved && coinRewardEligible && adDoubleState !== "claimed" && (
               <button
                 className="overlay-ad-coins-btn"
-                disabled={adCoinsState === "watching" || adClaimsToday >= MAX_AD_COIN_CLAIMS_PER_DAY}
-                onClick={handleWatchAdCoins}
+                disabled={adDoubleState === "watching"}
+                onClick={handleWatchAdDouble}
               >
-                {adCoinsState === "watching"
+                {adDoubleState === "watching"
                   ? "廣告播放中…"
-                  : adClaimsToday >= MAX_AD_COIN_CLAIMS_PER_DAY
-                    ? "今日已達上限"
-                    : `📺 看廣告 +${AD_COIN_REWARD} 金幣 (${adClaimsToday}/${MAX_AD_COIN_CLAIMS_PER_DAY})`}
+                  : `📺 看廣告 雙倍本局金幣 (+${computePlayReward(isLongMarch, finished, finished ? 1 : deathProgressRef.current)})`}
               </button>
             )}
           </div>

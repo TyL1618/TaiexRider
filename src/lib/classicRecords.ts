@@ -1,5 +1,8 @@
-// 經典模式紀錄榜（每關前 3 名，2026-07-06 從「每關 1 位保持者」改版）。
+// 經典模式紀錄榜（每關前 3 名，2026-07-06 從「每關 1 位保持者」改版；
+// 2026-07-08 改成每週重置＋前三名發鑽石，見 migration_20260708d.sql）。
 // 讀取走 PostgREST，提交走 RPC（需 Google 登入）。
+import { weekKey } from "./weeklyQuests";
+
 const URL = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
 
@@ -23,8 +26,9 @@ function anonHeaders(): Record<string, string> {
 
 let _cache: Promise<Map<string, ClassicRecord[]>> | null = null;
 
-// 一次撈全部前三名（整表天生封頂在「關卡數 × 3」列），回傳 level_id → 前三名陣列
-// （已依分數高→時間短排序）的 Map。promise 快取。
+// 一次撈「本週」全部前三名（只篩本週 week_key，避免清理排程還沒跑掉的上週殘留資料
+// 混進來變成每關 6 筆），回傳 level_id → 前三名陣列（已依分數高→時間短排序）的 Map。
+// promise 快取。
 export function fetchClassicRecords(): Promise<Map<string, ClassicRecord[]>> {
   if (!_cache) _cache = _fetch();
   return _cache;
@@ -40,7 +44,7 @@ async function _fetch(): Promise<Map<string, ClassicRecord[]>> {
   try {
     const r = await fetch(
       `${URL}/rest/v1/classic_records?select=level_id,player_name,score,time_ms` +
-      `&order=level_id.asc,score.desc,time_ms.asc`,
+      `&week_key=eq.${weekKey()}&order=level_id.asc,score.desc,time_ms.asc`,
       { headers: anonHeaders() },
     );
     if (!r.ok) return out;
