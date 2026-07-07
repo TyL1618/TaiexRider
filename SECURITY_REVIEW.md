@@ -16,13 +16,13 @@
 | 等級 | 項目 | 狀態 |
 |------|------|------|
 | 🟢 已改善 | RPC 物理一致性 + 提交冷卻（首輪 🟠「RPC 濫用面」主體） | **反作弊 Phase A 已實作並上線**（`migration_20260704.sql`，使用者 2026-07-04 已跑；含經典 level_id 白名單，順帶修掉任意字串塞列的污染面） |
-| 🟢 已修補 | `log_event` RPC anon 可無限呼叫 → events 表灌爆（DB 膨脹） | **三層節流已實作**（`migration_20260704b.sql`：單 IP 60/分 + 全服 10k/時 + 50k/日，props 上限 2048→512，膨脹絕對上限 ≈ 25MB/天）⚠️ 待使用者跑 |
+| 🟢 已修補 | `log_event` RPC anon 可無限呼叫 → events 表灌爆（DB 膨脹） | **三層節流已實作並已跑**（`migration_20260704b.sql`：單 IP 60/分 + 全服 10k/時 + 50k/日，props 上限 2048→512，膨脹絕對上限 ≈ 25MB/天） |
 | 🟢 已修補 | `cleanup_old_scores_if_needed` anon 可呼叫 | **已收權**（同 migration b），改由每日 CI 帶 service key 呼叫（fetchDailyMap.ts）；cron-job.org 的 cleanup 排程可刪、keepalive 保留 |
 | 🟢 已上線 | 無 CSP / 安全 headers | **`public/_headers` 已加**：nosniff/XFO DENY/Referrer-Policy/Permissions-Policy＋**CSP 已正式執法**（先 Report-Only 部署，使用者真機走完登入/遊玩/分享全流程 console 零違規後轉正，2026-07-04 晚） |
 | 🟢 已上線 | GitHub Actions 未 pin SHA（首輪供應鏈潔癖項） | checkout / setup-node 已 pin 到 commit SHA |
 | 🟢 已實作 | 車庫金幣/擁有清單/任務/streak/成就全為 localStorage，可被使用者端竄改 | **使用者 2026-07-04 晚拍板後當場改口「不用等 7/5」，同晚已實作伺服器端錢包**（`migration_20260705.sql` + garage.ts 全面改接，方案見 [WALLET_PLAN.md](WALLET_PLAN.md)）。 |
 | 🟢 已修復 | **暱稱/Q 系列成就/streak 純本地不分帳號，導致「同裝置切換 Google 帳號」真實污染事件**（2026-07-05 發現，非理論風險——tommyisboy08@gmail.com 測試帳號被裝置上另一帳號的假成就進度誤解鎖 Q 車款，寫進了伺服器端真實擁有清單） | `supabase/migration_20260706.sql`：新增 `player_achievements`/`player_streak` 表 + `get_player_name()`/`record_market_finish()`，**`wallet_unlock_achievement()` 改成伺服器自行驗證門檻**（v1 只信任客戶端宣稱「已達標」就給，正是這次污染事件能寫進伺服器的根本路徑；v2 這支 RPC 現在自己查 DB 判斷，客戶端傳什麼都無法騙到），`auth.ts signOut()` 補上暱稱/錢包/成就/streak 全部歸零。使用者已跑 migration + 一次性資料清零 SQL（把非開發者帳號的金幣/鑽石/車庫/成就全部歸零）+ 真機兩帳號交叉驗證通過。詳見 CLAUDE.md 待辦 1b。 |
-| 🟢 已實作 | 每日 5 次挑戰上限純前端（清 localStorage 可繞過） | `consume_attempt` RPC **已與錢包同一批做完**（`migration_20260705.sql` + DailyChallenge.tsx/challengeAttempts.ts 已改接）。**⚠️ 待使用者跑 migration 才生效** |
+| 🟢 已實作 | 每日 5 次挑戰上限純前端（清 localStorage 可繞過） | `consume_attempt` RPC **已與錢包同一批做完並已跑生效**（`migration_20260705.sql` + DailyChallenge.tsx/challengeAttempts.ts 已改接） |
 | 🟡 已答覆 | upload keystore 雲端備份 | 使用者 2026-07-04 回覆：密碼公司/家裡皆有記錄；keystore **檔案本體**備份狀態不確定但暫緩（Play App Signing 保底，upload key 遺失可向 Google 申請重置） |
 | 🟢 乾淨 | XSS 重掃（含新增畫面）／密鑰／npm audit prod 0 漏洞 | 無需動作 |
 | 🟡 dev-only | esbuild/vite dev server 漏洞 2 個 | **不進產品 bundle、只影響本機 dev server**——非上架風險；修復需 vite@8 breaking change，排正式上架後升級（跑 dev 時別逛可疑網站的緩解照舊） |
@@ -33,7 +33,7 @@
 > 原訂 7/5 動工的伺服器端錢包，使用者當場改口「現在就處理」，同晚完成實作：
 > `migration_20260705.sql`（`player_wallet` 等三表 + 六個 security definer RPC）+ garage.ts 等
 > 客戶端全面改接（已登入→伺服器 RPC 為權威；未登入→維持純本地，接受）。詳見 [WALLET_PLAN.md](WALLET_PLAN.md)
-> 開頭的完成狀態註記。**⚠️ 待使用者跑 migration + 真實帳號登入驗證才算真正生效**。
+> 開頭的完成狀態註記。**✅ migration 已跑生效**。
 
 - `tr_garage_coins`（金幣）、`tr_garage_diamonds`（鑽石）、`tr_garage_owned`（擁有車皮）、
   `tr_daily_streak`（streak）、`tr_achv_market`（Q 系列成就進度）、暱稱（`taiex_player_name`）
@@ -128,7 +128,7 @@
 
 - **情境**：`updateProfileName()` 直接 upsert 到 `user_profiles`，RLS 只驗 `player_id = auth.uid()`，**沒有驗 name 長度**。任何已登入者可用 anon key + 自己的 JWT 直接打 PostgREST，塞入任意長字串（MB 級）。排行榜 VIEW `daily_scores_ranked` COALESCE 讀這張表 → 排行榜 payload 被灌爆（流量/快取/前端渲染負擔）。前端的 `clampNameWidth` 擋不住直接打 API 的人。
 - **已修（前端防呆）**：`auth.ts` upsert 前 `slice(0, 32)`。
-- **待跑（DB 硬限制）**：`supabase/migration_20260702.sql` 加 `CHECK (char_length(player_name) <= 32)` + 對既有資料截斷。**要在 Supabase SQL Editor 手動跑**（push 不會生效）。
+- **已跑（DB 硬限制）**：`supabase/migration_20260702.sql` 加 `CHECK (char_length(player_name) <= 32)` + 對既有資料截斷。
 
 ## 🟠 RPC 濫用面（已知，交由反作弊設計處理）
 

@@ -175,10 +175,8 @@
       - `Garage.tsx` 版面同時調整：「💰 購買鑽石」搬到頁面最底部（原本夾在成就車款跟
         鑽石車款中間）、新增「🚫 永久去除廣告」區塊接在購買鑽石後面、「🎯 任務解鎖車款」
         改名「🎯 成就車款」。
-      **⚠️ 使用者待辦**：SQL Editor 跑 `migration_20260706d.sql`；Play Console 要多建一個
-      SKU **`remove_ads_forever`**（非消耗型／受管理商品，不是消耗型，記得選對類型）；
-      跟鑽石一樣卡在同一組前置阻礙（商家帳戶審核中 + Android 原生 Billing 橋接），詳見
-      上面鑽石購買那條的第 5 點。preview 驗證：訪客路徑零 console error，手動模擬
+      **✅ `migration_20260706d.sql` 已跑**；Play Console 的 `remove_ads_forever` SKU
+      也已跟其他三個鑽石 SKU 一起建立完成（見上面鑽石購買那條）。preview 驗證：訪客路徑零 console error，手動模擬
       `localStorage.tr_ads_removed=1` 確認「看廣告拿金幣」按鈕正確隱藏。
 
 - [ ] P3~P5 三台鑽石車款生圖 + 登記進 `wallet_spend_skin` 白名單（同時更新 `garage.ts` 的

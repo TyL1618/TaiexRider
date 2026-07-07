@@ -139,7 +139,7 @@ create table if not exists public.classic_records (
 
 **防重放**：`iap_purchases(purchase_token pk, player_id, sku_id, diamonds, created_at)` 記錄每筆已兌換的 purchase_token，同一筆不能重複發鑽石。`grant_iap_diamonds()` 內有 SKU 白名單（`diamonds_100`/`diamonds_350`/`diamonds_1200`，暫定鑽石數，實際定價在 Play Console 設定），**只給 service_role 呼叫**（`revoke ... from public, anon, authenticated`）——前端絕對不能直接呼叫這支，否則偽造 purchase_token 就能騙鑽石。
 
-**⚠️ 部署前置作業**（純程式碼骨架，還差這些外部手動設定才會真正啟用，缺一項就完全不會顯示購買按鈕，對現有玩家零影響）：① 跑 migration；② Play Console 建立單次產品（介面路徑：透過 Google Play 營利 → 產品 → 單次產品，實測發現這一步本身要求 APK 先有 BILLING 權限才給建，順序比預期更早卡關）；③ Google Cloud 服務帳號 + Play Console 授權；④ `supabase functions deploy verify-iap-purchase`（需要 secrets：`GOOGLE_SERVICE_ACCOUNT_EMAIL`/`GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY`）；⑤ **Android 原生專案要加 androidbrowserhelper 的 Play Billing 橋接**（Digital Goods API 光靠網頁端程式碼不會生效），屬於「android/ push 無效」的原生層改動，要在 Android Studio 加好＋versionCode+1＋重新上傳簽名 AAB 才會真正啟用。詳細清單見 [NEXT_BATCH_PLAN.md](NEXT_BATCH_PLAN.md) 批次 4。
+**✅ 部署前置作業皆已完成**（2026-07-06）：① migration 已跑；② Play Console 單次產品已建立（介面路徑：透過 Google Play 營利 → 產品 → 單次產品，實測發現這一步本身要求 APK 先有 BILLING 權限才給建，順序比預期更早卡關）；③ Google Cloud 服務帳號 + Play Console 授權已完成；④ `verify-iap-purchase` Edge Function 已部署（secrets：`GOOGLE_SERVICE_ACCOUNT_EMAIL`/`GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY`）；⑤ Android 原生專案已加 androidbrowserhelper 的 Play Billing 橋接（vc11 已上傳審核通過上線）。詳細清單見 [NEXT_BATCH_PLAN.md](NEXT_BATCH_PLAN.md) 批次 4。
 
 **永久去除廣告（非消耗型，`migration_20260706d.sql`）**：跟鑽石（消耗型，可重複買）不同，去廣告是「買一次終身有效」，Google 端驗證完要呼叫 `:acknowledge` 而不是 `:consume`（`consume` 會讓非消耗型商品變成可重複購買，語意錯誤）。`verify-iap-purchase` 依 SKU 是否在 `DIAMOND_SKUS` 集合裡分流兩種呼叫方式。購買後 `player_wallet.ads_removed` 設為 true，三個原本會顯示「看廣告」文案/流程的地方依此欄位調整：`GameCanvas.tsx` 復活按鈕只改標籤文字（本來就沒有真的擋廣告）；結算畫面 + `Garage.tsx` 的「看廣告拿金幣」按鈕直接隱藏（不是變免費——這組「看廣告換獎勵」機制存在的前提就是有廣告可看）；`DailyChallenge.tsx` 第 3~5 次挑戰的「看廣告開始」標籤消失、一律顯示「開始挑戰」（5 次額度本身不變）。SKU id：`remove_ads_forever`。
 
@@ -555,7 +555,7 @@ v0.9.3 加入 master gain node（`masterGain()`），所有音效都接到同一
 
 **全服死亡熱點（v0.12.11）**：`daily_death_heatmap` RPC（同 migration b，anon 可查的匿名 20 等分彙總）→ `src/lib/deathHeatmap.ts` → DailyChallenge 熱度條 + GameCanvas top3 ☠️ 標記。監控 death.xr 打點一份工投三用（監控/遊戲內容/社群哏）。
 
-**⚠️ 佈署依賴**：`supabase/migration_20260702.sql` 要在 SQL Editor 手動跑過一次，events 表與 RPC 才存在；沒跑之前前端打點靜默失敗（不影響遊戲）。
+**✅ 已跑**：`supabase/migration_20260702.sql`（events 表與 RPC）。
 
 ---
 
