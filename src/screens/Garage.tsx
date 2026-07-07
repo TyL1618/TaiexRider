@@ -12,14 +12,8 @@ import CoinIcon from "../components/CoinIcon";
 import "../TrackSelect.css";
 import "./Garage.css";
 
-// 鑽石車款（P 系列）尚未生圖的部分：真錢 IAP（Google Play Billing）接上前，
-// 連鑽石購買都還沒美術可放，維持「敬請期待」佔位卡。已生圖的 P1/P2 已登記進
-// garage.ts 的 BIKE_SKINS（currency:"diamond"），走一般購買流程，不在這份清單。
-const PAID_BIKES_COMING_SOON = [
-  { id: "p3-gold", name: "黃金大亨", desc: "黑金巡航旗艦，排行榜霸主座駕" },
-  { id: "p4-samurai", name: "電馭武士", desc: "電馭武士甲，冰藍電路紋" },
-  { id: "p5-phantom", name: "幽靈匿蹤", desc: "暗夜匿蹤，血色微光" },
-] as const;
+// 鑽石車款（P 系列）5 台已全數生圖完成，皆已登記進 garage.ts 的
+// BIKE_SKINS（currency:"diamond"），走一般購買流程，不再需要「敬請期待」佔位卡。
 
 export default function Garage({ onBack }: { onBack: () => void }) {
   const [coins, setCoins] = useState(() => getCoins());
@@ -240,18 +234,6 @@ export default function Garage({ onBack }: { onBack: () => void }) {
       <h2 className="garage-section-title">💎 鑽石車款</h2>
       <div className="garage-list">
         {BIKE_SKINS.filter((s) => s.currency === "diamond").map(renderSkinCard)}
-        {PAID_BIKES_COMING_SOON.map((p) => (
-          <div key={p.id} className="garage-card locked">
-            <div className="garage-preview garage-preview-locked">
-              <span className="garage-lock-icon">💎</span>
-            </div>
-            <div className="garage-card-body">
-              <div className="garage-card-name">{p.name}</div>
-              <div className="garage-card-desc">{p.desc}</div>
-              <button className="garage-btn disabled" disabled>敬請期待</button>
-            </div>
-          </div>
-        ))}
       </div>
 
       {billingAvailable && (

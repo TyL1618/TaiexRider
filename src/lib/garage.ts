@@ -77,7 +77,7 @@ export const BIKE_SKINS: BikeSkin[] = [
     price: 0, locked: true, hueRotateDeg: 0, src: "bikes/q3-phoenix.png",
     spriteW: 80.0, spriteOffsetX: -1.5, spriteOffsetY: -5.7,
   },
-  // 鑽石車款（P 系列，2 台已生圖可測；P3~P5 尚未生圖，維持 Garage.tsx 的「敬請期待」清單）。
+  // 鑽石車款（P 系列，5 台全數生圖完成）。
   // 量測方式同 Q 系列：OpenCV HoughCircles 找 alpha 遮罩上的兩個輪胎圓，換算 spriteW/offsetX/Y；
   // 價格為暫定佔位值（IAP 真實定價待 Billing 接上後再決定，見上方註解）。
   {
@@ -89,6 +89,21 @@ export const BIKE_SKINS: BikeSkin[] = [
     id: "p2-galaxy", name: "銀河鍍鉻", desc: "鏡面鍍鉻概念車，內嵌流轉星河",
     price: 380, currency: "diamond", hueRotateDeg: 0, src: "bikes/p2-galaxy.png",
     spriteW: 73.3, spriteOffsetX: -0.4, spriteOffsetY: -2.7,
+  },
+  {
+    id: "p3-gold", name: "黃金大亨", desc: "黑金巡航旗艦，排行榜霸主座駕",
+    price: 450, currency: "diamond", hueRotateDeg: 0, src: "bikes/p3-gold.png",
+    spriteW: 75.1, spriteOffsetX: -2.9, spriteOffsetY: -6.4,
+  },
+  {
+    id: "p4-samurai", name: "電馭武士", desc: "電馭武士甲，冰藍電路紋",
+    price: 520, currency: "diamond", hueRotateDeg: 0, src: "bikes/p4-samurai.png",
+    spriteW: 73.8, spriteOffsetX: -0.7, spriteOffsetY: -6.3,
+  },
+  {
+    id: "p5-phantom", name: "幽靈匿蹤", desc: "暗夜匿蹤，血色微光",
+    price: 600, currency: "diamond", hueRotateDeg: 0, src: "bikes/p5-phantom.png",
+    spriteW: 73.7, spriteOffsetX: -0.3, spriteOffsetY: -2.8,
   },
 ];
 
