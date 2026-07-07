@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.12.38";
+export const APP_VERSION = "0.12.39";
 
 export interface ChangelogEntry {
   date: string;
@@ -6,6 +6,12 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    date: "2026-07-09 (v0.12.39)",
+    notes: [
+      "看廣告拿金幣獎勵 20 → 40",
+    ],
+  },
   {
     date: "2026-07-08 (v0.12.38)",
     notes: [
