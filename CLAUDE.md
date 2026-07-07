@@ -151,6 +151,53 @@ v0.12.41 在三個關鍵點（`garage.ts` 的 `syncWalletFromServer`/`earnCoins`
 看 console，把 `[wallet]` 開頭的錯誤訊息回報回來**——有了實際錯誤內容（RLS 拒絕/函式不
 存在/網路逾時/資料驗證失敗等）才能鎖定真正原因，目前純看程式碼找不出更多線索。
 
+### 🔴🎉 2026-07-09（真正抓到了）：金幣/鑽石發放從 7/5 上線以來全部沒真的寫進資料庫！
+### 根因＝SQL 欄位參照不明確，**需要立刻手動跑 `supabase/migration_20260709b.sql`**
+
+使用者實測「車庫看廣告拿金幣」，用桌機瀏覽器 devtools 直接看到 RPC 回傳的 400 錯誤內容：
+
+```
+code: "42702"
+message: "column reference \"coins\" is ambiguous"
+details: "It could refer to either a PL/pgSQL variable or a table column."
+```
+
+**根因**：`wallet_earn()`／`claim_weekly_quest()`／`grant_iap_diamonds()` 這三支函式都用
+`returns table(coins int, ...)` 或 `returns table(diamonds int, ...)`——PL/pgSQL 會把
+`coins`/`diamonds` 這兩個輸出欄位名稱當成函式內的隱含變數。函式內部又寫
+`update player_wallet set coins = coins + v_amount`，右邊那個 `coins` 到底是指
+`player_wallet.coins` 這個資料表欄位、還是函式輸出變數，Postgres 無法判斷，**整個函式
+呼叫直接拋例外中止**（連前面已經 insert 的 `wallet_earn_log` 那筆也會一起被 rollback，
+這正是為什麼查 `wallet_earn_log` 完全零筆——不是沒執行到，是執行到一半被回滾）。玩家端
+完全看不到任何錯誤（呼叫端把 RPC 失敗靜默吞掉），只會安靜地拿不到錢。
+
+**影響範圍比想像中大很多**：查證這個 bug 從 **`migration_20260705.sql` 的第一版
+`wallet_earn()` 就存在**（2026-07-05 伺服器端錢包剛上線那天），一路被複製貼上到每一次
+改版（20260706b/20260707c/20260708/20260709）都沒被發現，代表：
+- **所有玩家從 7/5 以來，完賽/摔車/長征/任務/看廣告的金幣獎勵，從來沒有一次真的寫進
+  資料庫過**——畫面上看到的加幣全部只是前端 `addCoins()` 的樂觀顯示，一旦任何畫面重新
+  跟伺服器同步（例如進車庫），就會被打回原本（沒增加過）的真實餘額。這正是這幾天「金幣
+  回車庫/首頁歸零」報告的**真正根因**，跟 v0.12.40 修的 App.tsx 背景 token 競速是兩個
+  疊加的獨立問題（v0.12.40 那個是真實存在的 bug，但不是這次案例的主因）。
+- **週任務金幣獎勵（`claim_weekly_quest`）同樣的 bug，從來沒發過**。
+- **真錢購買鑽石（`grant_iap_diamonds`，Google Play Billing IAP）也是同樣的 bug**——
+  如果已經有玩家真的付錢買過鑽石包，錢有扣但鑽石可能沒有真的到帳，這點務必优先確認
+  Play Console 有沒有實際交易紀錄，若有需要額外處理退款/補發。
+- **沒有受影響、一直正常運作的**：`settle_daily_diamonds()`（排行榜名次鑽石）／
+  `settle_classic_weekly()`（經典模式週結算鑽石）——這兩支函式 `returns void`，沒有
+  跟 `diamonds` 撞名的輸出變數，從頭到尾都沒有這個問題，玩家應該有正常收到過這兩條路徑
+  的鑽石。`wallet_spend_skin()`（購買車皮）／`wallet_dev_grant()`（開發者測試帳號）也
+  沒事，因為都是先把運算結果存進 `v_coins`/`v_diamonds` 這種明確命名的區域變數，再一次
+  賦值回欄位，從未直接寫 `coins = coins + x` 這種會撞名的寫法。
+
+**✅ 修復 SQL 已寫好：[supabase/migration_20260709b.sql](supabase/migration_20260709b.sql)**
+——三支函式的 UPDATE 敘述改成 `set coins = player_wallet.coins + v_amount`（明確加上
+資料表名稱前綴，跟函式輸出變數 disambiguate），業務邏輯/金額/上限完全不變，逐字照舊。
+**⚠️⚠️ 這份 migration 極度優先，還沒執行**——請立刻去 Supabase SQL Editor 跑這份，
+跑完後建議馬上用真實帳號測一次「看廣告拿金幣」，並直接查
+`select * from wallet_earn_log order by earn_date desc limit 5;` 確認有新的一筆寫入、
+`player_wallet.coins` 真的有增加，才算真正確認修復。
+
 ### 🐛 2026-07-09（再追加）：SQL 直查排除「migration 沒跑」，鎖定範圍到「session 遺失」（v0.12.42）
 
 使用者懷疑是不是自己漏跑 SQL，直接在 Supabase SQL Editor 查證：

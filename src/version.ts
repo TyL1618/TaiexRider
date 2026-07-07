@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.12.42";
+export const APP_VERSION = "0.12.43";
 
 export interface ChangelogEntry {
   date: string;
@@ -6,6 +6,12 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    date: "2026-07-09 (v0.12.43)",
+    notes: [
+      "找到金幣/鑽石從未真正入帳的根因：SQL 欄位參照不明確，修復 SQL 待手動執行（migration_20260709b.sql）",
+    ],
+  },
   {
     date: "2026-07-09 (v0.12.42)",
     notes: [
