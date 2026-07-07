@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.12.33";
+export const APP_VERSION = "0.12.34";
 
 export interface ChangelogEntry {
   date: string;
@@ -6,6 +6,12 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    date: "2026-07-08 (v0.12.34)",
+    notes: [
+      "結算畫面「看廣告雙倍金幣」按鈕文字簡化，旁邊新增「本局收益 X 元」常駐顯示",
+    ],
+  },
   {
     date: "2026-07-08 (v0.12.33)",
     notes: [
