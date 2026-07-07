@@ -206,7 +206,7 @@ export default function App() {
     if (coinEligible) {
       const isLong = mode === "long";
       const amount = computePlayReward(isLong, stats.finished, stats.progressPct);
-      addCoins(grantPlayReward(dailyKey(), amount));
+      addCoins(grantPlayReward(dailyKey(), amount, user?.id ?? null));
       const kind = isLong
         ? (stats.finished ? "long_finish" : "long_crash")
         : (stats.finished ? "finish" : "crash");
@@ -219,7 +219,7 @@ export default function App() {
     const newlyDone = recordRun(dailyKey(), {
       score: stats.score, flips: stats.flips, perfect: stats.perfect, timeMs: stats.timeMs,
       finished: stats.finished, mode, marketMood: marketMood?.mood ?? null,
-    });
+    }, user?.id ?? null);
     for (const q of newlyDone) { addCoins(q.reward * rageMultiplier); earnCoins("quest"); }
     // 週任務：仿每日任務，但用 ISO 週別累計，需登入才有伺服器權威進度（詳見 weeklyQuests.ts）
     const week = weekKey();
@@ -288,6 +288,7 @@ export default function App() {
           revivalEnabled={isDailyRun}
           analyticsMode={analyticsModeRef.current}
           pbKey={track.classicId ? `classic_${track.classicId}` : `${analyticsModeRef.current}_${track.label}`}
+          uid={user?.id ?? null}
         />
       </Suspense>
     );
@@ -304,7 +305,7 @@ export default function App() {
   if (screen === "custom")  return <TrackSelect   onPick={handleStartTrack} onBack={goHome} />;
   if (screen === "random")  return <RandomSlot    onPick={handleStartTrack} onBack={goHome} />;
   if (screen === "classic") return <ClassicSelect user={user} onPick={handleStartTrack} onBack={goHome} />;
-  if (screen === "garage")  return <Garage onBack={goHome} />;
+  if (screen === "garage")  return <Garage user={user} onBack={goHome} />;
   if (screen === "daily")  return (
     <DailyChallenge
       user={user}

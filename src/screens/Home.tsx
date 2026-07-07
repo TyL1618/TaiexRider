@@ -71,8 +71,10 @@ export default function Home({
     if (user) updateProfileName(trimmed); // 同步到 Supabase user_profiles（fire-and-forget）
   };
 
-  const handleSignOut = () => {
-    signOut();
+  const handleSignOut = async () => {
+    // 等 signOut() 真正跑完（含 resetWalletCache 清空幣/成就/streak 等本地快取）才關面板，
+    // 避免使用者手速太快、緊接著切訪客遊玩時快取還沒清乾淨（2026-07-08 使用者回報成就殘留）。
+    await signOut();
     setShowSettings(false);
     setLogoutConfirm(false);
   };

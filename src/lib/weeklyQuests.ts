@@ -9,7 +9,13 @@
 
 import { supabase } from "./supabase";
 
-const PROGRESS_KEY = "tr_weekly_quest_progress";
+// 2026-07-08 晚間修正：key 原本不分帳號，同裝置切換帳號會沿用「前一個使用者」的本地
+// 快取（跟 quests.ts/playRewards.ts/challengeAttempts.ts 修過的同一種跨帳號污染問題），
+// 補上 uid 隔離（訪客固定用 "guest"）。已登入時這份本來就會被伺服器 sync 覆寫，這裡
+// 主要是保護「伺服器 RPC 尚未建立/離線」時的本地 fallback 不互相污染。
+function progressKey(uid: string | null): string {
+  return `tr_weekly_quest_progress_${uid ?? "guest"}`;
+}
 
 interface WeekProgress {
   week: string;
@@ -34,9 +40,9 @@ function emptyWeek(week: string): WeekProgress {
   };
 }
 
-function load(week: string): WeekProgress {
+function load(uid: string | null, week: string): WeekProgress {
   try {
-    const raw = localStorage.getItem(PROGRESS_KEY);
+    const raw = localStorage.getItem(progressKey(uid));
     if (!raw) return emptyWeek(week);
     const d = JSON.parse(raw) as WeekProgress;
     // 跨週重置；同週但欄位是舊格式（本次任務池擴充新增的欄位）就補預設值，避免 undefined
@@ -46,8 +52,8 @@ function load(week: string): WeekProgress {
   }
 }
 
-function save(d: WeekProgress): void {
-  try { localStorage.setItem(PROGRESS_KEY, JSON.stringify(d)); } catch { /* 靜默 */ }
+function save(uid: string | null, d: WeekProgress): void {
+  try { localStorage.setItem(progressKey(uid), JSON.stringify(d)); } catch { /* 靜默 */ }
 }
 
 interface QuestDef {
@@ -108,8 +114,8 @@ export interface WeeklyQuestView {
   reward: number;
 }
 
-export function getWeeklyQuests(week: string): WeeklyQuestView[] {
-  const d = load(week);
+export function getWeeklyQuests(week: string, uid: string | null = null): WeeklyQuestView[] {
+  const d = load(uid, week);
   return pickWeek(week).map((q) => {
     const progress = Math.min(q.target, q.progress(d));
     return {
@@ -141,7 +147,7 @@ export async function syncWeeklyFromServer(week: string): Promise<void> {
     finish_count: number; long_finish_count: number; classic_finish_count: number;
     up_day_finish_count: number; down_day_finish_count: number; claimed: string[];
   };
-  save({
+  save(uid, {
     week, perfectSum: row.perfect_sum, flipsSum: row.flips_sum, maxScore: row.max_score,
     maxSurviveSec: row.max_survive_sec, playCount: row.play_count,
     finishCount: row.finish_count, longFinishCount: row.long_finish_count,
@@ -185,13 +191,13 @@ export async function recordWeeklyRun(
         classicFinishCount: row.classic_finish_count, upDayFinishCount: row.up_day_finish_count,
         downDayFinishCount: row.down_day_finish_count, claimed: row.claimed ?? [],
       };
-      save(d);
+      save(uid, d);
       const todays = pickWeek(week);
       return todays.filter((q) => !d.claimed.includes(q.id) && q.progress(d) >= q.target);
     }
     // RPC 失敗（尚未跑 migration/網路問題）：退回本地累計，下次同步會被伺服器覆寫
   }
-  const d = load(week);
+  const d = load(uid, week);
   d.perfectSum += stats.perfect;
   d.flipsSum += stats.flips;
   d.maxScore = Math.max(d.maxScore, stats.score);
@@ -207,7 +213,7 @@ export async function recordWeeklyRun(
   const todays = pickWeek(week);
   const newlyDone = todays.filter((q) => !d.claimed.includes(q.id) && q.progress(d) >= q.target);
   for (const q of newlyDone) d.claimed.push(q.id);
-  save(d);
+  save(uid, d);
   return newlyDone;
 }
 

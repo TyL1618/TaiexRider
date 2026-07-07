@@ -15,7 +15,9 @@ alter table public.player_weekly_quest
   add column if not exists up_day_finish_count  int not null default 0,
   add column if not exists down_day_finish_count int not null default 0;
 
--- ── get_weekly_quest()：回傳多加 5 個新欄位 ──────────────────────────────
+-- ── get_weekly_quest()：回傳多加 5 個新欄位（改了 RETURNS TABLE 形狀，
+--    create or replace 不能改回傳型別，要先 drop）──────────────────────
+drop function if exists public.get_weekly_quest(text);
 create or replace function public.get_weekly_quest(p_week text)
 returns table(
   perfect_sum int, flips_sum int, max_score int, max_survive_sec numeric, play_count int,

@@ -35,6 +35,7 @@ interface GameCanvasProps {
   revivalEnabled?: boolean; // 每日排名賽：死亡後可「看廣告復活」（每局一次）
   analyticsMode?: string;   // 打點用模式標籤（daily/slot/custom/long/classic）
   pbKey?: string;           // 個人最佳紀錄的 localStorage key 尾碼（模式+標的）
+  uid?: string | null;      // 已登入玩家 id，看廣告雙倍金幣要用來隔離每日上限快取（見 playRewards.ts）
 }
 
 interface Hud {
@@ -153,7 +154,7 @@ function getBikeImageEntry(src: string): BikeImgEntry {
 }
 getBikeImageEntry(`${import.meta.env.BASE_URL}bike.png`); // 預熱預設車皮
 
-export default function GameCanvas({ prices, label, name, subtitle, onExit, onGameOver, hideMinimap = false, revivalEnabled = false, analyticsMode, pbKey }: GameCanvasProps) {
+export default function GameCanvas({ prices, label, name, subtitle, onExit, onGameOver, hideMinimap = false, revivalEnabled = false, analyticsMode, pbKey, uid = null }: GameCanvasProps) {
   const stars = difficultyStars(calcDifficulty(prices));
   const cityBuildings = generateCity(prices.length * 31 + Math.round((prices[0] || 0) * 100));
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -200,7 +201,7 @@ export default function GameCanvas({ prices, label, name, subtitle, onExit, onGa
       if (ok) {
         const progressPct = finished ? 1 : deathProgressRef.current;
         const amount = computePlayReward(isLongMarch, finished, progressPct);
-        addCoins(grantPlayReward(dailyKey(), amount));
+        addCoins(grantPlayReward(dailyKey(), amount, uid));
         const kind = isLongMarch
           ? (finished ? "long_finish" : "long_crash")
           : (finished ? "finish" : "crash");
@@ -1602,7 +1603,7 @@ let crashTimer = 0;
               return (
                 <div className="overlay-play-reward">
                   <span className="overlay-play-reward-amount">
-                    本局收益 {shownReward} 元{adDoubleState === "claimed" && " ✓"}
+                    本局收益 {shownReward} 金幣{adDoubleState === "claimed" && " ✓"}
                   </span>
                   {!adsRemoved && adDoubleState !== "claimed" && (
                     <button

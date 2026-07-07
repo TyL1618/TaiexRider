@@ -24,13 +24,17 @@ export function computePlayReward(isLong: boolean, finished: boolean, progressPc
   return finished ? 5 : 2;
 }
 
-function storageKey(day: string): string {
-  return `tr_play_reward_${day}`;
+// 2026-07-08 晚間修正：key 原本沒帶 uid，同裝置切換帳號（例如開發者測試帳號重度測試後
+// 登出改玩訪客）會沿用「前一個使用者」當天已經衝到滿的額度，訪客那邊看起來變成「怎麼玩
+// 都 0 元」——跟 challengeAttempts.ts 2026-07-07 修過的同一種跨帳號快取污染問題，這裡補上
+// 同樣的 uid 隔離（訪客固定用 "guest"）。
+function storageKey(uid: string | null, day: string): string {
+  return `tr_play_reward_${uid ?? "guest"}_${day}`;
 }
 
-function getEarnedToday(day: string): number {
+function getEarnedToday(uid: string | null, day: string): number {
   try {
-    const n = parseInt(localStorage.getItem(storageKey(day)) ?? "0", 10);
+    const n = parseInt(localStorage.getItem(storageKey(uid, day)) ?? "0", 10);
     return isNaN(n) ? 0 : n;
   } catch {
     return 0;
@@ -38,12 +42,12 @@ function getEarnedToday(day: string): number {
 }
 
 // 依當日已賺金額扣抵，回傳「這次實際能拿到的金幣數」（可能是 0，也可能小於 amount）。
-export function grantPlayReward(day: string, amount: number): number {
+export function grantPlayReward(day: string, amount: number, uid: string | null = null): number {
   try {
-    const earned = getEarnedToday(day);
+    const earned = getEarnedToday(uid, day);
     const remaining = Math.max(0, PLAY_REWARD_DAILY_CAP - earned);
     const granted = Math.min(amount, remaining);
-    if (granted > 0) localStorage.setItem(storageKey(day), String(earned + granted));
+    if (granted > 0) localStorage.setItem(storageKey(uid, day), String(earned + granted));
     return granted;
   } catch {
     return amount;

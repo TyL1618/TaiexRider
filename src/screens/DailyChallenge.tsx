@@ -62,7 +62,7 @@ export default function DailyChallenge({
   const [streak, setStreak] = useState(0);
   const [streakLive, setStreakLive] = useState(false); // 本期已參賽（🔥 實心）或待延續（提示）
   const [heat, setHeat] = useState<HeatBucket[]>([]); // 今日全服死亡熱點（20 等分）
-  const [quests] = useState(() => getDailyQuests(dailyKey())); // 每日任務（裝置本地日曆日，跨模式共用）
+  const [quests, setQuests] = useState(() => getDailyQuests(dailyKey(), user?.id ?? null)); // 每日任務（裝置本地日曆日，跨模式共用）
   const [adsRemoved] = useState(() => getAdsRemoved()); // 永久去廣告：第 3~5 次挑戰不再顯示「看廣告」標籤
   const [weeklyQuests, setWeeklyQuests] = useState<WeeklyQuestView[]>([]); // 本週任務（ISO 週別，已登入才有伺服器權威進度）
   const [pendingSettlement, setPendingSettlement] = useState<PendingSettlement | null>(null); // 前一期排行榜鑽石結算彈窗
@@ -73,6 +73,7 @@ export default function DailyChallenge({
   useEffect(() => {
     setAttempts(getAttempts(sessionKeyRef.current, user?.id ?? null));
     setServerMaxed(false);
+    setQuests(getDailyQuests(dailyKey(), user?.id ?? null)); // 換帳號/登出重讀，避免沿用前一個使用者的任務快取
   }, [user?.id]);
 
   useEffect(() => {
@@ -85,7 +86,7 @@ export default function DailyChallenge({
   useEffect(() => {
     let alive = true;
     const week = weekKey();
-    syncWeeklyFromServer(week).then(() => { if (alive) setWeeklyQuests(getWeeklyQuests(week)); });
+    syncWeeklyFromServer(week).then(() => { if (alive) setWeeklyQuests(getWeeklyQuests(week, user?.id ?? null)); });
     return () => { alive = false; };
   }, [user]);
 

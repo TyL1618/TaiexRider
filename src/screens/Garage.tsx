@@ -8,18 +8,19 @@ import { resolveSessionDate } from "../lib/dailyMap";
 import { isBillingAvailable, fetchPackPrices, purchaseDiamondPack, purchaseRemoveAds, DIAMOND_PACKS, REMOVE_ADS_SKU } from "../lib/billing";
 import { dailyKey } from "../data/pick";
 import CoinIcon from "../components/CoinIcon";
+import type { User } from "../lib/auth";
 import "../TrackSelect.css";
 import "./Garage.css";
 
 // 鑽石車款（P 系列）5 台已全數生圖完成，皆已登記進 garage.ts 的
 // BIKE_SKINS（currency:"diamond"），走一般購買流程，不再需要「敬請期待」佔位卡。
 
-export default function Garage({ onBack }: { onBack: () => void }) {
+export default function Garage({ user, onBack }: { user: User | null; onBack: () => void }) {
   const [coins, setCoins] = useState(() => getCoins());
   const [diamonds, setDiamonds] = useState(() => getDiamonds());
   const [active, setActive] = useState(() => getActiveSkinId());
   const [watchingAd, setWatchingAd] = useState(false);
-  const [adClaims, setAdClaims] = useState(() => getAdCoinClaims(dailyKey()));
+  const [adClaims, setAdClaims] = useState(() => getAdCoinClaims(dailyKey(), user?.id ?? null));
   const [achvBikes, setAchvBikes] = useState<AchvBikeView[]>(() => getAchievementBikes(0));
   const [billingAvailable] = useState(() => isBillingAvailable());
   const [packPrices, setPackPrices] = useState<Map<string, string>>(new Map());
@@ -117,8 +118,8 @@ export default function Garage({ onBack }: { onBack: () => void }) {
     requestRewardedCoins().then((ok) => {
       setWatchingAd(false);
       if (ok) {
-        incrementAdCoinClaims(dailyKey());
-        setAdClaims(getAdCoinClaims(dailyKey()));
+        incrementAdCoinClaims(dailyKey(), user?.id ?? null);
+        setAdClaims(getAdCoinClaims(dailyKey(), user?.id ?? null));
         setCoins(addCoins(AD_COIN_REWARD));
         earnCoins("ad").then(() => setCoins(getCoins()));
       }

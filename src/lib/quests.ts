@@ -3,7 +3,13 @@
 // （dailyKey()）而非 resolveSessionDate()，午夜就換一批，不用等非同步解析。
 // 進度來自任何模式的 GameOverStats（每日賽/隨機/自選/經典皆算），累計一整天。
 
-const PROGRESS_KEY = "tr_quest_progress";
+// 2026-07-08 晚間修正：key 原本不分帳號，同裝置切換帳號（例如開發者測試帳號重度測試
+// 後登出改玩訪客）會沿用「前一個使用者」當天已經領過的任務清單，訪客那邊會誤判「今天
+// 這些任務都領過了」——跟 challengeAttempts.ts 修過的同一種跨帳號快取污染問題，補上
+// uid 隔離（訪客固定用 "guest"）。
+function progressKey(uid: string | null): string {
+  return `tr_quest_progress_${uid ?? "guest"}`;
+}
 
 interface DayProgress {
   day: string;
@@ -28,9 +34,9 @@ function emptyDay(day: string): DayProgress {
   };
 }
 
-function load(day: string): DayProgress {
+function load(uid: string | null, day: string): DayProgress {
   try {
-    const raw = localStorage.getItem(PROGRESS_KEY);
+    const raw = localStorage.getItem(progressKey(uid));
     if (!raw) return emptyDay(day);
     const d = JSON.parse(raw) as DayProgress;
     // 跨日重置；同日但欄位是舊格式（本次任務池擴充新增的欄位）就補預設值，避免 undefined
@@ -40,9 +46,9 @@ function load(day: string): DayProgress {
   }
 }
 
-function save(d: DayProgress): void {
+function save(uid: string | null, d: DayProgress): void {
   try {
-    localStorage.setItem(PROGRESS_KEY, JSON.stringify(d));
+    localStorage.setItem(progressKey(uid), JSON.stringify(d));
   } catch { /* 靜默 */ }
 }
 
@@ -94,8 +100,8 @@ export interface QuestView {
   reward: number;
 }
 
-export function getDailyQuests(day: string): QuestView[] {
-  const d = load(day);
+export function getDailyQuests(day: string, uid: string | null = null): QuestView[] {
+  const d = load(uid, day);
   return pickToday(day).map((q) => {
     const progress = Math.min(q.target, q.progress(d));
     return {
@@ -118,8 +124,9 @@ export function recordRun(
     score: number; flips: number; perfect: number; timeMs: number;
     finished?: boolean; mode?: string; marketMood?: "up" | "down" | "flat" | null;
   },
+  uid: string | null = null,
 ): QuestDef[] {
-  const d = load(day);
+  const d = load(uid, day);
   d.perfectSum += stats.perfect;
   d.flipsSum += stats.flips;
   d.maxScore = Math.max(d.maxScore, stats.score);
@@ -137,6 +144,6 @@ export function recordRun(
   const newlyDone = todays.filter((q) => !d.claimed.includes(q.id) && q.progress(d) >= q.target);
   for (const q of newlyDone) d.claimed.push(q.id);
 
-  save(d);
+  save(uid, d);
   return newlyDone;
 }

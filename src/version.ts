@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.12.34";
+export const APP_VERSION = "0.12.35";
 
 export interface ChangelogEntry {
   date: string;
@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    date: "2026-07-08 (v0.12.35)",
+    notes: [
+      "修正跨帳號金幣/任務快取污染 bug：同裝置登入帳號重度測試後登出改玩訪客，會沿用前一個帳號當天已衝到滿的每日上限（看起來像「怎麼玩都 0 元」）——遊玩獎勵/每日任務/週任務/看廣告拿金幣的本地快取全部改成依帳號隔離",
+      "修正登出時設定面板可能搶先關閉、來不及清乾淨本地快取的競速問題",
+      "本局收益顯示改用「金幣」取代「元」",
+    ],
+  },
   {
     date: "2026-07-08 (v0.12.34)",
     notes: [
