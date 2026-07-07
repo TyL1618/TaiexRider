@@ -190,13 +190,19 @@ details: "It could refer to either a PL/pgSQL variable or a table column."
   沒事，因為都是先把運算結果存進 `v_coins`/`v_diamonds` 這種明確命名的區域變數，再一次
   賦值回欄位，從未直接寫 `coins = coins + x` 這種會撞名的寫法。
 
-**✅ 修復 SQL 已寫好：[supabase/migration_20260709b.sql](supabase/migration_20260709b.sql)**
+**✅ 修復 SQL 已寫好並已跑：[supabase/migration_20260709b.sql](supabase/migration_20260709b.sql)**
 ——三支函式的 UPDATE 敘述改成 `set coins = player_wallet.coins + v_amount`（明確加上
 資料表名稱前綴，跟函式輸出變數 disambiguate），業務邏輯/金額/上限完全不變，逐字照舊。
-**⚠️⚠️ 這份 migration 極度優先，還沒執行**——請立刻去 Supabase SQL Editor 跑這份，
-跑完後建議馬上用真實帳號測一次「看廣告拿金幣」，並直接查
-`select * from wallet_earn_log order by earn_date desc limit 5;` 確認有新的一筆寫入、
-`player_wallet.coins` 真的有增加，才算真正確認修復。
+
+**驗證狀態（2026-07-09）**：
+- **✅ `wallet_earn()` 已實測確認修復**——使用者跑完 migration 後真機測試看廣告拿金幣，
+  金幣有正確入帳，這條路徑（也涵蓋完賽/摔車/長征/任務）確認修好。
+- **`claim_weekly_quest()`／`grant_iap_diamonds()` 未實測，但採用完全相同的修法**
+  （欄位加資料表名稱前綴消歧義），語法結構跟已驗證有效的 `wallet_earn()` 一致，合理
+  推斷一併修好，使用者接受同理推斷、不強求實測。**⚠️ 唯一提醒**：如果封測期間曾經有
+  真的玩家透過 Google Play Billing 付錢購買鑽石包（`grant_iap_diamonds` 那條真錢
+  路徑），那筆錢當時很可能扣了但鑽石沒有真的入帳——若之後查 Play Console 發現有這種
+  歷史交易紀錄，需要額外手動補發鑽石或退款，不會因為這次修好 SQL 而自動回溯處理。
 
 ### 🐛 2026-07-09（再追加）：SQL 直查排除「migration 沒跑」，鎖定範圍到「session 遺失」（v0.12.42）
 
