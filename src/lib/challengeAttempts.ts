@@ -29,7 +29,7 @@ export interface ConsumeAttemptResult {
 // 未登入或 RPC 尚未建立/網路失敗一律回傳 ok=true（放行，維持現行純前端把關的定位不變）。
 export async function consumeAttemptServer(): Promise<ConsumeAttemptResult> {
   const { data: { session } } = await supabase.auth.getSession();
-  if (!session) return { ok: true, streak: null, lastSessionKey: null };
+  if (!session) { console.warn("[wallet] consume_attempt 略過：目前沒有登入 session"); return { ok: true, streak: null, lastSessionKey: null }; }
   const { data, error } = await supabase.rpc("consume_attempt");
   if (error) console.error("[wallet] consume_attempt 失敗，streak 沒有更新到", error);
   if (error || !data || !data[0]) return { ok: true, streak: null, lastSessionKey: null };

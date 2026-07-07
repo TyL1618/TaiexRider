@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.12.41";
+export const APP_VERSION = "0.12.42";
 
 export interface ChangelogEntry {
   date: string;
@@ -6,6 +6,12 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    date: "2026-07-09 (v0.12.42)",
+    notes: [
+      "金幣歸零：SQL 查證 wallet_earn_log 該帳號從未寫入過任何一筆，加上「session 遺失」的診斷 log",
+    ],
+  },
   {
     date: "2026-07-09 (v0.12.41)",
     notes: [

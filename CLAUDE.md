@@ -151,6 +151,34 @@ v0.12.41 在三個關鍵點（`garage.ts` 的 `syncWalletFromServer`/`earnCoins`
 看 console，把 `[wallet]` 開頭的錯誤訊息回報回來**——有了實際錯誤內容（RLS 拒絕/函式不
 存在/網路逾時/資料驗證失敗等）才能鎖定真正原因，目前純看程式碼找不出更多線索。
 
+### 🐛 2026-07-09（再追加）：SQL 直查排除「migration 沒跑」，鎖定範圍到「session 遺失」（v0.12.42）
+
+使用者懷疑是不是自己漏跑 SQL，直接在 Supabase SQL Editor 查證：
+`pg_get_functiondef('public.wallet_earn(text, int)')` 顯示 `'ad'` case 是
+`v_amount := 40`——證明資料庫裡目前生效的就是最新的 `migration_20260709.sql` 版本
+（`create or replace function` 是整段原子性替換，不會「改一半」，能看到新數字就代表
+整支函式都已更新），**排除「SQL 漏跑」的可能**。
+
+進一步直接查媽媽帳號（`z0923372899@gmail.com`）的實際資料：
+- `player_wallet`：`coins=0`、`updated_at=2026-07-06 11:22:55`——這個帳號的錢包從
+  7/6 之後**到現在為止一次都沒有被成功寫入過**，不是「今天寫入又被蓋掉」。
+- `wallet_earn_log`：**該帳號從有紀錄以來完全零筆**（"Success. No rows returned"）——
+  代表 `wallet_earn()` 這支函式**從來沒有真正執行到寫入那幾行**，範圍比原本以為的
+  更早、更嚴重：不是「RPC 送出去被拒絕」，很可能是**呼叫端 `getUid()` 拿到 `null`，
+  代表當下 Supabase 根本沒有有效 session，`earnCoins()`/`syncWalletFromServer()`/
+  `consumeAttemptServer()` 在呼叫 RPC 之前就直接 return**——這種情況完全不會觸發
+  v0.12.41 加的 `console.error`（那個 log 只在「RPC 真的送出去但失敗」時才會印），
+  是先前完全沒設想到的盲點。
+
+v0.12.42：在 `garage.ts` 的 `earnCoins()`/`syncWalletFromServer()`、
+`challengeAttempts.ts` 的 `consumeAttemptServer()`，對「uid/session 為 null」這個
+分支加上 `console.warn("[wallet] ... 略過：目前沒有登入 session")`（用 warn 不用
+error，因為訪客玩家本來就會正常走到這條分支，不算異常，只是需要能跟「已登入但 RPC
+失敗」區分開）。**下次重現時看 console 裡出現的是 `[wallet] ... 略過：目前沒有登入
+session`（代表要查為什麼登入中的帳號 session 會遺失，可能是 token 過期/裝置儲存空間
+被清/PWA 背景太久沒回來）還是 `[wallet] wallet_earn(...) 失敗`（代表要查 Supabase
+端錯誤），才能決定下一步方向。**
+
 ### 🐛 2026-07-09：金幣回車庫/首頁歸零 + 連續參賽延遲觸發（v0.12.40）
 
 使用者用媽媽的帳號+不同手機測試，回報「不管用什麼方式拿到金幣，回到車庫或回到首頁都

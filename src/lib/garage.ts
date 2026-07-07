@@ -147,7 +147,7 @@ export function getAdsRemoved(): boolean {
 // 每次登入都整包覆寫，不管裝置上原本殘留哪個帳號的資料）。
 export async function syncWalletFromServer(): Promise<void> {
   const uid = await getUid();
-  if (!uid) return;
+  if (!uid) { console.warn("[wallet] syncWalletFromServer 略過：目前沒有登入 session"); return; }
   const { data, error } = await supabase.rpc("wallet_get");
   if (error) console.error("[wallet] wallet_get 失敗，本地快取沿用舊值", error);
   if (error || !data || !data[0]) return; // RPC 尚未建立/未登入/網路失敗：本地快取先頂著
@@ -240,7 +240,11 @@ export async function earnCoins(
   amount?: number,
 ): Promise<void> {
   const uid = await getUid();
-  if (!uid) return; // 未登入：addCoins() 樂觀更新已經是最終結果，不用再校正
+  // 2026-07-09 診斷：wallet_earn_log 對某些帳號完全查不到任何一筆紀錄，代表問題可能
+  // 發生在「連 RPC 都沒送出去」這個更早的環節（getUid() 拿到 null，Supabase session
+  // 遺失/尚未還原），而不是「RPC 送出去但被拒絕」。用 console.warn（非 error，guest
+  // 玩家沒登入本來就會走這條，不算異常）先把這個分支印出來，區分兩種情況。
+  if (!uid) { console.warn(`[wallet] earnCoins(${kind}) 略過：目前沒有登入 session`); return; }
   const { data, error } = await supabase.rpc("wallet_earn", { p_kind: kind, p_amount: amount ?? null });
   if (error) console.error(`[wallet] wallet_earn(${kind}) 失敗，伺服器沒有記到這筆`, error);
   if (error || !data || !data[0]) return; // RPC 尚未建立/網路失敗：樂觀值先頂著
