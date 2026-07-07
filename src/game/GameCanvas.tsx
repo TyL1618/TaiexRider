@@ -1596,17 +1596,26 @@ let crashTimer = 0;
             <div className="overlay-stats">
               翻轉 {hud.totalFlips} 圈 ・ 完美落地 {hud.perfectLandings} 次
             </div>
-            {!adsRemoved && coinRewardEligible && adDoubleState !== "claimed" && (
-              <button
-                className="overlay-ad-coins-btn"
-                disabled={adDoubleState === "watching"}
-                onClick={handleWatchAdDouble}
-              >
-                {adDoubleState === "watching"
-                  ? "廣告播放中…"
-                  : `📺 看廣告 雙倍本局金幣 (+${computePlayReward(isLongMarch, finished, finished ? 1 : deathProgressRef.current)})`}
-              </button>
-            )}
+            {coinRewardEligible && (() => {
+              const baseReward = computePlayReward(isLongMarch, finished, finished ? 1 : deathProgressRef.current);
+              const shownReward = adDoubleState === "claimed" ? baseReward * 2 : baseReward;
+              return (
+                <div className="overlay-play-reward">
+                  <span className="overlay-play-reward-amount">
+                    本局收益 {shownReward} 元{adDoubleState === "claimed" && " ✓"}
+                  </span>
+                  {!adsRemoved && adDoubleState !== "claimed" && (
+                    <button
+                      className="overlay-ad-coins-btn"
+                      disabled={adDoubleState === "watching"}
+                      onClick={handleWatchAdDouble}
+                    >
+                      {adDoubleState === "watching" ? "廣告播放中…" : "📺 觀看廣告 獎勵 ×2"}
+                    </button>
+                  )}
+                </div>
+              );
+            })()}
           </div>
           {/* 中段透明點擊區：切換賽道 / 走勢圖（長征模式無單一走勢圖，隱藏切換） */}
           {!hideMinimap ? (
