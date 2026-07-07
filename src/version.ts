@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.12.39";
+export const APP_VERSION = "0.12.40";
 
 export interface ChangelogEntry {
   date: string;
@@ -6,6 +6,12 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    date: "2026-07-09 (v0.12.40)",
+    notes: [
+      "修正金幣回車庫/首頁歸零 + 連續參賽延遲觸發：漏改的背景 token 刷新競速 bug",
+    ],
+  },
   {
     date: "2026-07-09 (v0.12.39)",
     notes: [

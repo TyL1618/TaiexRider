@@ -63,9 +63,16 @@ export default function App() {
   // 任何已登入玩家：把伺服器錢包（金幣/鑽石/擁有清單/成就進度/streak，2026-07-05~06
   // 起改伺服器端權威）拉到本地快取——換裝置/換帳號登入或清過 localStorage 時，
   // 畫面才不會卡在舊值，也不會誤讀到裝置上殘留的「另一個帳號」的資料。
+  // 2026-07-09 修正：依賴陣列原本是 [user]（物件參照）——跟下面 grantDevWallet 那支
+  // effect 同一種 bug，7/8 只修了 grantDevWallet 這支漏改。onAuthStateChange 連背景
+  // token 自動刷新（無真正登入/登出）都會給全新 user 物件，導致這支 effect 反覆觸發
+  // syncWalletFromServer()；如果玩家剛用 earnCoins()/consume_attempt() 寫入新金幣/
+  // streak，這支背景重觸發的 wallet_get() 若比較晚回來，會把剛寫入的新值蓋回舊值——
+  // 這是「回車庫/回首頁金幣歸零」與「連續參賽要玩 2、3 場才顯示」的根因。改依 user?.id
+  // （穩定字串）比較，只有真的登入/登出/換帳號才重新觸發。
   useEffect(() => {
     if (user) syncWalletFromServer();
-  }, [user]);
+  }, [user?.id]);
 
   // 開發者測試帳號：登入即補滿金幣+鑽石+Q 系列成就進度+streak（wallet_dev_grant RPC，
   // JWT email 綁定於伺服器端，非開發者帳號呼叫會被靜默拒絕），方便真機測車庫購買/裝備/
