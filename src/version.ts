@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.12.35";
+export const APP_VERSION = "0.12.38";
 
 export interface ChangelogEntry {
   date: string;
@@ -6,6 +6,12 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    date: "2026-07-08 (v0.12.38)",
+    notes: [
+      "修正開發者測試帳號背景重複補滿金幣：原本 Supabase 連線狀態背景更新（非真的登入/登出）都會誤觸發補滿，讓餘額無預警跳回滿格、誤以為是遊戲給的獎勵",
+    ],
+  },
   {
     date: "2026-07-08 (v0.12.35)",
     notes: [

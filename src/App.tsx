@@ -73,10 +73,16 @@ export default function App() {
   // 2026-07-06 起改成單一 RPC 直接寫伺服器 player_achievements/player_streak，
   // 取代舊版前端 devSetProgress()/devForceStreak() 純本地寫死（那正是同裝置切換
   // 帳號會互相污染的源頭之一，見 achievements.ts/streak.ts 開頭說明）。
+  // 2026-07-08 修正：依賴陣列原本是 [user]（物件參照），Supabase onAuthStateChange
+  // 連 token 背景自動更新這種沒有真的登入/登出的事件都會給一個全新的 user 物件，
+  // 導致這支 effect 被重複觸發、金幣被重新設回 99999——玩家買車皮等操作讓餘額降到
+  // 99999 以下後，只要背景再觸發一次，餘額就會無預警跳回滿格，被誤以為是遊戲給的
+  // 獎勵（2026-07-08 使用者用開發者帳號測試時回報）。改成依 email（穩定字串）比較，
+  // 只有「真的登入/登出/換帳號」才會重新觸發。
   useEffect(() => {
     if (user?.email !== "tyl161803@gmail.com") return;
     grantDevWallet();
-  }, [user]);
+  }, [user?.email]);
 
   // 全站盤勢主題氛圍：解析當期大盤漲跌 → 背景色調 CSS 變數 + 首頁說明文字
   useEffect(() => {
