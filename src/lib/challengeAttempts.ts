@@ -4,6 +4,12 @@
 // 2026-07-05：純 localStorage 計數可被清瀏覽器資料繞過（SECURITY_REVIEW 反作弊 Phase B 項）。
 // 已登入玩家改在 consume_attempt() RPC（migration_20260705.sql）做伺服器端真正把關，
 // localStorage 只當顯示用計數快取；未登入玩家維持純本地（無法上排行榜，接受）。
+//
+// 2026-07-07：使用者回報同裝置切換帳號時，本地計數快取（原本 key 只帶 sessionDate，
+// 不分帳號）會沿用「前一個使用者」當天用掉的次數，顯示錯誤（真正的把關仍是上面
+// consume_attempt() 的伺服器端邏輯，per-uid 正確，只有本地顯示快取跑掉）。改成
+// key 也帶 uid（訪客固定用 "guest"，且訪客現在已在 DailyChallenge.tsx 被完全鎖住
+// 不能進場，這裡保留 guest 分支純粹是防禦性寫法）。
 
 import { supabase } from "./supabase";
 
@@ -30,20 +36,20 @@ export async function consumeAttemptServer(): Promise<ConsumeAttemptResult> {
   return { ok: row.ok, streak: row.streak_count, lastSessionKey: row.last_session_key };
 }
 
-function storageKey(sessionDate: string): string {
-  return `tr_daily_att_${sessionDate}`;
+function storageKey(sessionDate: string, uid: string | null): string {
+  return `tr_daily_att_${uid ?? "guest"}_${sessionDate}`;
 }
 
-export function getAttempts(sessionDate: string): number {
+export function getAttempts(sessionDate: string, uid: string | null): number {
   try {
-    const n = parseInt(localStorage.getItem(storageKey(sessionDate)) ?? "0", 10);
+    const n = parseInt(localStorage.getItem(storageKey(sessionDate, uid)) ?? "0", 10);
     return isNaN(n) ? 0 : Math.min(n, MAX_ATTEMPTS);
   } catch { return 0; }
 }
 
-export function incrementAttempts(sessionDate: string): void {
+export function incrementAttempts(sessionDate: string, uid: string | null): void {
   try {
-    const n = getAttempts(sessionDate);
-    if (n < MAX_ATTEMPTS) localStorage.setItem(storageKey(sessionDate), String(n + 1));
+    const n = getAttempts(sessionDate, uid);
+    if (n < MAX_ATTEMPTS) localStorage.setItem(storageKey(sessionDate, uid), String(n + 1));
   } catch {}
 }

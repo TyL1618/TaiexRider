@@ -1,5 +1,5 @@
 // Q 系列任務解鎖車款的成就計數。Q1 多頭鬥牛／Q2 空頭獵手＝大漲/大跌日「完賽」累計次數；
-// Q3 不死鳥沿用既有 streak.ts 連續參賽天數，不重複記一份。
+// Q3 火鳳凰（原名不死鳥，2026-07-07 改名）沿用既有 streak.ts 連續參賽天數，不重複記一份。
 //
 // 2026-07-06：已登入玩家改以伺服器 player_achievements 表（migration_20260706.sql）
 // 為權威來源，這裡的 localStorage 只當「顯示用快取」——登入時由 garage.ts
@@ -82,7 +82,7 @@ export function getAchievementBikes(streakDays: number): AchvBikeView[] {
       unlocked: m.bearFinishes >= Q2_BEAR_TARGET,
     },
     {
-      id: "q3-phoenix", name: "不死鳥", desc: `連續參賽 ${Q3_STREAK_TARGET} 天`,
+      id: "q3-phoenix", name: "火鳳凰", desc: `連續參賽 ${Q3_STREAK_TARGET} 天`,
       target: Q3_STREAK_TARGET, progress: Math.min(Q3_STREAK_TARGET, streakDays),
       unlocked: streakDays >= Q3_STREAK_TARGET,
     },

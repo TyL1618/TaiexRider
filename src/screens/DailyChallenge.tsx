@@ -55,7 +55,7 @@ export default function DailyChallenge({
   // 排行榜的「目前這一期」key（= max(map_date)），連假整段沿用同一張榜。
   // 非日曆日 dailyKey()，避免連假第二天起換到空榜。handleRefresh 也讀它。
   const sessionKeyRef = useRef<string>(dailyKey());
-  const [attempts, setAttempts] = useState(() => getAttempts(dailyKey()));
+  const [attempts, setAttempts] = useState(() => getAttempts(dailyKey(), user?.id ?? null));
   const [serverMaxed, setServerMaxed] = useState(false); // 伺服器判定今日已達上限（優先於本地計數，防清 localStorage 繞過）
   const [checkingStart, setCheckingStart] = useState(false);
   const [streak, setStreak] = useState(0);
@@ -64,6 +64,14 @@ export default function DailyChallenge({
   const [quests] = useState(() => getDailyQuests(dailyKey())); // 每日任務（裝置本地日曆日，跨模式共用）
   const [adsRemoved] = useState(() => getAdsRemoved()); // 永久去廣告：第 3~5 次挑戰不再顯示「看廣告」標籤
   const [weeklyQuests, setWeeklyQuests] = useState<WeeklyQuestView[]>([]); // 本週任務（ISO 週別，已登入才有伺服器權威進度）
+
+  // 2026-07-07：同裝置切換帳號時，本地次數快取重新從「這個 uid」自己的 key 讀取
+  // （見 challengeAttempts.ts 頂部說明），避免沿用前一個使用者當天用掉的次數；
+  // serverMaxed 也一併重置（那是針對前一個 uid 判定的，換人要重新問伺服器）。
+  useEffect(() => {
+    setAttempts(getAttempts(sessionKeyRef.current, user?.id ?? null));
+    setServerMaxed(false);
+  }, [user?.id]);
 
   useEffect(() => {
     let alive = true;
@@ -96,7 +104,7 @@ export default function DailyChallenge({
     resolveSessionDate(dailyKey()).then((key) => {
       sessionKeyRef.current = key;
       if (alive) {
-        setAttempts(getAttempts(key)); // 用正確的 session key 重新讀取次數
+        setAttempts(getAttempts(key, user?.id ?? null)); // 用正確的 session key 重新讀取次數
         setStreak(getStreak(key));
         setStreakLive(playedThisSession(key));
       }
@@ -206,7 +214,10 @@ export default function DailyChallenge({
         )}
 
         {(() => {
-          const canPlay = attempts < MAX_ATTEMPTS && !serverMaxed;
+          // 2026-07-07：未登入玩家完全鎖住不能開始（原本只是提示「登入後成績才會
+          // 上榜」，卻仍能實際遊玩、還會消耗次數——同張地圖想玩免登入版本可以走
+          // 自選賽道，排行榜這裡直接要求登入比較單純）。
+          const canPlay = !!user && attempts < MAX_ATTEMPTS && !serverMaxed;
           const showAd  = !adsRemoved && attempts >= FREE_ATTEMPTS;
           const num     = attempts + 1; // 即將進行的第幾次
           // 已登入玩家先問伺服器 consume_attempt()（真正把關，清 localStorage 也繞不過）；
@@ -216,7 +227,7 @@ export default function DailyChallenge({
             const result = await consumeAttemptServer();
             setCheckingStart(false);
             if (!result.ok) { setServerMaxed(true); return; }
-            incrementAttempts(sessionKeyRef.current);
+            incrementAttempts(sessionKeyRef.current, user?.id ?? null);
             setAttempts(prev => prev + 1);
             // 連續參賽：進遊戲即算本期參賽。已登入時伺服器已算好最新 streak（見
             // consume_attempt() RPC），未登入才 fallback 本地 recordStreak()。
@@ -235,13 +246,15 @@ export default function DailyChallenge({
               disabled={!canPlay || checkingStart}
               onClick={canPlay ? handleStart : undefined}
             >
-              {!canPlay
-                ? "今日已達上限"
-                : checkingStart
-                  ? "確認中…"
-                  : showAd
-                    ? `看廣告開始 (${num}/5)`
-                    : `開始挑戰 (${num}/5)`}
+              {!user
+                ? "登入才能挑戰"
+                : !canPlay
+                  ? "今日已達上限"
+                  : checkingStart
+                    ? "確認中…"
+                    : showAd
+                      ? `看廣告開始 (${num}/5)`
+                      : `開始挑戰 (${num}/5)`}
             </button>
           );
         })()}

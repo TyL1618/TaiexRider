@@ -26,6 +26,7 @@ import { recordWeeklyRun, claimWeeklyQuest, weekKey } from "./lib/weeklyQuests";
 import { collectStock } from "./lib/collection";
 import { resolveMarketMood, type MarketMood } from "./lib/marketMood";
 import { recordFinish } from "./lib/achievements";
+import { grantPlayReward } from "./lib/playRewards";
 
 export default function App() {
   const [screen, setScreen]         = useState<Screen>("home");
@@ -193,9 +194,12 @@ export default function App() {
       submitClassicRecord(classicId, getPlayerName(), { score: stats.score, timeMs: stats.timeMs });
     }
     // 車庫金幣：完賽/摔車都給小額基本獎勵，任何模式皆算（純個人習慣迴圈，見 RETENTION_PLAN.md）。
+    // 2026-07-07 調降+加日總量上限（避免刷短賽道無限賺幣）：完賽5/摔車2，兩者合計
+    // 單日 50 上限（playRewards.ts，跟看廣告/任務的各自每日上限彼此獨立）。
     // addCoins 做本地樂觀更新（不管有沒有登入都立刻反映在畫面上）；earnCoins 已登入時
-    // 背景呼叫伺服器 RPC 覆寫成真實餘額（含每日上限），未登入時 earnCoins 直接略過。
-    addCoins(stats.finished ? 10 : 3);
+    // 背景呼叫伺服器 RPC 覆寫成真實餘額（伺服器端同一套 50 上限，見 wallet_earn()），
+    // 未登入時 earnCoins 直接略過。
+    addCoins(grantPlayReward(dailyKey(), stats.finished ? 5 : 2));
     earnCoins(stats.finished ? "finish" : "crash");
     // 狂暴盤日（|漲跌|≥2.5%）任務獎勵 ×2：已登入時伺服器 wallet_earn/claim_weekly_quest
     // 各自重算當期漲跌決定是否加倍（不信任前端），這裡的倍率只影響未登入玩家的本地樂觀值。
