@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.12.32";
+export const APP_VERSION = "0.12.33";
 
 export interface ChangelogEntry {
   date: string;
@@ -6,6 +6,17 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    date: "2026-07-08 (v0.12.33)",
+    notes: [
+      "長征模式金幣加碼：完賽固定 30、摔車依跑完全程的比例給（一般模式維持完賽5/摔車2）",
+      "結算畫面看廣告拿金幣改成「雙倍本局金幣」（排行榜/經典模式無金幣可雙倍，不顯示）",
+      "每日/週任務新增多種類型：累計完賽場次、長征/經典模式、上漲/下跌盤完賽",
+      "每日排名賽改鑽石獎勵：參與 +3、名次第1~10名分級 +10~+80，每晚結算前一日戰績",
+      "經典模式紀錄榜改成每週重置，每關前三名週結算可得 30/20/10 鑽石",
+      "咖啡騎士／通勤小白定價調整為 500 金幣",
+    ],
+  },
   {
     date: "2026-07-06 (v0.12.32)",
     notes: [
