@@ -169,6 +169,42 @@ typecheck + build 皆過。**⚠️ 待辦**：① Edge Function 改了程式碼
 ② 前端隨網頁部署自動生效，但真正的購買/對帳只有 TWA 環境能測，需等 vc14（修好購買按鈕）
 上線後真機走一次完整購買流程確認。
 
+### ✅🎉 2026-07-09（收尾）：IAP 金流「按鈕灰→付款→入帳」整條打通，真機實測通過
+
+vc14 上線後真機逐關排查+修復，整條 IAP 從頭到尾跑通（購買正常、`iap_purchases`/
+`player_wallet` 正確入帳、`ads_removed` false→true）。**完整問題鏈（每層都是獨立的坑，
+以後任一環又壞可對照排查）**：
+1. **按鈕灰**：TWA 缺 Play Billing 橋接元件 → 補 `DelegationService.kt`（子類別註冊
+   DigitalGoodsRequestHandler）+ `PaymentActivity`/`PaymentService`（vc12）。
+2. **仍失敗**：`<application>` 缺 `asset_statements` meta-data → 補上（vc13）。
+3. **getDetails 被擋**：`<service .DelegationService>` 帶了 `BIND_JOB_SERVICE` 系統權限，
+   Chrome bind 被擋（logcat 定罪 `Permission Denial ... requires BIND_JOB_SERVICE`）→
+   移除該權限（vc14，**目前線上 native 版本**）。
+4. **點了沒反應**：自家 CSP 的 `connect-src` 沒放 `https://play.google.com`，PaymentRequest
+   建構直接拋 `RangeError ... violates Content Security Policy` → [public/_headers](public/_headers)
+   connect-src 補 `https://play.google.com`（純網頁）。
+5. **又變「暫無法購買」**：查價(`fetchPackPrices`)與對帳(`reconcilePurchases`)在車庫載入時
+   並發各自 await `getDigitalGoodsService()` 互相干擾，加上冷啟動 billing 連線未就緒
+   (`clientAppUnavailable`) → `getService()` 改快取 Promise（並發共用一條連線）+ 查價自動
+   重試 4 次 + 查價/購買失敗原因顯示在畫面紅色橫幅 + 「🔄 重試」按鈕（純網頁）。
+6. **付款成功卻不發鑽石（Edge Function 全 500）**：Logs 抓到
+   `[iap] 未預期例外：DER message is incomplete ... importPrivateKey`——**服務帳號私鑰
+   secret 從一開始（2026-07-06）就設壞了**：多行 PEM 私鑰用 `supabase secrets set --env-file`
+   設定時被 env-file 折行吃掉，只剩開頭一行 → 解析成 0 bytes。因為私鑰只在「真的有人付款」
+   時才會被 `getGoogleAccessToken()` 用到，當初只 curl 測到「未登入」就停、從沒觸發到，
+   所以壞了三天沒被發現。**修法**：從 Google Cloud 重新產生金鑰 JSON（舊金鑰的私鑰檔已遺失、
+   無法重下載），用 `JSON.stringify(private_key)` 保持「單行 + `\n` 轉義 + 外層引號」的格式
+   寫進 env-file 再 `secrets set`（避開折行），私鑰長度 1704 正常。**⚠️ 踩雷筆記見下方**。
+
+**排查工具沉澱（保留，非臨時 debug 碼）**：billing 失敗原因顯示在車庫紅色橫幅
+（`getLastPurchaseError`/`getPriceDiag`）、查價「🔄 重試」按鈕、Edge Function 三處
+`console.error`（grant/例外）——這些是長期該有的可觀測性，不移除。
+
+**待辦（非阻塞）**：① Google Cloud 舊服務帳號金鑰 `aabce7b...`（2026-07-06 建、私鑰已遺失）
+確認新的能用後可刪；② 新下載的金鑰 JSON（`tokyo-dispatch-...707003edc7a0.json`）secret 已設好，
+建議移出 Downloads 或刪除；③ 若在意安全，Google 登入用的 OAuth client_secret 可 rotate
+（曾在對話中顯示過，封測期風險低，選配）。
+
 ### 🌙 2026-07-07 收工總覽（明天公司電腦接手，先看這段再看下面細節）
 
 今天橫跨兩條主線：① Play Console 封測門檻危機 + 付費找測試人員，② 挖出一個潛伏一個多月
@@ -766,6 +802,20 @@ session`（代表要查為什麼登入中的帳號 session 會遺失，可能是
 - **meta-data 的 `android:value` vs `android:resource` 不能混用**：`SPLASH_SCREEN_BACKGROUND_COLOR` 必須 `android:resource="@color/..."`——用 `android:value="#05080f"` 會被函式庫當「資源 ID」查表 → `Resources$NotFoundException` 點開秒崩（vc9 事故）。而 `FADE_OUT_DURATION`（要毫秒 int）、`DEFAULT_URL`/`FILE_PROVIDER_AUTHORITY`（@string 引用會自動解析）用 `android:value` 是對的。**改 TWA meta-data 時查 androidbrowserhelper 文件確認該欄位要 value 還是 resource。**
 - **沉睡地雷效應**：函式庫很多讀取是條件觸發（如背景色只在有 SPLASH_IMAGE_DRAWABLE 時才讀），錯誤寫法可能潛伏多版不發作。**android/ 有任何改動，上傳 AAB 前一律先 signed APK + `adb install -r` 真機開機驗證。**
 - **Play Console 不能回滾版本**：壞版本只能用更高 versionCode 的新版蓋掉，出事成本高，更要上傳前驗證。
+
+### 🔑 IAP/Supabase secret 踩雷：多行私鑰別用 --env-file 直接塞
+- **症狀**：Edge Function 呼叫 Google API 前 `importPrivateKey()` 拋
+  `DOMException DataError: ASN.1 DER message is incomplete ... at DER byte 0`（DER 0 bytes）。
+- **根因**：服務帳號 PEM 私鑰是**多行**的，`supabase secrets set --env-file` 的 dotenv 解析
+  遇到值裡的實體換行會**只吃第一行**（`-----BEGIN PRIVATE KEY-----`），其餘被當成別的
+  entry 丟掉 → secret 只剩開頭 → strip 完 base64 body 是空的。
+- **正解**：私鑰要保持**單一實體行**寫進 env-file，用 `JSON.stringify(json.private_key)`
+  產生「`\n` 轉義 + 外層雙引號」的形式（正好是 JSON 原始字串的樣子），Edge Function 端再
+  `.replace(/\\n/g, "\n")` 還原（就算 dotenv 有把 `\n` 展開成真換行也沒差，`importPrivateKey`
+  會 strip 掉所有 `\s`）。設完長度應 1600~1800 字元、開頭 `-----BEGIN PRIVATE KEY-----`。
+- **延伸雷**：private_key 只在「真的有付款」時才被 `getGoogleAccessToken()` 用到，setup 當下
+  只 curl 測「未登入」不會觸發 → 壞了也不會馬上發現。**設完 secret 後要真的走一次付款**
+  才算驗證過。金鑰 JSON 私鑰 Google 只在建立當下給下載一次，遺失只能重建新金鑰。
 
 ### 🧪 測試踩雷：preview 分頁是隱藏分頁，rAF 被瀏覽器暫停
 - 用 preview 工具驗證時，分頁 `document.hidden=true` → `requestAnimationFrame` 不會 fire → 遊戲主迴圈整個停住（看起來像「車不會動」，其實是迴圈沒跑）。screenshot 也會 timeout。
