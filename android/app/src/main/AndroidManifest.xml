@@ -81,11 +81,15 @@
 
         <!-- 自訂子類別（見 DelegationService.kt），預設實作不會接上 Play Billing
              的 Digital Goods 處理器，一定要換成自己的子類別 + 這個 intent-filter，
-             Chrome 才找得到人處理 getDetails()/listPurchases()。 -->
+             Chrome 才找得到人處理 getDetails()/listPurchases()。
+             ⚠️ 絕對不能加 android:permission="android.permission.BIND_JOB_SERVICE"：
+             那是系統簽章權限，Chrome 沒有 → 會被擋在 bindService() 那一關，
+             getDetails() 直接失敗（vc12/13 卡關真因）。Google 官方 twa-play-billing
+             範例的這個 service 就是「exported=true + 只有 intent-filter，無 permission」，
+             呼叫端身分驗證由 TrustedWebActivityService 內部比對簽章完成，不靠這個權限。 -->
         <service
             android:name=".DelegationService"
-            android:exported="true"
-            android:permission="android.permission.BIND_JOB_SERVICE">
+            android:exported="true">
             <intent-filter>
                 <action android:name="android.support.customtabs.trusted.TRUSTED_WEB_ACTIVITY_SERVICE" />
                 <category android:name="android.intent.category.DEFAULT" />

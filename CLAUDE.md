@@ -120,6 +120,20 @@ versionCode 11→12（1.11→1.12）。已同步複製進 Android Studio 專案
 對應 `<meta-data>`，versionCode 12→13（1.12→1.13）。**這個假設還沒真機驗證**，是否為
 真因待使用者更新 vc13 後回報。
 
+**⚠️ 再追加（vc13 仍失敗，鎖定真因＝DelegationService 帶了 BIND_JOB_SERVICE 權限，vc14）**：
+vc13 上線後真機重測、快取全清、重裝、重開機皆試過，`getDetails()` 一樣失敗。改用「拿
+Google 官方 `twa-play-billing` 範例專案的 manifest 逐行比對」的方式，發現關鍵差異：我們的
+`<service .DelegationService>` 帶了 `android:permission="android.permission.BIND_JOB_SERVICE"`
+（這行是專案最早手寫 manifest 時就在的，vc12 加 intent-filter 時沒注意到要拿掉），官方範例
+的這個 service **完全沒有 permission 屬性**。`BIND_JOB_SERVICE` 是系統簽章權限，Chrome
+沒有 → Chrome 想 `bindService()` 進來執行 Digital Goods 指令時直接被 Android 擋在權限那關 →
+`Unable to execute getDetails.`。這完美解釋為什麼 vc12（加 intent-filter）、vc13（加
+asset_statements）都沒用——Chrome 在 bind 階段就被擋掉，後面加什麼都到不了。修法：移除該
+權限屬性（`exported=true` + 只留 intent-filter，呼叫端身分驗證由 TrustedWebActivityService
+內部比對簽章完成，安全性不受影響，跟官方範例一致），versionCode 13→14。**待真機驗證。**
+（vc12 加的 Delegation.kt/PaymentActivity/PaymentService、vc13 加的 asset_statements 都是
+正確且必要的設定，保留，只是先前被這個權限擋在前面看不出效果。）
+
 **排查過程中順帶確認、皆正常、非本次根因的項目**（下次如果又卡住，這些可以跳過不用重查）：
 授權測試名單（Play Console →設定→授權測試，多份清單全打勾，涵蓋 14 人）、應用程式內
 產品狀態（4 個皆「有效」，ID 與程式碼 `DIAMOND_PACKS`/`REMOVE_ADS_SKU` 完全對應）、
