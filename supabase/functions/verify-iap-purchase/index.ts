@@ -198,7 +198,8 @@ Deno.serve(async (req) => {
         p_purchase_token: purchase_token,
       });
       if (error || !data || data.length === 0) {
-        return new Response(JSON.stringify({ ok: false, error: "grant error" }),
+        console.error("[iap] grant_iap_diamonds 失敗：", JSON.stringify(error), "data=", JSON.stringify(data));
+        return new Response(JSON.stringify({ ok: false, error: `grant error: ${error?.message ?? "no data"}` }),
           { status: 500, headers: CORS_HEADERS });
       }
       // 消耗型：consume 後玩家才能再次購買同一 SKU。已消耗（consumptionState=1）代表
@@ -220,7 +221,8 @@ Deno.serve(async (req) => {
       p_purchase_token: purchase_token,
     });
     if (error || !data || data.length === 0) {
-      return new Response(JSON.stringify({ ok: false, error: "grant error" }),
+      console.error("[iap] grant_remove_ads 失敗：", JSON.stringify(error), "data=", JSON.stringify(data));
+      return new Response(JSON.stringify({ ok: false, error: `grant error: ${error?.message ?? "no data"}` }),
         { status: 500, headers: CORS_HEADERS });
     }
     // 非消耗型用 acknowledge（不能 consume，見函式註解）；失敗不回報成功，留待對帳重試。
@@ -232,6 +234,7 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ ok: true, adsRemoved: data[0].ads_removed }),
       { headers: { ...CORS_HEADERS, "Content-Type": "application/json" } });
   } catch (e) {
+    console.error("[iap] 未預期例外：", e instanceof Error ? `${e.name}: ${e.message}\n${e.stack}` : String(e));
     return new Response(JSON.stringify({ ok: false, error: String(e) }),
       { status: 500, headers: CORS_HEADERS });
   }
