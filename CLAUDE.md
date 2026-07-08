@@ -822,6 +822,41 @@ session`（代表要查為什麼登入中的帳號 session 會遺失，可能是
     - 廣告單元 `revive_reward`（死亡復活用）：`ca-app-pub-8981745966447649/1679422480`
     - 廣告單元 `coin_reward`（看廣告拿金幣用）：`ca-app-pub-8981745966447649/2170377077`
     - 帳戶審核+廣告單元啟用最多需 24 小時，Google 端跑；真正串 SDK 進 `android/` 專案仍照原計畫排在正式上架過審後。
+  - **📋 2026-07-09 技術方案研究（Claude + Grok 交叉驗證，動工前先讀這段）**：
+    - **🔴 關鍵前提**：AdMob rewarded ads 在 TWA 裡**沒有 Google 官方套件**，跟 Play Billing（有官方
+      `androidbrowserhelper:billing`）完全不同等級——GitHub
+      [android-browser-helper#535](https://github.com/GoogleChrome/android-browser-helper/issues/535)
+      （要求官方支援）至今仍 open、無 roadmap。公開的生產案例也很稀少，多數開發者卡在這步、
+      轉去用 Custom Tab/WebView 特定畫面當保底。
+    - **好消息**：問題主要卡在「橫幅廣告」（要跟 TWA 畫面同時共存，真的很難）；我們兩個廣告單元
+      （`revive_reward`/`coin_reward`）都是**獎勵廣告**（全螢幕彈出、看完消失），不需要跟 TWA
+      畫面共存，繞開了最難的那塊。
+    - **❌ 已排除的錯誤方向**：一度以為可以沿用今天已驗證能用的 `DelegationService`/
+      `registerExtraCommandHandler`（Play Billing 那套機制）加一個自訂「show ad」指令，
+      Claude 查證後**排除**——`TrustedWebActivityServiceConnection#sendExtraCommand()` 只能由
+      「瀏覽器/其他原生 App」呼叫，**網頁 JS 完全沒有管道觸發**；Chrome 只轉發它自己內建認識的
+      Web Platform API（Notification API、Digital Goods API），沒有「網頁呼叫任意自訂指令」這種
+      通用管道。這條路是死路，不要浪費時間往這個方向設計。
+    - **✅ 確定的主線方案**：[PostMessage for TWA](https://developer.chrome.com/docs/android/post-message-twa)
+      （Chrome 115+ + androidx.browser 1.6.0-alpha02+，官方文件真的存在，跟 extra-command 不同，
+      這個才是真正給網頁 JS 主動觸發用的）：網頁呼叫看廣告時 `postMessage` 給原生層 → 原生層呼叫
+      標準 `RewardedAd.load()`/`.show()` → 看完再 `postMessage` 回網頁發獎勵。
+    - **⚠️ 動工前必做，已知地雷**：`assetlinks.json` 要**額外**加一條
+      `"relation": ["delegate_permission/common.use_as_origin"]`（跟現有的
+      `delegate_permission/common.handle_all_urls` 不同、要並存，不是取代），manifest 要加
+      `<service android:name="androidx.browser.customtabs.PostMessageService" android:exported="true"/>`。
+      兩者少一個都會讓 postMessage channel 建立失敗、`onRelationshipValidationResult` 回 false。
+    - **保底方案**：如果 PostMessage 也卡關，退回「復活/看廣告拿獎勵這幾個特定畫面切換成
+      Custom Tab 或 native WebView 包裝」，policy 上可接受，多數 hybrid app 這樣做。
+    - **✅ 可以現在就用測試 ID 開發**：Google 官方測試廣告單元 ID（如
+      `ca-app-pub-3940256099942544/5224354917`）不受 AdMob 帳戶連結狀態影響，可以在正式上架前
+      把整條原生橋接+標準 AdMob 呼叫都做完測穩，上架前只需换成真的廣告單元 ID（幾乎零風險的
+      收尾動作），不用整個等到上架後才開始動工。
+    - **AdMob SDK（`com.google.android.gms:play-services-ads`）與 `androidbrowserhelper` 共存**：
+      無已知重大 Gradle 依賴衝突，兩者都是 Google 函式庫。
+    - **待辦**：真的要動工時，先照上面「主線方案」的三個manifest改動做，再寫原生 postMessage
+      handler + 標準 RewardedAd 呼叫，網頁端加 postMessage 監聽——比 Play Billing 工程量更大
+      （沒有官方 manifest 範本可以照抄比對），但沒有金流正確性的壓力，可以慢慢測。
   - **宣傳時機**：正式上架即可宣傳，不用等廣告上線；廣告作為之後的更新，本身也是二次宣傳機會
 - ~~ETF 含字母代號納入每日地圖~~：✅ **已完成（2026-07-06）**。實際拉 TWSE 資料驗證後範圍
   比預期大很多——1368 支上市證券裡有 278 支（~20%）不是純 4 位數字（ETF 4/5/6 位數、
