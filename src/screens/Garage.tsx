@@ -47,6 +47,9 @@ export default function Garage({ user, onBack }: { user: User | null; onBack: ()
     setPriceDiag(m.size === 0 ? getPriceDiag() : "");
     setPriceLoading(false);
     const r = await reconcilePurchases();
+    // 對帳若有孤兒交易補發失敗，把 Edge Function 的具體原因顯示出來（免再買一筆就能看到）。
+    const err = getLastPurchaseError();
+    if (err) setBuyError(err);
     if (!r) return;
     if (typeof r.diamonds === "number") { writeDiamondsCache(r.diamonds); setDiamonds(r.diamonds); }
     if (r.adsRemoved) { markAdsRemoved(); setAdsRemoved(true); }

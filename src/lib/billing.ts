@@ -141,15 +141,34 @@ export async function fetchPackPrices(skus: string[]): Promise<Map<string, strin
 // 把一筆 purchase_token 送 Edge Function 驗證+發放。Edge Function 是冪等的：同一筆
 // 重複送不會重複發鑽石（DB 端 purchase_token 防重放），但每次都會重試 consume/acknowledge，
 // 所以「付款成功卻中途失敗」的孤兒交易可以靠重送補救。
-// 回傳 Edge Function 的完整回應（null 代表 session 遺失／驗證失敗／發放未完成，可重試）。
+// 回傳 Edge Function 的完整回應（null 代表 session 遺失／驗證失敗／發放未完成，可重試）；
+// 失敗時把 Edge Function 真正的錯誤字串寫進 _lastPurchaseError 供 UI 顯示。
 async function submitPurchaseToken(sku: string, purchaseToken: string): Promise<Record<string, unknown> | null> {
   const { data: { session } } = await supabase.auth.getSession();
-  if (!session) return null;
+  if (!session) { _lastPurchaseError = "發放失敗：尚未登入（session 遺失）"; return null; }
 
   const { data, error } = await supabase.functions.invoke("verify-iap-purchase", {
     body: { sku_id: sku, purchase_token: purchaseToken },
   });
-  if (error || !data?.ok) return null;
+
+  if (error) {
+    // Edge Function 回非 2xx 時，真正的 {ok:false,error:"..."} 在 error.context（Response）裡，
+    // 不在 data。把它讀出來才知道是哪一關失敗（purchase not valid／grant error／consume pending…）。
+    let detail = (error as { message?: string })?.message ?? String(error);
+    try {
+      const ctx = (error as { context?: { json?: () => Promise<{ error?: string }> } }).context;
+      if (ctx?.json) {
+        const body = await ctx.json();
+        if (body?.error) detail = body.error;
+      }
+    } catch { /* 讀不到就用 message */ }
+    _lastPurchaseError = `發放失敗：${detail}`;
+    return null;
+  }
+  if (!data?.ok) {
+    _lastPurchaseError = `發放失敗：${(data as { error?: string })?.error ?? "未知"}`;
+    return null;
+  }
   return data as Record<string, unknown>;
 }
 
@@ -188,9 +207,11 @@ async function runPurchaseFlow(sku: string, label: string): Promise<Record<strin
     return null;
   }
 
-  // 走到這裡代表 Google 已扣款，之後任何失敗都靠 reconcilePurchases 對帳補救
+  // 走到這裡代表 Google 已扣款，之後任何失敗都靠 reconcilePurchases 對帳補救。
+  // submitPurchaseToken 失敗時已把 Edge Function 的具體錯誤寫進 _lastPurchaseError，
+  // 這裡不要覆蓋掉那個更有用的訊息（只有它沒寫時才補上籠統版）。
   const data = await submitPurchaseToken(sku, purchaseToken);
-  if (!data) _lastPurchaseError = "付款完成但發放暫時失敗，重新進車庫會自動補發";
+  if (!data && !_lastPurchaseError) _lastPurchaseError = "付款完成但發放暫時失敗，重新進車庫會自動補發";
   return data;
 }
 
@@ -211,6 +232,7 @@ function markReconciled(token: string): void {
 
 // 回傳補發後的最新 {diamonds?, adsRemoved?}（有處理到東西才回，否則 null），呼叫端用來更新 UI。
 export async function reconcilePurchases(): Promise<{ diamonds?: number; adsRemoved?: boolean } | null> {
+  _lastPurchaseError = ""; // 清空，若下面有孤兒交易補發失敗，會留下最後一筆的原因供 UI 顯示
   const service = await getService();
   if (!service || typeof service.listPurchases !== "function") return null;
 
