@@ -5,7 +5,7 @@ import { AD_COIN_REWARD, MAX_AD_COIN_CLAIMS_PER_DAY, getAdCoinClaims, incrementA
 import { getAchievementBikes, type AchvBikeView } from "../lib/achievements";
 import { getStreak } from "../lib/streak";
 import { resolveSessionDate } from "../lib/dailyMap";
-import { isBillingAvailable, fetchPackPrices, purchaseDiamondPack, purchaseRemoveAds, DIAMOND_PACKS, REMOVE_ADS_SKU } from "../lib/billing";
+import { isBillingAvailable, fetchPackPrices, purchaseDiamondPack, purchaseRemoveAds, reconcilePurchases, DIAMOND_PACKS, REMOVE_ADS_SKU } from "../lib/billing";
 import { dailyKey } from "../data/pick";
 import CoinIcon from "../components/CoinIcon";
 import type { User } from "../lib/auth";
@@ -37,6 +37,13 @@ export default function Garage({ user, onBack }: { user: User | null; onBack: ()
     let alive = true;
     fetchPackPrices([...DIAMOND_PACKS.map((p) => p.sku), REMOVE_ADS_SKU]).then((m) => {
       if (alive) setPackPrices(m);
+    });
+    // 對帳：撈出「已扣款但可能沒發成功」的孤兒交易補發（付款當下 session 遺失/網路斷/
+    // function 逾時都靠這裡救回，不必等 Google 3 天後退款）。補發到的餘額直接更新 UI。
+    reconcilePurchases().then((r) => {
+      if (!alive || !r) return;
+      if (typeof r.diamonds === "number") { writeDiamondsCache(r.diamonds); setDiamonds(r.diamonds); }
+      if (r.adsRemoved) { markAdsRemoved(); setAdsRemoved(true); }
     });
     return () => { alive = false; };
   }, [billingAvailable]);

@@ -35,8 +35,16 @@ export const DIAMOND_PACKS: DiamondPack[] = [
 // DailyChallenge.tsx 讀 garage.ts getAdsRemoved() 的判斷點）。
 export const REMOVE_ADS_SKU = "remove_ads_forever";
 
+interface PurchaseDetails {
+  itemId: string;
+  purchaseToken: string;
+}
+
 interface DigitalGoodsService {
   getDetails(itemIds: string[]): Promise<{ itemId: string; price: { currency: string; value: string } }[]>;
+  // 目前「已擁有／尚未消耗」的購買清單。用來對帳：付款成功但發鑽石中途失敗時，
+  // 下次能撈出這筆孤兒交易重新補發（見 reconcilePurchases）。
+  listPurchases(): Promise<PurchaseDetails[]>;
 }
 
 interface WindowWithDigitalGoods extends Window {
@@ -97,7 +105,22 @@ export async function fetchPackPrices(skus: string[]): Promise<Map<string, strin
   return out;
 }
 
-// 共用購買流程：觸發 PaymentRequest 付款 → 拿 purchase_token → 呼叫 Edge Function 驗證。
+// 把一筆 purchase_token 送 Edge Function 驗證+發放。Edge Function 是冪等的：同一筆
+// 重複送不會重複發鑽石（DB 端 purchase_token 防重放），但每次都會重試 consume/acknowledge，
+// 所以「付款成功卻中途失敗」的孤兒交易可以靠重送補救。
+// 回傳 Edge Function 的完整回應（null 代表 session 遺失／驗證失敗／發放未完成，可重試）。
+async function submitPurchaseToken(sku: string, purchaseToken: string): Promise<Record<string, unknown> | null> {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) return null;
+
+  const { data, error } = await supabase.functions.invoke("verify-iap-purchase", {
+    body: { sku_id: sku, purchase_token: purchaseToken },
+  });
+  if (error || !data?.ok) return null;
+  return data as Record<string, unknown>;
+}
+
+// 共用購買流程：觸發 PaymentRequest 付款 → 拿 purchase_token → 送 Edge Function 驗證+發放。
 // 回傳 Edge Function 的完整回應（null 代表使用者取消/失敗），呼叫端各自取需要的欄位。
 async function runPurchaseFlow(sku: string, label: string): Promise<Record<string, unknown> | null> {
   const w = window as WindowWithDigitalGoods;
@@ -111,18 +134,54 @@ async function runPurchaseFlow(sku: string, label: string): Promise<Record<strin
     const response = await request.show();
     const purchaseToken = response.details.purchaseToken;
     await response.complete("success");
-
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) return null;
-
-    const { data, error } = await supabase.functions.invoke("verify-iap-purchase", {
-      body: { sku_id: sku, purchase_token: purchaseToken },
-    });
-    if (error || !data?.ok) return null;
-    return data as Record<string, unknown>;
+    return await submitPurchaseToken(sku, purchaseToken);
   } catch {
     return null;
   }
+}
+
+// 對帳：撈出「已購買但可能沒發成功」的交易逐筆重送 Edge Function。這是金流的安全網——
+// 只要 Google 已扣款，這筆就會出現在 listPurchases()，即使當初付款後發鑽石中途失敗
+// （session 遺失/網路斷/function 逾時），下次進車庫就會自動補發，不必等 Google 3 天後退款。
+// 已成功對帳過的 token 記在本地，避免對「永久有效」的去廣告商品每次進車庫都重打一次。
+const RECONCILED_KEY = "tr_iap_reconciled";
+function getReconciledTokens(): Set<string> {
+  try { return new Set(JSON.parse(localStorage.getItem(RECONCILED_KEY) ?? "[]") as string[]); }
+  catch { return new Set(); }
+}
+function markReconciled(token: string): void {
+  const s = getReconciledTokens();
+  s.add(token);
+  try { localStorage.setItem(RECONCILED_KEY, JSON.stringify([...s])); } catch { /* 容量滿等，忽略 */ }
+}
+
+// 回傳補發後的最新 {diamonds?, adsRemoved?}（有處理到東西才回，否則 null），呼叫端用來更新 UI。
+export async function reconcilePurchases(): Promise<{ diamonds?: number; adsRemoved?: boolean } | null> {
+  const service = await getService();
+  if (!service || typeof service.listPurchases !== "function") return null;
+
+  let purchases: PurchaseDetails[];
+  try {
+    purchases = await service.listPurchases();
+  } catch (e) {
+    console.warn("[billing] listPurchases() 失敗（無法對帳）：", e);
+    return null;
+  }
+
+  const done = getReconciledTokens();
+  const result: { diamonds?: number; adsRemoved?: boolean } = {};
+  let changed = false;
+
+  for (const p of purchases) {
+    if (done.has(p.purchaseToken)) continue; // 已成功對帳過，跳過
+    const data = await submitPurchaseToken(p.itemId, p.purchaseToken);
+    if (!data) continue; // 這次補發沒成功（例如 consume 又失敗）→ 不記錄，下次再試
+    markReconciled(p.purchaseToken);
+    if (typeof data.diamonds === "number") { result.diamonds = data.diamonds; changed = true; }
+    if (typeof data.adsRemoved === "boolean") { result.adsRemoved = data.adsRemoved; changed = true; }
+  }
+
+  return changed ? result : null;
 }
 
 // 購買一包鑽石。回傳最新鑽石餘額；null 代表使用者取消/失敗（不用特別跳錯誤，

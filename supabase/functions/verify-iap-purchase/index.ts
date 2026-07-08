@@ -107,16 +107,42 @@ async function verifyPurchase(productId: string, token: string, accessToken: str
   return await r.json() as GooglePurchase;
 }
 
-async function consumePurchase(productId: string, token: string, accessToken: string): Promise<void> {
+// 消耗（鑽石）。回傳是否成功。⚠️ 不能靜默吞掉失敗：Google 規定 3 天內沒 consume/acknowledge
+// 會自動退款，若這裡失敗卻回報成功，會變成「鑽石已發 + 玩家又被退款」＝真錢損失。因此失敗
+// 時要讓上層知道、不回報整筆成功，交由下次對帳（reconcilePurchases）重試。
+// Google 端 consume 對「已消耗」的 token 會回 4xx，視為已完成（冪等，重試安全）。
+async function consumePurchase(productId: string, token: string, accessToken: string): Promise<boolean> {
   const url = `https://androidpublisher.googleapis.com/androidpublisher/v3/applications/${PACKAGE_NAME}/purchases/products/${productId}/tokens/${token}:consume`;
-  await fetch(url, { method: "POST", headers: { Authorization: `Bearer ${accessToken}` } }).catch(() => {});
+  try {
+    const r = await fetch(url, { method: "POST", headers: { Authorization: `Bearer ${accessToken}` } });
+    if (r.ok) return true;
+    // 已消耗過會回 400（alreadyConsumed）→ 視為成功；其餘（5xx/網路）才算失敗要重試
+    const body = await r.text();
+    if (r.status === 400 && body.includes("alreadyConsumed")) return true;
+    console.warn(`[iap] consume 失敗 status=${r.status} body=${body}`);
+    return false;
+  } catch (e) {
+    console.warn("[iap] consume 例外：", e);
+    return false;
+  }
 }
 
 // 非消耗型商品（去廣告）用 acknowledge，不能用 consume——consume 會讓這個「買一次終身有效」
-// 的商品變成可以重複購買，跟消耗型商品的語意搞混。
-async function acknowledgePurchase(productId: string, token: string, accessToken: string): Promise<void> {
+// 的商品變成可以重複購買，跟消耗型商品的語意搞混。回傳是否成功，理由同上。
+// 對「已確認」的 token，Google 回 400（alreadyAcknowledged）→ 視為成功（冪等）。
+async function acknowledgePurchase(productId: string, token: string, accessToken: string): Promise<boolean> {
   const url = `https://androidpublisher.googleapis.com/androidpublisher/v3/applications/${PACKAGE_NAME}/purchases/products/${productId}/tokens/${token}:acknowledge`;
-  await fetch(url, { method: "POST", headers: { Authorization: `Bearer ${accessToken}` } }).catch(() => {});
+  try {
+    const r = await fetch(url, { method: "POST", headers: { Authorization: `Bearer ${accessToken}` } });
+    if (r.ok) return true;
+    const body = await r.text();
+    if (r.status === 400 && body.includes("alreadyAcknowledged")) return true;
+    console.warn(`[iap] acknowledge 失敗 status=${r.status} body=${body}`);
+    return false;
+  } catch (e) {
+    console.warn("[iap] acknowledge 例外：", e);
+    return false;
+  }
 }
 
 Deno.serve(async (req) => {
@@ -159,21 +185,30 @@ Deno.serve(async (req) => {
 
     const adminClient = createClient(supabaseUrl, serviceKey);
 
+    // grant RPC 的 ok 語意：true=這次剛發、false=之前就發過（purchase_token 防重放）。
+    // 這裡 sku_id/player_id 都已先驗證過，所以 ok=false 只可能是「已發過」，不是錯誤——
+    // 兩種都算「發放已完成」，要繼續往下做 consume/acknowledge（冪等，可重試）。
+    // 只有 error（DB 真的出錯）或完全沒回資料才算失敗。這是對帳能自我修復的關鍵：
+    // 「上次發了但沒 consume」重送時會走到這裡，重新補做 consume。
+
     if (DIAMOND_SKUS.has(sku_id)) {
-      // 消耗型：驗證通過才用 service role 呼叫資料庫發鑽石
-      // （RPC 內有 SKU 白名單 + purchase_token 防重放，這裡不需要再檢查一次）
       const { data, error } = await adminClient.rpc("grant_iap_diamonds", {
         p_player_id: user.id,
         p_sku_id: sku_id,
         p_purchase_token: purchase_token,
       });
-      if (error || !data || !data[0]?.ok) {
-        return new Response(JSON.stringify({ ok: false, error: "grant failed" }),
-          { status: 400, headers: CORS_HEADERS });
+      if (error || !data || data.length === 0) {
+        return new Response(JSON.stringify({ ok: false, error: "grant error" }),
+          { status: 500, headers: CORS_HEADERS });
       }
-      // 消耗型商品，消費後玩家才能再次購買同一個 SKU
-      if (purchase.consumptionState === 0) {
-        await consumePurchase(sku_id, purchase_token, accessToken);
+      // 消耗型：consume 後玩家才能再次購買同一 SKU。已消耗（consumptionState=1）代表
+      // 整筆之前就完成過，直接視為成功；否則實際打 consume，失敗就不回報成功、留待對帳重試。
+      if (purchase.consumptionState !== 1) {
+        const consumed = await consumePurchase(sku_id, purchase_token, accessToken);
+        if (!consumed) {
+          return new Response(JSON.stringify({ ok: false, error: "consume pending" }),
+            { status: 502, headers: CORS_HEADERS });
+        }
       }
       return new Response(JSON.stringify({ ok: true, diamonds: data[0].diamonds }),
         { headers: { ...CORS_HEADERS, "Content-Type": "application/json" } });
@@ -184,12 +219,16 @@ Deno.serve(async (req) => {
       p_player_id: user.id,
       p_purchase_token: purchase_token,
     });
-    if (error || !data || !data[0]?.ok) {
-      return new Response(JSON.stringify({ ok: false, error: "grant failed" }),
-        { status: 400, headers: CORS_HEADERS });
+    if (error || !data || data.length === 0) {
+      return new Response(JSON.stringify({ ok: false, error: "grant error" }),
+        { status: 500, headers: CORS_HEADERS });
     }
-    // 非消耗型商品用 acknowledge，不能用 consume（見上方函式註解）
-    await acknowledgePurchase(sku_id, purchase_token, accessToken);
+    // 非消耗型用 acknowledge（不能 consume，見函式註解）；失敗不回報成功，留待對帳重試。
+    const acked = await acknowledgePurchase(sku_id, purchase_token, accessToken);
+    if (!acked) {
+      return new Response(JSON.stringify({ ok: false, error: "acknowledge pending" }),
+        { status: 502, headers: CORS_HEADERS });
+    }
     return new Response(JSON.stringify({ ok: true, adsRemoved: data[0].ads_removed }),
       { headers: { ...CORS_HEADERS, "Content-Type": "application/json" } });
   } catch (e) {
