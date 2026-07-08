@@ -109,6 +109,15 @@ function resetService(): void {
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
+// Google 回傳的 price.value 是固定 6 位小數字串（如 "31.000000"），直接顯示會很醜。
+// 整數金額（TWD 常見情況）去掉小數點；非整數保留最多 2 位。
+function formatPrice(currency: string, value: string): string {
+  const n = parseFloat(value);
+  if (Number.isNaN(n)) return `${currency} ${value}`;
+  const amount = Number.isInteger(n) ? String(n) : n.toFixed(2);
+  return `${currency} ${amount}`;
+}
+
 export async function fetchPackPrices(skus: string[]): Promise<Map<string, string>> {
   _priceDiag = "";
   const out = new Map<string, string>();
@@ -120,7 +129,7 @@ export async function fetchPackPrices(skus: string[]): Promise<Map<string, strin
       try {
         const details = await service.getDetails(skus);
         console.info(`[billing] getDetails 第 ${attempt} 次回傳 ${details.length} 筆：`, details);
-        for (const d of details) out.set(d.itemId, `${d.price.currency} ${d.price.value}`);
+        for (const d of details) out.set(d.itemId, formatPrice(d.price.currency, d.price.value));
         if (out.size > 0) { _priceDiag = ""; return out; } // 有拿到就成功收工
         // 沒 throw 但一筆都沒有 = SKU 真的查不到（非時序問題），不重試，直接報原因
         _priceDiag = `查無定價：${skus.join(", ")}（商品未生效／id 錯／帳號非授權測試名單）`;
