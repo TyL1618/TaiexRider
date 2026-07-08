@@ -187,6 +187,15 @@ async function runPurchaseFlow(sku: string, label: string): Promise<Record<strin
     return null;
   }
 
+  // 🔴 未登入就別叫出付款視窗——訪客錢包只存本地、後端沒有帳號可入帳，若讓 Google 真的
+  // 扣款會變成「扣了錢卻無處發鑽石」（只能等 3 天退款）。必須在 PaymentRequest 之前擋掉，
+  // 這是最關鍵的一層（UI 隱藏按鈕是第二層）。
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) {
+    _lastPurchaseError = "請先登入 Google 帳號才能購買（訪客的購買無法保存）";
+    return null;
+  }
+
   let purchaseToken: string;
   try {
     const request = new w.PaymentRequest(

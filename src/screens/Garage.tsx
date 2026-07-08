@@ -39,7 +39,7 @@ export default function Garage({ user, onBack }: { user: User | null; onBack: ()
   // clientAppUnavailable 這類 Chrome↔App billing 連線間歇失敗時，手動重試往往比反覆
   // 重開 App 更有效（重開反而把 Chrome 連線池弄得更不穩）。
   const loadPrices = async () => {
-    if (!billingAvailable) return;
+    if (!billingAvailable || !user) return; // 訪客不查價/不對帳（沒帳號可入帳）
     setPriceLoading(true);
     setBuyError("");
     const m = await fetchPackPrices([...DIAMOND_PACKS.map((p) => p.sku), REMOVE_ADS_SKU]);
@@ -56,10 +56,10 @@ export default function Garage({ user, onBack }: { user: User | null; onBack: ()
   };
 
   useEffect(() => {
-    if (!billingAvailable) return;
+    if (!billingAvailable || !user) return;
     void loadPrices();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [billingAvailable]);
+  }, [billingAvailable, user?.id]);
 
   const handleBuyDiamonds = async (sku: string) => {
     if (purchasingSku) return;
@@ -249,7 +249,23 @@ export default function Garage({ user, onBack }: { user: User | null; onBack: ()
         {BIKE_SKINS.filter((s) => s.currency === "diamond").map(renderSkinCard)}
       </div>
 
-      {billingAvailable && (
+      {/* 未登入玩家：TWA 支援購買但沒有帳號可入帳，一律不顯示購買按鈕（billing.ts 也在
+          付款前再擋一層），改顯示登入提示，避免訪客扣了錢卻無處發放。 */}
+      {billingAvailable && !user && (
+        <>
+          <h2 className="garage-section-title">💰 購買鑽石</h2>
+          <div style={{
+            margin: "0 0 12px", padding: "12px 14px", borderRadius: 10,
+            background: "rgba(120,170,255,0.1)", border: "1px solid rgba(120,170,255,0.4)",
+            color: "#bcd4ff", fontSize: 13, lineHeight: 1.6,
+          }}>
+            🔒 請先登入 Google 帳號才能購買鑽石與永久去廣告——訪客的購買記錄只存在本機、
+            換裝置就消失，無法保存，因此暫不開放。
+          </div>
+        </>
+      )}
+
+      {billingAvailable && user && (
         <>
           <h2 className="garage-section-title">💰 購買鑽石</h2>
           {(buyError || priceDiag) && (
