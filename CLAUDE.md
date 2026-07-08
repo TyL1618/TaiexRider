@@ -827,7 +827,7 @@ session`（代表要查為什麼登入中的帳號 session 會遺失，可能是
       `androidbrowserhelper:billing`）完全不同等級——GitHub
       [android-browser-helper#535](https://github.com/GoogleChrome/android-browser-helper/issues/535)
       （要求官方支援）至今仍 open、無 roadmap。公開的生產案例也很稀少，多數開發者卡在這步、
-      轉去用 Custom Tab/WebView 特定畫面當保底。
+      轉去用 WebView 包特定畫面當保底。
     - **好消息**：問題主要卡在「橫幅廣告」（要跟 TWA 畫面同時共存，真的很難）；我們兩個廣告單元
       （`revive_reward`/`coin_reward`）都是**獎勵廣告**（全螢幕彈出、看完消失），不需要跟 TWA
       畫面共存，繞開了最難的那塊。
@@ -846,14 +846,46 @@ session`（代表要查為什麼登入中的帳號 session 會遺失，可能是
       `delegate_permission/common.handle_all_urls` 不同、要並存，不是取代），manifest 要加
       `<service android:name="androidx.browser.customtabs.PostMessageService" android:exported="true"/>`。
       兩者少一個都會讓 postMessage channel 建立失敗、`onRelationshipValidationResult` 回 false。
-    - **保底方案**：如果 PostMessage 也卡關，退回「復活/看廣告拿獎勵這幾個特定畫面切換成
-      Custom Tab 或 native WebView 包裝」，policy 上可接受，多數 hybrid app 這樣做。
+    - **保底方案（已修正，2026-07-09 晚再確認）**：如果 PostMessage 也卡關，退回「復活/看廣告
+      拿獎勵這幾個特定畫面，改用**原生 Activity + 內嵌 `android.webkit.WebView`** 包裝」，因為
+      前景是自己的原生 Activity 才能直接呼叫 `RewardedAd.show()`。**⚠️ 原本這裡誤寫成
+      「Custom Tab 或 WebView」，已修正拿掉 Custom Tab**：Custom Tab 骨子裡還是 Chrome 在渲染，
+      跟 TWA 一樣叫不出原生廣告，不算真正的保底方案，只有 WebView 那條才有效。
     - **✅ 可以現在就用測試 ID 開發**：Google 官方測試廣告單元 ID（如
       `ca-app-pub-3940256099942544/5224354917`）不受 AdMob 帳戶連結狀態影響，可以在正式上架前
       把整條原生橋接+標準 AdMob 呼叫都做完測穩，上架前只需换成真的廣告單元 ID（幾乎零風險的
       收尾動作），不用整個等到上架後才開始動工。
     - **AdMob SDK（`com.google.android.gms:play-services-ads`）與 `androidbrowserhelper` 共存**：
       無已知重大 Gradle 依賴衝突，兩者都是 Google 函式庫。
+
+  - **🔀 最終保底：TWA 若連續失敗改 Capacitor（2026-07-09 深度討論定案）**：
+    - **升級順序**（不要一次跳到重寫整個 App）：① PostMessage 主線方案 → ② 特定畫面
+      WebView 包裝的保底方案（上面那條，仍在 TWA 架構內）→ ③ **只有前兩步都走不通，才考慮
+      整個專案換 Capacitor**。
+    - **✅ 關鍵確認：換 Capacitor 不會讓封測歸零**。Google Play 判斷「同一個 App」只看
+      `applicationId`（維持 `com.tylapp.taiexrider`）+ 簽署金鑰（沿用 `taiexrider-release.jks`），
+      跟內部用什麼技術做完全無關——只要這兩者不變，新 AAB 就只是「同一個 App 的新版本」，
+      測試軌道/測試人員名單/12 人門檻/14 天倒數**全部不受影響**，測試人員也會像平常更新一樣
+      自動收到新版，不用重新 opt-in。**唯一會讓封測歸零的是改 `applicationId`**，不要改這個。
+    - **為什麼 Capacitor 是最合理的「最終保底」選項**（勝過 React Native / 全原生 Kotlin 重寫）：
+      現有 React/Vite/TypeScript/Canvas2D/Matter.js/Supabase 整包**幾乎 100% 可以留用**，只換
+      掉「打包成 App 的殼」；Capacitor 有成熟社群外掛（IAP、`react-native-google-mobile-ads`
+      同等級的 AdMob 外掛）用**正規的 JS↔原生橋接**（外掛作者能自由開放任何原生功能給 JS，
+      不像 TWA 只能用 Chrome 內建認識的少數幾種 Web API），不會重演今天這類「網頁沒辦法觸發
+      自訂指令」的死路。React Native 要重寫 Canvas 渲染層（換成 react-native-skia），全原生
+      重寫等於重做一款遊戲，代價都遠大於 Capacitor。
+    - **順帶發現、值得記住的 Capacitor 附加好處**：目前每次進遊戲畫面，[wakeLock.ts](src/lib/wakeLock.ts)
+      呼叫網頁標準 `navigator.wakeLock.request("screen")` 防止螢幕鎖屏，但 Wake Lock API
+      規格**強制要求瀏覽器提示使用者**「目前有網頁在保持螢幕喚醒」——TWA 架構下真正持有這個
+      喚醒鎖的行程是 Chrome，所以會跳出「Chrome 在背景執行」的系統通知，這是 Chrome 對 Wake
+      Lock API 的規格強制行為，**不屬於 TWA delegation 機制能委派成 App 自己身分的範圍，目前
+      查無設定可以關掉**。Capacitor 通常改用原生 `FLAG_KEEP_SCREEN_ON` 旗標（例如
+      `@capacitor-community/keep-awake` 套件）達到同樣效果，原生旗標沒有這條規格要求，不會
+      跳這個通知，順便解決這個困擾。
+    - **查無紀錄的一件事**：使用者記得曾經討論過 Capacitor，但翻遍整個 git 歷史 + 所有 .md +
+      本機 memory 完全找不到任何紀錄，可能是在別的工具/session 討論過沒寫進來。推測：
+      2026-06-18 建立 TWA 時專案還沒有 IAP/AdMob 需求（那些是 7 月才加的），當時 TWA 應該是
+      「PWA 已做好、想最快上架」的合理預設選擇，不是「比較過 Capacitor 後選輸」。
     - **待辦**：真的要動工時，先照上面「主線方案」的三個manifest改動做，再寫原生 postMessage
       handler + 標準 RewardedAd 呼叫，網頁端加 postMessage 監聽——比 Play Billing 工程量更大
       （沒有官方 manifest 範本可以照抄比對），但沒有金流正確性的壓力，可以慢慢測。
