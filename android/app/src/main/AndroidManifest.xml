@@ -73,10 +73,41 @@
             android:name="com.google.androidbrowserhelper.trusted.ManageDataLauncherActivity"
             android:exported="false" />
 
+        <!-- 自訂子類別（見 DelegationService.kt），預設實作不會接上 Play Billing
+             的 Digital Goods 處理器，一定要換成自己的子類別 + 這個 intent-filter，
+             Chrome 才找得到人處理 getDetails()/listPurchases()。 -->
         <service
-            android:name="com.google.androidbrowserhelper.trusted.DelegationService"
+            android:name=".DelegationService"
             android:exported="true"
-            android:permission="android.permission.BIND_JOB_SERVICE" />
+            android:permission="android.permission.BIND_JOB_SERVICE">
+            <intent-filter>
+                <action android:name="android.support.customtabs.trusted.TRUSTED_WEB_ACTIVITY_SERVICE" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </service>
+
+        <!-- Play Billing 付款橋接元件（androidbrowserhelper:billing），
+             Chrome 透過這兩個元件跟 Play Billing 溝通付款流程。 -->
+        <activity
+            android:name="com.google.androidbrowserhelper.playbilling.provider.PaymentActivity"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:configChanges="keyboardHidden|keyboard|orientation|screenLayout|screenSize"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="org.chromium.intent.action.PAY" />
+            </intent-filter>
+            <meta-data
+                android:name="org.chromium.default_payment_method_name"
+                android:value="https://play.google.com/billing" />
+        </activity>
+
+        <service
+            android:name="com.google.androidbrowserhelper.playbilling.provider.PaymentService"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="org.chromium.intent.action.IS_READY_TO_PAY" />
+            </intent-filter>
+        </service>
 
         <!-- androidbrowserhelper splash 圖傳遞用 FileProvider -->
         <provider
