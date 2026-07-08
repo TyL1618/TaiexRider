@@ -99,26 +99,41 @@ function getService(): Promise<DigitalGoodsService | null> {
 // 常見原因：商品剛建立還在生效中（可達數小時）／SKU id 打錯字／帳號未加入 Play Console
 // 「授權測試」名單（app 尚未正式上線到 Production 前，Billing API 通常只對授權測試名單內的
 // 帳號開放，即使該帳號能透過封測連結正常安裝遊玩）。
+// 重設服務快取，讓下次 getService() 重新向 Chrome 要一條連線。
+// clientAppUnavailable 時用——App 內的 Play billing 連線是非同步建立的，冷啟動查太快會
+// 拿到「連線還沒好」的錯，重新取連線+重試通常就成功。
+function resetService(): void {
+  _service = null;
+  _servicePromise = null;
+}
+
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
 export async function fetchPackPrices(skus: string[]): Promise<Map<string, string>> {
   _priceDiag = "";
   const out = new Map<string, string>();
-  const service = await getService();
-  if (!service) {
-    if (!_priceDiag) _priceDiag = "付款服務尚未就緒";
-    return out;
-  }
-  try {
-    const details = await service.getDetails(skus);
-    console.info(`[billing] getDetails(${JSON.stringify(skus)}) 回傳 ${details.length} 筆：`, details);
-    for (const d of details) out.set(d.itemId, `${d.price.currency} ${d.price.value}`);
-    const missing = skus.filter((s) => !out.has(s));
-    if (missing.length > 0) {
-      _priceDiag = `查無定價：${missing.join(", ")}（商品未生效／id 錯／帳號非授權測試名單）`;
-      console.warn(`[billing] 以下 SKU 查無定價（Play Console 商品未生效／id 打錯／帳號非授權測試名單）：${missing.join(", ")}`);
+  // 冷啟動 billing 連線未就緒（clientAppUnavailable）會查價失敗，自動重試幾次、間隔漸長。
+  const maxAttempts = 4;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const service = await getService();
+    if (service) {
+      try {
+        const details = await service.getDetails(skus);
+        console.info(`[billing] getDetails 第 ${attempt} 次回傳 ${details.length} 筆：`, details);
+        for (const d of details) out.set(d.itemId, `${d.price.currency} ${d.price.value}`);
+        if (out.size > 0) { _priceDiag = ""; return out; } // 有拿到就成功收工
+        // 沒 throw 但一筆都沒有 = SKU 真的查不到（非時序問題），不重試，直接報原因
+        _priceDiag = `查無定價：${skus.join(", ")}（商品未生效／id 錯／帳號非授權測試名單）`;
+        return out;
+      } catch (e) {
+        _priceDiag = `查價失敗：${(e as { name?: string })?.name ?? "Error"}: ${(e as { message?: string })?.message ?? String(e)}`;
+        console.warn(`[billing] getDetails 第 ${attempt} 次拋例外：`, e);
+        resetService(); // 連線可能壞了，下次重新取
+      }
+    } else if (!_priceDiag) {
+      _priceDiag = "付款服務尚未就緒";
     }
-  } catch (e) {
-    _priceDiag = `查價失敗：${(e as { name?: string })?.name ?? "Error"}: ${(e as { message?: string })?.message ?? String(e)}`;
-    console.warn("[billing] service.getDetails() 拋出例外：", e);
+    if (attempt < maxAttempts) await sleep(attempt * 600); // 0.6s / 1.2s / 1.8s
   }
   return out;
 }
