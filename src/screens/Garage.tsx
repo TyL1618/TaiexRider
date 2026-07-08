@@ -5,7 +5,7 @@ import { AD_COIN_REWARD, MAX_AD_COIN_CLAIMS_PER_DAY, getAdCoinClaims, incrementA
 import { getAchievementBikes, type AchvBikeView } from "../lib/achievements";
 import { getStreak } from "../lib/streak";
 import { resolveSessionDate } from "../lib/dailyMap";
-import { isBillingAvailable, fetchPackPrices, purchaseDiamondPack, purchaseRemoveAds, reconcilePurchases, getLastPurchaseError, DIAMOND_PACKS, REMOVE_ADS_SKU } from "../lib/billing";
+import { isBillingAvailable, fetchPackPrices, purchaseDiamondPack, purchaseRemoveAds, reconcilePurchases, getLastPurchaseError, getPriceDiag, DIAMOND_PACKS, REMOVE_ADS_SKU } from "../lib/billing";
 import { dailyKey } from "../data/pick";
 import CoinIcon from "../components/CoinIcon";
 import type { User } from "../lib/auth";
@@ -28,6 +28,7 @@ export default function Garage({ user, onBack }: { user: User | null; onBack: ()
   const [adsRemoved, setAdsRemoved] = useState(() => getAdsRemoved());
   const [purchasingAdsRemoval, setPurchasingAdsRemoval] = useState(false);
   const [buyError, setBuyError] = useState("");
+  const [priceDiag, setPriceDiag] = useState("");
   const [, forceRender] = useState(0);
 
   // 鑽石購買 + 永久去廣告：只有 Android TWA + 瀏覽器支援 Digital Goods API 才顯示
@@ -36,12 +37,15 @@ export default function Garage({ user, onBack }: { user: User | null; onBack: ()
   useEffect(() => {
     if (!billingAvailable) return;
     let alive = true;
+    // 先查價，查完再對帳（兩者不並發，避免同時搶同一條 Digital Goods 服務連線）。
     fetchPackPrices([...DIAMOND_PACKS.map((p) => p.sku), REMOVE_ADS_SKU]).then((m) => {
-      if (alive) setPackPrices(m);
-    });
-    // 對帳：撈出「已扣款但可能沒發成功」的孤兒交易補發（付款當下 session 遺失/網路斷/
-    // function 逾時都靠這裡救回，不必等 Google 3 天後退款）。補發到的餘額直接更新 UI。
-    reconcilePurchases().then((r) => {
+      if (!alive) return;
+      setPackPrices(m);
+      setPriceDiag(m.size === 0 ? getPriceDiag() : "");
+      // 對帳：撈出「已扣款但可能沒發成功」的孤兒交易補發（付款當下 session 遺失/網路斷/
+      // function 逾時都靠這裡救回，不必等 Google 3 天後退款）。補發到的餘額直接更新 UI。
+      return reconcilePurchases();
+    }).then((r) => {
       if (!alive || !r) return;
       if (typeof r.diamonds === "number") { writeDiamondsCache(r.diamonds); setDiamonds(r.diamonds); }
       if (r.adsRemoved) { markAdsRemoved(); setAdsRemoved(true); }
@@ -240,13 +244,13 @@ export default function Garage({ user, onBack }: { user: User | null; onBack: ()
       {billingAvailable && (
         <>
           <h2 className="garage-section-title">💰 購買鑽石</h2>
-          {buyError && (
+          {(buyError || priceDiag) && (
             <div style={{
               margin: "0 0 12px", padding: "10px 14px", borderRadius: 10,
               background: "rgba(255,80,80,0.12)", border: "1px solid rgba(255,80,80,0.45)",
               color: "#ff9d9d", fontSize: 13, lineHeight: 1.5, wordBreak: "break-word",
             }}>
-              ⚠️ {buyError}
+              ⚠️ {buyError || priceDiag}
             </div>
           )}
           <div className="garage-list">

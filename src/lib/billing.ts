@@ -64,21 +64,33 @@ export function isBillingAvailable(): boolean {
   return isInsideTWA() && typeof w.getDigitalGoodsService === "function" && typeof w.PaymentRequest === "function";
 }
 
+// 查價/對帳失敗的診斷字串（給 UI 顯示；TWA release 版 JS console 不進 logcat 也不能
+// chrome://inspect，只能靠畫面把原因秀出來）。
+let _priceDiag = "";
+export function getPriceDiag(): string { return _priceDiag; }
+
 let _service: DigitalGoodsService | null = null;
-async function getService(): Promise<DigitalGoodsService | null> {
-  if (_service) return _service;
+let _servicePromise: Promise<DigitalGoodsService | null> | null = null;
+// 取 Digital Goods 服務。⚠️ 快取「Promise」而非結果：查價與對帳會在車庫載入時同時呼叫，
+// 若各自獨立 await getDigitalGoodsService() 會並發建立兩條服務連線，可能互相干擾導致查價
+// 卡住（這正是加了對帳後鑽石又變「暫無法購買」的疑點）。快取 Promise 讓並發呼叫共用同一次。
+function getService(): Promise<DigitalGoodsService | null> {
+  if (_service) return Promise.resolve(_service);
+  if (_servicePromise) return _servicePromise;
   const w = window as WindowWithDigitalGoods;
   if (!w.getDigitalGoodsService) {
-    console.warn("[billing] getDigitalGoodsService 不存在於 window（瀏覽器/TWA 不支援 Digital Goods API）");
-    return null;
+    _priceDiag = "此瀏覽器不支援 Digital Goods API（getDigitalGoodsService 不存在）";
+    return Promise.resolve(null);
   }
-  try {
-    _service = await w.getDigitalGoodsService("https://play.google.com/billing");
-    return _service;
-  } catch (e) {
-    console.warn("[billing] getDigitalGoodsService() 呼叫失敗：", e);
-    return null;
-  }
+  _servicePromise = w.getDigitalGoodsService("https://play.google.com/billing")
+    .then((s) => { _service = s; return s; })
+    .catch((e) => {
+      _priceDiag = `取得付款服務失敗：${(e as { name?: string })?.name ?? "Error"}: ${(e as { message?: string })?.message ?? String(e)}`;
+      console.warn("[billing] getDigitalGoodsService() 呼叫失敗：", e);
+      _servicePromise = null; // 失敗不快取，下次可重試
+      return null;
+    });
+  return _servicePromise;
 }
 
 // 向 Google Play 查任意 SKU 清單的實際定價（顯示用；扣款金額由 Google 那邊決定，這裡不寫死）。
@@ -88,18 +100,24 @@ async function getService(): Promise<DigitalGoodsService | null> {
 // 「授權測試」名單（app 尚未正式上線到 Production 前，Billing API 通常只對授權測試名單內的
 // 帳號開放，即使該帳號能透過封測連結正常安裝遊玩）。
 export async function fetchPackPrices(skus: string[]): Promise<Map<string, string>> {
+  _priceDiag = "";
   const out = new Map<string, string>();
   const service = await getService();
-  if (!service) return out;
+  if (!service) {
+    if (!_priceDiag) _priceDiag = "付款服務尚未就緒";
+    return out;
+  }
   try {
     const details = await service.getDetails(skus);
     console.info(`[billing] getDetails(${JSON.stringify(skus)}) 回傳 ${details.length} 筆：`, details);
     for (const d of details) out.set(d.itemId, `${d.price.currency} ${d.price.value}`);
     const missing = skus.filter((s) => !out.has(s));
     if (missing.length > 0) {
+      _priceDiag = `查無定價：${missing.join(", ")}（商品未生效／id 錯／帳號非授權測試名單）`;
       console.warn(`[billing] 以下 SKU 查無定價（Play Console 商品未生效／id 打錯／帳號非授權測試名單）：${missing.join(", ")}`);
     }
   } catch (e) {
+    _priceDiag = `查價失敗：${(e as { name?: string })?.name ?? "Error"}: ${(e as { message?: string })?.message ?? String(e)}`;
     console.warn("[billing] service.getDetails() 拋出例外：", e);
   }
   return out;
