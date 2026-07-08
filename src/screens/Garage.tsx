@@ -29,28 +29,33 @@ export default function Garage({ user, onBack }: { user: User | null; onBack: ()
   const [purchasingAdsRemoval, setPurchasingAdsRemoval] = useState(false);
   const [buyError, setBuyError] = useState("");
   const [priceDiag, setPriceDiag] = useState("");
+  const [priceLoading, setPriceLoading] = useState(false);
   const [, forceRender] = useState(0);
 
   // 鑽石購買 + 永久去廣告：只有 Android TWA + 瀏覽器支援 Digital Goods API 才顯示
   // （網頁版不開放購買）。就算兩者都成立，Play Console 商品尚未建立前查價也會失敗，
   // 卡片會顯示「暫無法購買」。
+  // 查價（+查完對帳）。抽成函式，讓「進車庫自動查」跟「手動重試按鈕」共用。
+  // clientAppUnavailable 這類 Chrome↔App billing 連線間歇失敗時，手動重試往往比反覆
+  // 重開 App 更有效（重開反而把 Chrome 連線池弄得更不穩）。
+  const loadPrices = async () => {
+    if (!billingAvailable) return;
+    setPriceLoading(true);
+    setBuyError("");
+    const m = await fetchPackPrices([...DIAMOND_PACKS.map((p) => p.sku), REMOVE_ADS_SKU]);
+    setPackPrices(m);
+    setPriceDiag(m.size === 0 ? getPriceDiag() : "");
+    setPriceLoading(false);
+    const r = await reconcilePurchases();
+    if (!r) return;
+    if (typeof r.diamonds === "number") { writeDiamondsCache(r.diamonds); setDiamonds(r.diamonds); }
+    if (r.adsRemoved) { markAdsRemoved(); setAdsRemoved(true); }
+  };
+
   useEffect(() => {
     if (!billingAvailable) return;
-    let alive = true;
-    // 先查價，查完再對帳（兩者不並發，避免同時搶同一條 Digital Goods 服務連線）。
-    fetchPackPrices([...DIAMOND_PACKS.map((p) => p.sku), REMOVE_ADS_SKU]).then((m) => {
-      if (!alive) return;
-      setPackPrices(m);
-      setPriceDiag(m.size === 0 ? getPriceDiag() : "");
-      // 對帳：撈出「已扣款但可能沒發成功」的孤兒交易補發（付款當下 session 遺失/網路斷/
-      // function 逾時都靠這裡救回，不必等 Google 3 天後退款）。補發到的餘額直接更新 UI。
-      return reconcilePurchases();
-    }).then((r) => {
-      if (!alive || !r) return;
-      if (typeof r.diamonds === "number") { writeDiamondsCache(r.diamonds); setDiamonds(r.diamonds); }
-      if (r.adsRemoved) { markAdsRemoved(); setAdsRemoved(true); }
-    });
-    return () => { alive = false; };
+    void loadPrices();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [billingAvailable]);
 
   const handleBuyDiamonds = async (sku: string) => {
@@ -250,7 +255,20 @@ export default function Garage({ user, onBack }: { user: User | null; onBack: ()
               background: "rgba(255,80,80,0.12)", border: "1px solid rgba(255,80,80,0.45)",
               color: "#ff9d9d", fontSize: 13, lineHeight: 1.5, wordBreak: "break-word",
             }}>
-              ⚠️ {buyError || priceDiag}
+              <div>⚠️ {buyError || priceDiag}</div>
+              {priceDiag && !buyError && (
+                <button
+                  onClick={() => { void loadPrices(); }}
+                  disabled={priceLoading}
+                  style={{
+                    marginTop: 8, padding: "6px 16px", borderRadius: 8,
+                    background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,157,157,0.5)",
+                    color: "#ffd0d0", fontSize: 13, cursor: "pointer",
+                  }}
+                >
+                  {priceLoading ? "查詢中…" : "🔄 重試"}
+                </button>
+              )}
             </div>
           )}
           <div className="garage-list">
