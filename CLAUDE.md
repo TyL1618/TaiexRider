@@ -106,6 +106,20 @@ versionCode 11→12（1.11→1.12）。已同步複製進 Android Studio 專案
 更新 → 重新測試購買鑽石/永久去廣告是否恢復正常**。這步同時也符合 Testers Community
 建議的「14 天內至少再發布 3 個新封測版本」其中一次。
 
+**⚠️ 追加（vc12 上線後實測仍失敗，vc13）**：使用者更新到 vc12、真機重測，`adb logcat` 抓到
+一樣的 `cr_DigitalGoods: Unable to execute getDetails.`——直接把手機上裝的 APK 拉下來拆開
+（`aapt2 dump xmltree`）確認 vc12 真的有包進 `DelegationService`/`PaymentActivity`/
+`PaymentService`，不是上傳到舊版，manifest 三塊確實都在，問題還沒解。試過強制停止 Chrome、
+清 Chrome 資料、解除安裝重裝、手機重開機，皆無效。查 GitHub
+[android-browser-helper#431](https://github.com/GoogleChrome/android-browser-helper/issues/431)
+同樣症狀的討論，比對 Google 官方 `twa-play-billing` 範例專案的 manifest，發現我們的專案
+從頭到尾都**沒有宣告 `asset_statements` 這個 meta-data**（`assetlinks.json` 內容的本機
+鏡像字串，官方範例的 `<application>` 層級都有這塊）——補上
+[strings.xml](android/app/src/main/res/values/strings.xml) 的 `asset_statements` 字串
+資源（JSON 內容跟 [assetlinks.json](public/.well-known/assetlinks.json) 一致）+ manifest
+對應 `<meta-data>`，versionCode 12→13（1.12→1.13）。**這個假設還沒真機驗證**，是否為
+真因待使用者更新 vc13 後回報。
+
 **排查過程中順帶確認、皆正常、非本次根因的項目**（下次如果又卡住，這些可以跳過不用重查）：
 授權測試名單（Play Console →設定→授權測試，多份清單全打勾，涵蓋 14 人）、應用程式內
 產品狀態（4 個皆「有效」，ID 與程式碼 `DIAMOND_PACKS`/`REMOVE_ADS_SKU` 完全對應）、

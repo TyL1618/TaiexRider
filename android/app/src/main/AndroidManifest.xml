@@ -16,6 +16,12 @@
         android:enableOnBackInvokedCallback="true"
         android:theme="@style/Theme.TaiexRider">
 
+        <!-- assetlinks.json 的本機鏡像，官方 TWA/Play Billing 範例都有宣告這塊，
+             原本缺漏，補上一起排查 getDetails() 失敗問題 -->
+        <meta-data
+            android:name="asset_statements"
+            android:resource="@string/asset_statements" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true">

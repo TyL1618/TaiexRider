@@ -6,4 +6,18 @@
     <string name="shortcut_daily_long">每日排名賽</string>
     <string name="shortcut_random_short">拉霸</string>
     <string name="shortcut_random_long">隨機拉霸</string>
+
+    <!-- Digital Asset Links 的本機鏡像版本（跟 public/.well-known/assetlinks.json 內容
+         保持一致）。官方 TWA + Play Billing 範例專案的 manifest 都有這塊，我們原本沒加，
+         查 Chrome 端 getDetails() 永遠失敗的 bug 時發現這個落差，補上一起試。 -->
+    <string name="asset_statements">
+        [{
+          \"relation\": [\"delegate_permission/common.handle_all_urls\"],
+          \"target\": {
+            \"namespace\": \"android_app\",
+            \"package_name\": \"com.tylapp.taiexrider\",
+            \"sha256_cert_fingerprints\": [\"DB:F0:8B:8F:BA:71:10:51:92:DD:8F:83:B8:4D:92:91:85:34:B0:3E:5B:9B:2A:CA:92:E6:9E:9E:22:9F:57:DA\"]
+          }
+        }]
+    </string>
 </resources>
