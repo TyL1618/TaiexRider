@@ -35,10 +35,6 @@ export default function App() {
   const [user, setUser]             = useState<User | null>(null);
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [marketMood, setMarketMood] = useState<MarketMood | null>(null);
-  // 每次 app 啟動（新 session）顯示一次封測通知；同一 session 內返回首頁不再跳
-  const [showBetaNotice, setShowBetaNotice] = useState(
-    () => !sessionStorage.getItem("tr_beta_notice_shown")
-  );
   const gameKeyRef = useRef(0); // 每次 handleStartTrack +1，確保新局 GameCanvas 重建（revivalUsed 重置）
 
   // refs 讓 popstate 閉包隨時拿到最新值，不靠 useEffect 依賴陣列
@@ -326,10 +322,6 @@ export default function App() {
       onBack={goHome}
     />
   );
-  const dismissBetaNotice = () => {
-    sessionStorage.setItem("tr_beta_notice_shown", "1");
-    setShowBetaNotice(false);
-  };
 
   return (
     <>
@@ -340,16 +332,6 @@ export default function App() {
             <div className="modal-title leave-title">再按一次返回鍵即可離開</div>
             <div className="modal-leave-hint">或點下方按鈕留下繼續玩</div>
             <button className="modal-btn" onClick={() => setConfirmLeave(false)}>留下繼續玩</button>
-          </div>
-        </div>
-      )}
-      {showBetaNotice && (
-        <div className="modal-overlay">
-          <div className="modal-panel">
-            <div className="modal-title">14天封測進行中</div>
-            <div className="modal-item">封測期間請勿解除安裝！<br />感謝各位配合測試 🙏</div>
-            <div className="modal-item dim">若封測結束，此視窗將不再跳出</div>
-            <button className="modal-btn" onClick={dismissBetaNotice}>我知道了</button>
           </div>
         </div>
       )}
