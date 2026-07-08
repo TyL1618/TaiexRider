@@ -5,7 +5,7 @@ import { AD_COIN_REWARD, MAX_AD_COIN_CLAIMS_PER_DAY, getAdCoinClaims, incrementA
 import { getAchievementBikes, type AchvBikeView } from "../lib/achievements";
 import { getStreak } from "../lib/streak";
 import { resolveSessionDate } from "../lib/dailyMap";
-import { isBillingAvailable, fetchPackPrices, purchaseDiamondPack, purchaseRemoveAds, reconcilePurchases, DIAMOND_PACKS, REMOVE_ADS_SKU } from "../lib/billing";
+import { isBillingAvailable, fetchPackPrices, purchaseDiamondPack, purchaseRemoveAds, reconcilePurchases, getLastPurchaseError, DIAMOND_PACKS, REMOVE_ADS_SKU } from "../lib/billing";
 import { dailyKey } from "../data/pick";
 import CoinIcon from "../components/CoinIcon";
 import type { User } from "../lib/auth";
@@ -27,6 +27,7 @@ export default function Garage({ user, onBack }: { user: User | null; onBack: ()
   const [purchasingSku, setPurchasingSku] = useState<string | null>(null);
   const [adsRemoved, setAdsRemoved] = useState(() => getAdsRemoved());
   const [purchasingAdsRemoval, setPurchasingAdsRemoval] = useState(false);
+  const [buyError, setBuyError] = useState("");
   const [, forceRender] = useState(0);
 
   // 鑽石購買 + 永久去廣告：只有 Android TWA + 瀏覽器支援 Digital Goods API 才顯示
@@ -50,18 +51,22 @@ export default function Garage({ user, onBack }: { user: User | null; onBack: ()
 
   const handleBuyDiamonds = async (sku: string) => {
     if (purchasingSku) return;
+    setBuyError("");
     setPurchasingSku(sku);
     const result = await purchaseDiamondPack(sku);
     setPurchasingSku(null);
     if (result !== null) { writeDiamondsCache(result); setDiamonds(result); }
+    else { setBuyError(getLastPurchaseError()); }
   };
 
   const handleBuyRemoveAds = async () => {
     if (purchasingAdsRemoval || adsRemoved) return;
+    setBuyError("");
     setPurchasingAdsRemoval(true);
     const ok = await purchaseRemoveAds();
     setPurchasingAdsRemoval(false);
     if (ok) { markAdsRemoved(); setAdsRemoved(true); }
+    else { setBuyError(getLastPurchaseError()); }
   };
 
   // Q 系列 streak 進度依「目前這一期」session key 讀（連假整段算同一期，跟 DailyChallenge 同源）
@@ -235,6 +240,15 @@ export default function Garage({ user, onBack }: { user: User | null; onBack: ()
       {billingAvailable && (
         <>
           <h2 className="garage-section-title">💰 購買鑽石</h2>
+          {buyError && (
+            <div style={{
+              margin: "0 0 12px", padding: "10px 14px", borderRadius: 10,
+              background: "rgba(255,80,80,0.12)", border: "1px solid rgba(255,80,80,0.45)",
+              color: "#ff9d9d", fontSize: 13, lineHeight: 1.5, wordBreak: "break-word",
+            }}>
+              ⚠️ {buyError}
+            </div>
+          )}
           <div className="garage-list">
             {DIAMOND_PACKS.map((p) => {
               const price = packPrices.get(p.sku);

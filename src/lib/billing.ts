@@ -120,24 +120,45 @@ async function submitPurchaseToken(sku: string, purchaseToken: string): Promise<
   return data as Record<string, unknown>;
 }
 
+// 最近一次購買失敗的原因（給 UI 顯示用；靜默失敗會讓玩家不知道發生什麼事）。
+// 使用者取消付款不算失敗，不寫入這裡。
+let _lastPurchaseError = "";
+export function getLastPurchaseError(): string { return _lastPurchaseError; }
+
 // 共用購買流程：觸發 PaymentRequest 付款 → 拿 purchase_token → 送 Edge Function 驗證+發放。
 // 回傳 Edge Function 的完整回應（null 代表使用者取消/失敗），呼叫端各自取需要的欄位。
 async function runPurchaseFlow(sku: string, label: string): Promise<Record<string, unknown> | null> {
+  _lastPurchaseError = "";
   const w = window as WindowWithDigitalGoods;
-  if (!isBillingAvailable() || !w.PaymentRequest) return null;
+  if (!isBillingAvailable() || !w.PaymentRequest) {
+    _lastPurchaseError = "此環境不支援購買（需 Google Play 安裝版）";
+    return null;
+  }
 
+  let purchaseToken: string;
   try {
     const request = new w.PaymentRequest(
       [{ supportedMethods: "https://play.google.com/billing", data: { sku } }],
       { total: { label, amount: { currency: "TWD", value: "0" } } },
     );
     const response = await request.show();
-    const purchaseToken = response.details.purchaseToken;
+    purchaseToken = response.details.purchaseToken;
     await response.complete("success");
-    return await submitPurchaseToken(sku, purchaseToken);
-  } catch {
+  } catch (e) {
+    // AbortError = 使用者自己取消付款，不是錯誤，不顯示訊息
+    const name = (e as { name?: string })?.name ?? "";
+    const msg = (e as { message?: string })?.message ?? String(e);
+    if (name !== "AbortError") {
+      _lastPurchaseError = `付款無法開始：${name || "Error"}: ${msg}`;
+      console.warn("[billing] PaymentRequest 失敗：", e);
+    }
     return null;
   }
+
+  // 走到這裡代表 Google 已扣款，之後任何失敗都靠 reconcilePurchases 對帳補救
+  const data = await submitPurchaseToken(sku, purchaseToken);
+  if (!data) _lastPurchaseError = "付款完成但發放暫時失敗，重新進車庫會自動補發";
+  return data;
 }
 
 // 對帳：撈出「已購買但可能沒發成功」的交易逐筆重送 Edge Function。這是金流的安全網——
