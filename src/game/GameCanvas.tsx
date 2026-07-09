@@ -11,7 +11,7 @@ import { haptics } from "../lib/haptics";
 import { fetchDeathHeatmap } from "../lib/deathHeatmap";
 import { startWakeLock } from "../lib/wakeLock";
 import { getActiveBikeSkin, addCoins, earnCoins, getAdsRemoved } from "../lib/garage";
-import { requestRewardedCoins } from "../lib/ads";
+import { requestRewardedAd } from "../lib/ads";
 import { grantPlayReward, computePlayReward } from "../lib/playRewards";
 import { dailyKey } from "../data/pick";
 
@@ -196,7 +196,7 @@ export default function GameCanvas({ prices, label, name, subtitle, onExit, onGa
   const handleWatchAdDouble = () => {
     if (!coinRewardEligible || adDoubleState !== "idle") return;
     setAdDoubleState("watching");
-    requestRewardedCoins().then((ok) => {
+    requestRewardedAd("coin").then((ok) => {
       setAdDoubleState(ok ? "claimed" : "idle");
       if (ok) {
         const progressPct = finished ? 1 : deathProgressRef.current;
@@ -232,6 +232,26 @@ export default function GameCanvas({ prices, label, name, subtitle, onExit, onGa
   // 外部觸發復活（死亡位置上方懸空，保留分數/時間）
   const reviveSignal = useRef(0);
   const requestRevive = () => { reviveSignal.current++; };
+
+  // 「看廣告復活」按鈕過去點下去就直接免費復活，從沒真的呼叫過廣告——
+  // 補上真正的廣告閘門，跟按鈕文字（已購買永久去廣告才顯示「復活」）一致。
+  const [reviveWatching, setReviveWatching] = useState(false);
+  const handleWatchAdRevive = () => {
+    if (reviveWatching) return;
+    if (adsRemoved) {
+      setRevivalUsed(true);
+      requestRevive();
+      return;
+    }
+    setReviveWatching(true);
+    requestRewardedAd("revive").then((ok) => {
+      setReviveWatching(false);
+      if (ok) {
+        setRevivalUsed(true);
+        requestRevive();
+      }
+    });
+  };
 
   // 結算面板出現後 350ms 才接受點擊（見上方 resultReady 註解）
   useEffect(() => {
@@ -1635,8 +1655,12 @@ let crashTimer = 0;
             {revivalEnabled ? (
               <>
                 {crashed && !revivalUsed && (
-                  <button className="overlay-btn ad-btn" onClick={() => { setRevivalUsed(true); requestRevive(); }}>
-                    {adsRemoved ? "復活" : "看廣告復活"}
+                  <button
+                    className="overlay-btn ad-btn"
+                    disabled={reviveWatching}
+                    onClick={handleWatchAdRevive}
+                  >
+                    {adsRemoved ? "復活" : reviveWatching ? "廣告播放中…" : "看廣告復活"}
                   </button>
                 )}
                 <button className="overlay-btn share-btn" onClick={shareScore}>📤 分享成績</button>

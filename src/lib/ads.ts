@@ -90,11 +90,36 @@ function loadAdSense(pubId: string): void {
   document.head.appendChild(s);
 }
 
-// ── 看廣告拿金幣（第一階段 stub）───────────────────────────────
-// TODO 正式串接時：TWA → AdMob Rewarded intent bridge；網頁 → AdSense/其他 rewarded
-// SDK，等「使用者看完整支影片」的 callback 再 resolve(true)；中途關閉/失敗 resolve(false)。
-// 現在還沒有任何廣告 SDK 串接，直接 resolve(true) 讓呼叫端立刻發幣，
-// 純粹先把「按鈕位置 + 呼叫時機」卡好，之後只需替換這個函式本體。
-export function requestRewardedCoins(): Promise<boolean> {
-  return Promise.resolve(true);
+// ── 看廣告拿獎勵（金幣雙倍 / 復活）─────────────────────────────
+// TWA：本機 loopback HTTP server 橋接原生 AdMob（見 android/…/AdBridgeService.kt
+// 檔頭說明——androidbrowserhelper 的 LauncherActivity 不暴露 CustomTabsSession，
+// 官方 PostMessage for TWA 走不通，改用這支不碰 TWA session 的做法）。
+// 網頁：AdSense 插頁式廣告暫緩（見 CLAUDE.md 廣告雙軌架構），先直接發獎勵。
+const AD_BRIDGE_PORT = 47591; // ⚠️ 需與 AdBridgeService.kt 的 PORT 常數保持一致
+const AD_BRIDGE_TIMEOUT_MS = 12000;
+
+export type RewardedAdKind = "coin" | "revive";
+
+export function requestRewardedAd(kind: RewardedAdKind): Promise<boolean> {
+  if (detectEnv() !== "twa") return Promise.resolve(true);
+  return requestTwaRewardedAd(kind);
+}
+
+async function requestTwaRewardedAd(kind: RewardedAdKind): Promise<boolean> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), AD_BRIDGE_TIMEOUT_MS);
+  try {
+    const res = await fetch(
+      `http://127.0.0.1:${AD_BRIDGE_PORT}/ad/rewarded?type=${kind}`,
+      { signal: controller.signal },
+    );
+    if (!res.ok) return false;
+    const data = await res.json();
+    return !!data.granted;
+  } catch (err) {
+    console.error("[ads] TWA 原生廣告橋接失敗", err);
+    return false;
+  } finally {
+    clearTimeout(timeout);
+  }
 }

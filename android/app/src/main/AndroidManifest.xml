@@ -4,6 +4,9 @@
 
     <!-- Google Play Billing（鑽石購買/永久去廣告 IAP）必要權限 -->
     <uses-permission android:name="com.android.vending.BILLING" />
+    <!-- AdMob SDK 讀取廣告 + 本機 loopback server（AdBridgeService）必要權限 -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
     <application
         android:allowBackup="true"
@@ -21,6 +24,12 @@
         <meta-data
             android:name="asset_statements"
             android:resource="@string/asset_statements" />
+
+        <!-- AdMob App ID（真實值，測試階段仍用真的 App ID，只有廣告單元 ID 用 Google
+             測試單元，見 AdActivity.kt 檔頭說明） -->
+        <meta-data
+            android:name="com.google.android.gms.ads.APPLICATION_ID"
+            android:value="ca-app-pub-8981745966447649~3758790919" />
 
         <activity
             android:name=".MainActivity"
@@ -118,6 +127,21 @@
                 <action android:name="org.chromium.intent.action.IS_READY_TO_PAY" />
             </intent-filter>
         </service>
+
+        <!-- AdMob 獎勵廣告橋接（見 AdBridgeService.kt 檔頭說明）：
+             MainActivity 啟動時 startService 這支，網頁用 fetch(http://127.0.0.1:PORT/...)
+             呼叫；不對外 export，只有本機 loopback 能連到，另有 socket 綁 127.0.0.1 把關。 -->
+        <service
+            android:name=".AdBridgeService"
+            android:exported="false" />
+
+        <!-- 收到廣告請求後被 AdBridge.requestRewardedAd() 啟動、實際載入/顯示 RewardedAd
+             的透明畫面，沒有自己的 UI，廣告播完/失敗就 finish() 回到原本的 TWA。 -->
+        <activity
+            android:name=".AdActivity"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:excludeFromRecents="true"
+            android:exported="false" />
 
         <!-- androidbrowserhelper splash 圖傳遞用 FileProvider -->
         <provider

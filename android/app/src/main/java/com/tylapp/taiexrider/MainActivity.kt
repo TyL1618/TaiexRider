@@ -1,5 +1,6 @@
 package com.tylapp.taiexrider
 
+import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import android.view.View
@@ -11,6 +12,10 @@ class MainActivity : LauncherActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // 啟動 AdMob 獎勵廣告的本機橋接 server（見 AdBridgeService.kt 檔頭說明）。
+        // 這支 Activity 啟動 TWA 成功後很快就會 finish()，但 startService 的
+        // Service 不會跟著死，之後網頁靠 fetch(127.0.0.1) 呼叫它都還在。
+        startService(Intent(this, AdBridgeService::class.java))
         hideSystemUI()
     }
 

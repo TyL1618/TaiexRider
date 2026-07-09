@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { BIKE_SKINS, getCoins, getDiamonds, isOwned, getActiveSkinId, purchaseSkin, setActiveSkin, addCoins, earnCoins, unlockAchievementSkin, syncWalletFromServer, writeDiamondsCache, getAdsRemoved, markAdsRemoved, type BikeSkin } from "../lib/garage";
-import { requestRewardedCoins } from "../lib/ads";
+import { requestRewardedAd } from "../lib/ads";
 import { AD_COIN_REWARD, MAX_AD_COIN_CLAIMS_PER_DAY, getAdCoinClaims, incrementAdCoinClaims } from "../lib/adRewards";
 import { getAchievementBikes, type AchvBikeView } from "../lib/achievements";
 import { getStreak } from "../lib/streak";
@@ -139,7 +139,7 @@ export default function Garage({ user, onBack }: { user: User | null; onBack: ()
   const handleWatchAd = () => {
     if (watchingAd || adClaims >= MAX_AD_COIN_CLAIMS_PER_DAY) return;
     setWatchingAd(true);
-    requestRewardedCoins().then((ok) => {
+    requestRewardedAd("coin").then((ok) => {
       setWatchingAd(false);
       if (ok) {
         incrementAdCoinClaims(dailyKey(), user?.id ?? null);
