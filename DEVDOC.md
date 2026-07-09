@@ -123,6 +123,18 @@ create table if not exists public.classic_records (
 （2026-07-05 事故，見 CLAUDE.md 待辦 1b）。之後任何「解鎖/發獎勵」類 RPC 新增時，
 都應該讓伺服器自己查權威資料判斷資格，不要只信任客戶端傳的「我達標了」。
 
+⚠️ **PL/pgSQL 重大踩雷（2026-07-09 修，`migration_20260709b.sql`，SQLSTATE 42702）**：
+`returns table(coins int, ...)` 會把輸出欄位名變成函式內的**隱含變數**，函式裡再寫
+`update player_wallet set coins = coins + x` 時，右邊的 `coins` 到底是資料表欄位還是
+輸出變數，Postgres 判斷不了，**整個函式呼叫直接拋例外 rollback**（連同前面已 insert 的
+log 一起回滾，前端又慣例把 RPC 失敗靜默吞掉 → 玩家只是「安靜拿不到錢」）。這個 bug 從
+`migration_20260705.sql` 第一版 `wallet_earn()` 就存在、被複製到每次改版，**代表 7/5~7/9
+期間所有玩家的金幣獎勵/週任務金幣/真錢購買鑽石從來沒有真的寫進資料庫**（畫面上的加幣
+全是前端樂觀顯示，進車庫重新同步就打回原形——這正是當時「金幣歸零」回報潮的真因）。
+`settle_daily_diamonds()`/`settle_classic_weekly()` 因 `returns void` 沒有撞名輸出變數，
+一直正常。**規則：RPC 的輸出欄位名跟資料表欄位同名時，UPDATE/WHERE 裡的欄位一律加
+資料表名前綴**（`player_wallet.coins`），或改用 `v_` 前綴的區域變數中轉。
+
 ### 2.6 留存規劃第二批（2026-07-06/07，`migration_20260706b.sql` + `migration_20260707.sql`）
 
 **狂暴盤日事件**：`public.taiex_change_pct()` 共用函式（抽出自 `record_market_finish()`）算出當期 TAIEX 漲跌幅；`|漲跌| ≥ 2.5%` 時 `wallet_earn('quest')`／`claim_weekly_quest()` 自動把任務獎勵面額 ×2。門檻用 TAIEX 近 2 年 482 交易日實測資料校準（2% 出現機率 14.9%／約每週一次太常見，2.5% 出現機率 10.0%／約兩週一次）。前端 `src/lib/marketMood.ts` 的 `MarketMood.isRage` 只負責首頁公告顯示，實際加倍判定在伺服器端，不信任前端。
@@ -141,7 +153,48 @@ create table if not exists public.classic_records (
 
 **✅ 部署前置作業皆已完成**（2026-07-06）：① migration 已跑；② Play Console 單次產品已建立（介面路徑：透過 Google Play 營利 → 產品 → 單次產品，實測發現這一步本身要求 APK 先有 BILLING 權限才給建，順序比預期更早卡關）；③ Google Cloud 服務帳號 + Play Console 授權已完成；④ `verify-iap-purchase` Edge Function 已部署（secrets：`GOOGLE_SERVICE_ACCOUNT_EMAIL`/`GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY`）；⑤ Android 原生專案已加 androidbrowserhelper 的 Play Billing 橋接（vc11 已上傳審核通過上線）。詳細清單見 [NEXT_BATCH_PLAN.md](NEXT_BATCH_PLAN.md) 批次 4。
 
-**永久去除廣告（非消耗型，`migration_20260706d.sql`）**：跟鑽石（消耗型，可重複買）不同，去廣告是「買一次終身有效」，Google 端驗證完要呼叫 `:acknowledge` 而不是 `:consume`（`consume` 會讓非消耗型商品變成可重複購買，語意錯誤）。`verify-iap-purchase` 依 SKU 是否在 `DIAMOND_SKUS` 集合裡分流兩種呼叫方式。購買後 `player_wallet.ads_removed` 設為 true，三個原本會顯示「看廣告」文案/流程的地方依此欄位調整：`GameCanvas.tsx` 復活按鈕只改標籤文字（本來就沒有真的擋廣告）；結算畫面 + `Garage.tsx` 的「看廣告拿金幣」按鈕直接隱藏（不是變免費——這組「看廣告換獎勵」機制存在的前提就是有廣告可看）；`DailyChallenge.tsx` 第 3~5 次挑戰的「看廣告開始」標籤消失、一律顯示「開始挑戰」（5 次額度本身不變）。SKU id：`remove_ads_forever`。
+**永久去除廣告（非消耗型，`migration_20260706d.sql`）**：跟鑽石（消耗型，可重複買）不同，去廣告是「買一次終身有效」，Google 端驗證完要呼叫 `:acknowledge` 而不是 `:consume`（`consume` 會讓非消耗型商品變成可重複購買，語意錯誤）。`verify-iap-purchase` 依 SKU 是否在 `DIAMOND_SKUS` 集合裡分流兩種呼叫方式。購買後 `player_wallet.ads_removed` 設為 true，四個「看廣告」點依此欄位調整（**2026-07-09 定案：一律改「免看廣告直接領取」，不是隱藏按鈕**——曾把拿金幣/雙倍按鈕整段藏起來，等於花錢買去廣告反而失去獎勵，已修正）：`GameCanvas.tsx` 復活按鈕直接復活、結算「觀看廣告 獎勵 ×2」→「🎁 領取 獎勵 ×2」、`Garage.tsx`「看廣告 +40 金幣」→「🎁 領取 +40 金幣」（每日上限不變）；`DailyChallenge.tsx` 第 3~5 次挑戰標籤一律顯示「開始挑戰」。SKU id：`remove_ads_forever`。
+
+**金流安全網（2026-07-09 稽核補強）**：
+- **consume/acknowledge 不可靜默吞錯**：Google 規定付款 3 天內沒 consume/acknowledge 會自動退款——若失敗卻回報 `ok:true`，會變成「鑽石已發＋又被退款」的真錢損失。Edge Function 兩支呼叫回傳 bool，`alreadyConsumed`/`alreadyAcknowledged`（400）視為冪等成功，真失敗回 502 不回報成功、留給對帳重試。
+- **對帳 `reconcilePurchases()`（`src/lib/billing.ts`）**：付款成功但發放中途失敗（session 掉/網路斷/function 逾時）的孤兒交易，下次進車庫 `listPurchases()` 撈出重送 Edge Function 補發（grant RPC 冪等：已發過走防重放分支、但 consume/acknowledge 每次重試）。已成功對帳的 token 記本地 `tr_iap_reconciled` 避免重打。
+- **未登入雙層防護**：`runPurchaseFlow()` 在叫出 PaymentRequest **之前**先查 session（關鍵層——訪客沒帳號可入帳，扣了款只能等退款）；Garage UI 訪客不顯示購買區塊（第二層）。
+- **診斷可觀測性（刻意保留，別清掉）**：billing 查價/購買失敗原因顯示在車庫紅色橫幅（`getLastPurchaseError`/`getPriceDiag`）＋「🔄 重試」按鈕；Edge Function 三處 `console.error`。TWA release 版無法 chrome://inspect，畫面顯示是唯一的真機除錯管道。
+
+**IAP 打通除錯鏈（2026-07-09，每層都是獨立的坑，之後任一環又壞可對照排查）**：
+① 按鈕灰＝TWA 缺 Play Billing 橋接元件 → 自訂 `DelegationService` 子類別註冊 `DigitalGoodsRequestHandler` + manifest intent-filter + `PaymentActivity`/`PaymentService`（vc12）；
+② 仍失敗＝`<application>` 缺 `asset_statements` meta-data → 補 strings.xml 鏡像（vc13）；
+③ getDetails 被擋＝`DelegationService` 誤帶 `BIND_JOB_SERVICE` 系統權限，Chrome bind 被拒 → 移除（vc14）；
+④ 點了沒反應＝CSP `connect-src` 沒放 `https://play.google.com`，PaymentRequest 建構直接拋 RangeError → `public/_headers` 補白名單；
+⑤ 又變「暫無法購買」＝查價與對帳並發各自建 billing 連線互相干擾＋冷啟動連線未就緒 → `getService()` 快取 Promise 共用連線＋查價自動重試 4 次；
+⑥ 付款成功不發鑽石（Edge Function 全 500）＝服務帳號**多行 PEM 私鑰用 `supabase secrets set --env-file` 被折行吃掉只剩第一行** → 用 `JSON.stringify(private_key)` 保持單行+`\n` 轉義寫入（詳見 CLAUDE.md 踩雷筆記）；
+⑦ 鑽石入帳被 42702 擋（見 §2.5 的 PL/pgSQL 踩雷）。
+**⚠️ 二次稽核（2026-07-09，見 [FABLE5_HANDOFF_20260709.md](FABLE5_HANDOFF_20260709.md) 報告）發現的已知缺口**：Edge Function 未比對 Google 回應 `productId` 與聲稱 `sku_id`（便宜包冒充貴包風險，待修）；退款後無收回機制（封測期接受，正式上架後視退款率決定是否接 Voided Purchases API）。
+
+### 2.8 金幣/鑽石經濟總覽（2026-07-08 大改版定案，v0.12.33 起）
+
+伺服器權威版在 `wallet_earn()`/`claim_weekly_quest()` 等 RPC（前端 `playRewards.ts`/
+`adRewards.ts` 只是樂觀顯示，**兩邊改任何數字都要同步**，否則已登入玩家會被伺服器覆寫回舊值）。
+
+**金幣來源與每日上限**：
+| 來源 | 金額 | 上限（桶） |
+|---|---|---|
+| 一般/自選完賽 / 摔車 | 5 / 2 | 「遊玩」桶單日 100 金幣（含長征、含雙倍） |
+| 長征完賽 / 摔車 | 30 / 依跑到比例 0~30 | 同上桶 |
+| 每日任務 | 25/個（狂暴盤日 ×2） | 3 個/日 |
+| 週任務 | 35~45/個（狂暴盤日 ×2） | 每週各任務一次 |
+| 看廣告（車庫領取） | 40 | 2 次/日（結算「雙倍本局金幣」不占這桶、算遊玩桶） |
+
+**鑽石來源**（金幣買不到鑽石）：排行榜每日結算（參與 +3；名次 1st +80／2nd +50／
+3~4th +20／5~10th +10，`settle_daily_diamonds()`＋每日台灣 00:00 GitHub Actions）、
+經典模式週結算（每關前三 30/20/10，`settle_classic_weekly()` 同一支排程）、
+真錢 IAP（`diamonds_100/350/1200`，TWD 31/94/280；`remove_ads_forever` TWD 72）。
+
+**支出**：金幣車款咖啡騎士/通勤小白各 500；鑽石車款（P 系列）赤紅暴走 300／電馭武士
+380／黃金期貨 450／匿蹤幽靈 520／銀河鍍鉻 600。白名單與定價在 `wallet_spend_skin()`。
+
+**排行榜/經典模式不給金幣**（只給鑽石），避免刷短賽道無限賺。狂暴盤日＝TAIEX
+`|漲跌| ≥ 2.5%`（`taiex_change_pct()`，伺服器端判定，見 §2.6）。
 
 ---
 
@@ -163,6 +216,24 @@ create table if not exists public.classic_records (
 6. **股票圖鑑登記表**（2026-07-07 新增）：拿第 2 步已經抓到的官方上市清單，`upsertStockRegistry()` 順手 upsert 進 `stock_registry`（不重複打一次 TWSE API），再呼叫 `mark_delisted_stocks()` RPC 比對維護「絕版」狀態，詳見 §2.6。
 
 > 每日約 ~1090 支股票，失敗容錯繼續（不中斷整批）。連假/休市時 Yahoo `range=1d` 自動回最後交易日 → sessionDate 不變 → 持續顯示最後交易日的盤（正確）。
+
+### 3.1b app 讀取端（連假安全 + 午夜換圖，`src/lib/dailyMap.ts`）
+
+`resolveSessionDate()` 取「daily_map 中 `map_date ≤ **今天**（日曆日）的**最大值**」當
+「目前這一期」，三個 fetcher（hardest/list/stock）全對齊它。
+
+- **上界用「今天」而非 nextDay**：`map_date = sessionDate+1` 已內建「00:00 才生效」。
+  週五 16:00 cron 把週五盤存成 `map_date=週六`，週五當天 `max(≤週五)` 仍是週四盤
+  （不提早跳）；**週六 00:00** 起才切到週五盤＝午夜精準換圖。⚠️ 上界若用 `nextDay`
+  會讓週五下午就提早換圖（曾誤用）。
+- **連假 fallback**：日曆日超過最後交易日的 map_date 時，`lte + desc` 往回取「最近
+  一期」→ 整段沿用最後交易日的盤。（2026-06-20 曾因舊邏輯精準比對 `[今天,明天]` 錯過
+  `map_date=6/19` 而掉回靜態 24 支。）
+- **排行榜對齊（同一張榜跨連假）**：challenge key 也用 `resolveSessionDate()`，讀取
+  （`DailyChallenge`）、提交清快取（`leaderboard.ts`）、RPC 寫入（`submit_daily_score`
+  的 `v_today := coalesce(max(map_date)≤台灣今天, 台灣日曆日)`）三者同源 → 週末/連假
+  整段成績累積在同一張榜，午夜才換新榜。**schema 改完要手動在 Supabase SQL Editor 跑
+  `create or replace function submit_daily_score`，push 不會更新 RPC。**
 
 ### 3.2 資料源端點
 
@@ -520,6 +591,21 @@ TWA 沒有官方 postMessage 套件可用（androidbrowserhelper 的 `LauncherAc
   `TEST_REWARDED_AD_UNIT_ID` 仍是 Google 官方測試單元，要換成真實單元 ID
   （revive_reward: `ca-app-pub-8981745966447649/1679422480`；coin_reward:
   `ca-app-pub-8981745966447649/2170377077`，依 `intent.data` 的 `type` 參數分流）。
+- **8 層問題鏈完整回顧（2026-07-09 打通，每層都是獨立的坑，供之後排查類似跨
+  TWA/原生橋接問題對照）**：
+  ① 官方 PostMessage for TWA 在 `LauncherActivity` 架構下無解（session 是 private
+  欄位無 getter＋啟動後必 `finish()`，github android-browser-helper#472 仍 open）→
+  改本機 loopback server；
+  ② 普通 Service 被系統背景省電殺掉（三星 One UI「app idle」幾分鐘就殺）→ 前景服務；
+  ③ Service 直接 `startActivity` 被 BAL 擋（前景服務不在豁免清單）→ 改 Chrome
+  使用者手勢導轉自訂 scheme；
+  ④ `<a>.click()` 同文件導轉觸發 TWA「離開網站」確認框 → 改 `window.open`；
+  ⑤ `AppCompatActivity` 配非 AppCompat 主題啟動即崩 → 改繼承 `Activity`；
+  ⑥ 載入廣告吃記憶體，系統砍掉整個行程重開、新行程沒有 Service → `AdActivity`
+  自己也 `startForegroundService`（vc17 起乾脆成為唯一啟動點）；
+  ⑦ 背景分頁計時器節流讓輪詢睡死 → `visibilitychange` 喚醒；
+  ⑧（真因）loopback 回應缺 `Access-Control-Allow-Origin`，網頁 JS 永遠讀不到伺服器
+  早已正確回應的結果 → 加 CORS 標頭。
 - **⚠️ Android 13+ 通知權限**：`MainActivity.kt` 會在 API 33+ 請求
   `POST_NOTIFICATIONS` 執行時權限（沒有這個權限，前景服務本身仍正常運作、廣告
   功能不受影響，但系統會靜默不顯示常駐通知——vc15 上傳 Play Console 時因為要填
@@ -568,6 +654,20 @@ TWA 沒有官方 postMessage 套件可用（androidbrowserhelper 的 `LauncherAc
 - **IAP**：✅ 已完成（Google Play Billing API + Digital Goods API，見 §「鑽石車款」）。
 - **商業模式**：看廣告復活一次／雙倍金幣／車庫拿金幣（AdMob Rewarded，✅ 已上線）
   / IAP 永久去廣告（✅ 已上線，待真廣告可移除才有實際意義）
+- **最終保底：整專案換 Capacitor（2026-07-09 深度討論定案，只在 TWA 架構連續走不通
+  時才考慮）**：現有 React/Vite/Canvas2D/Matter.js/Supabase 幾乎 100% 留用，只換
+  「打包成 App 的殼」；Capacitor 有成熟外掛（AdMob/IAP）走正規 JS↔原生橋接，不會重演
+  「網頁無法觸發自訂原生指令」的 TWA 死路。**✅ 關鍵確認：換 Capacitor 不會讓封測歸零**
+  ——Google Play 只認 `applicationId`（維持 `com.tylapp.taiexrider`）+ 簽署金鑰（沿用
+  `taiexrider-release.jks`），測試軌道/名單/14 天倒數全部不受影響；唯一會歸零的是改
+  applicationId，不要改。附加好處：原生 `FLAG_KEEP_SCREEN_ON`（如
+  `@capacitor-community/keep-awake`）可取代 Web Wake Lock API，消除 TWA 下「Chrome 在
+  背景執行」的規格強制通知。升級順序：TWA 現行方案 → 特定畫面 WebView 包裝 → 才是
+  Capacitor（勝過 React Native＝要重寫渲染層／全原生＝重做整款遊戲）。
+- **PNA 風險（Chrome Private Network Access 政策）**：未來若擋掉公開網頁對 127.0.0.1
+  的 loopback fetch，廣告橋接整條失效（**不影響 IAP**——那條走 DelegationService，無
+  loopback）。網頁端已有優雅降級（15 秒連不上提早放棄、不發獎勵不扣次數、遊戲照常，
+  見 §9.4c），屆時的根治選項＝上面的 Capacitor 或 PostMessage for TWA。
 
 ---
 
@@ -610,6 +710,13 @@ v0.9.3 加入 master gain node（`masterGain()`），所有音效都接到同一
 | `share` | （保留，分享功能用） | — |
 
 **安全**：寫入只能走 RPC（事件白名單 + props ≤2KB + device ≤48 字）；`player_id` 由 `auth.uid()` 綁定；events 表**無任何 select policy**（只有 Dashboard/service_role 可讀）。`device_id` = localStorage 匿名 UUID（`taiex_player_id`），未登入也能算留存。
+
+⚠️ **player_id 歷史缺陷（2026-07-09 修）**：`logEvent()` 原本 `Authorization` header 固定用
+anon key（不代表任何登入者），伺服器端 `auth.uid()` 永遠 NULL → **7/2 上線到 7/9 的 377 筆
+事件 player_id 全部 NULL、無法回溯修補**（device_id↔帳號的關聯沒有任何表記過）。修法：
+先 `supabase.auth.getSession()`，登入帶真 access_token、訪客才 fallback anon key。查特定
+帳號遊玩史只有 7/9 之後的資料有效；更早的只能拿 `daily_scores.created_at`/
+`player_wallet.updated_at` 間接推測。
 
 **保留策略**：原始事件留 90 天，每日 16:00 CI（`fetchDailyMap.ts`）以 service key 呼叫 `cleanup_old_events()` 清理。
 
