@@ -1549,7 +1549,11 @@ let crashTimer = 0;
         <div className="overlay" onClick={() => setConfirmExit(false)}>
           <div className="settings-panel" onClick={(e) => e.stopPropagation()}>
             <div className="overlay-title">離開賽道？</div>
-            <div className="settings-row dim">目前成績不會保存</div>
+            <div className="settings-row dim">
+              {analyticsMode === "daily"
+                ? "本次挑戰次數將直接作廢，不會歸還"
+                : "目前成績不會保存"}
+            </div>
             <button className="overlay-btn" onClick={onExit}>
               確定離開
             </button>

@@ -11,6 +11,7 @@ import { fetchDeathHeatmap, type HeatBucket } from "../lib/deathHeatmap";
 import { getDailyQuests } from "../lib/quests";
 import { getWeeklyQuests, syncWeeklyFromServer, weekKey, type WeeklyQuestView } from "../lib/weeklyQuests";
 import { getAdsRemoved, syncWalletFromServer } from "../lib/garage";
+import { requestRewardedAd } from "../lib/ads";
 import { checkPendingSettlement, ackSettlement, type PendingSettlement } from "../lib/dailyDiamondSettlement";
 import CoinIcon from "../components/CoinIcon";
 import type { TrackData } from "../data/tracks";
@@ -59,6 +60,7 @@ export default function DailyChallenge({
   const [attempts, setAttempts] = useState(() => getAttempts(dailyKey(), user?.id ?? null));
   const [serverMaxed, setServerMaxed] = useState(false); // 伺服器判定今日已達上限（優先於本地計數，防清 localStorage 繞過）
   const [checkingStart, setCheckingStart] = useState(false);
+  const [watchingAd, setWatchingAd] = useState(false); // 第 3~5 次挑戰：看廣告中，看完才消耗次數
   const [streak, setStreak] = useState(0);
   const [streakLive, setStreakLive] = useState(false); // 本期已參賽（🔥 實心）或待延續（提示）
   const [heat, setHeat] = useState<HeatBucket[]>([]); // 今日全服死亡熱點（20 等分）
@@ -256,7 +258,15 @@ export default function DailyChallenge({
           const num     = attempts + 1; // 即將進行的第幾次
           // 已登入玩家先問伺服器 consume_attempt()（真正把關，清 localStorage 也繞不過）；
           // 未登入/RPC 尚未建立時直接回 true，維持現行純前端計數行為不變。
+          // 第 3~5 次（showAd）：廣告要先看完才消耗次數——放在 consumeAttemptServer() 之前，
+          // 廣告沒看完/失敗就直接 return，不會白白扣掉一次今日僅 5 次的挑戰機會。
           const handleStart = async () => {
+            if (showAd) {
+              setWatchingAd(true);
+              const granted = await requestRewardedAd("coin");
+              setWatchingAd(false);
+              if (!granted) return;
+            }
             setCheckingStart(true);
             const result = await consumeAttemptServer();
             setCheckingStart(false);
@@ -277,18 +287,20 @@ export default function DailyChallenge({
           return (
             <button
               className={`daily-challenge-btn${showAd && canPlay ? " ad" : ""}${!canPlay ? " maxed" : ""}`}
-              disabled={!canPlay || checkingStart}
+              disabled={!canPlay || checkingStart || watchingAd}
               onClick={canPlay ? handleStart : undefined}
             >
               {!user
                 ? "登入才能挑戰"
                 : !canPlay
                   ? "今日已達上限"
-                  : checkingStart
-                    ? "確認中…"
-                    : showAd
-                      ? `看廣告開始 (${num}/5)`
-                      : `開始挑戰 (${num}/5)`}
+                  : watchingAd
+                    ? "廣告播放中…"
+                    : checkingStart
+                      ? "確認中…"
+                      : showAd
+                        ? `看廣告開始 (${num}/5)`
+                        : `開始挑戰 (${num}/5)`}
             </button>
           );
         })()}
