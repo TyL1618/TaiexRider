@@ -98,7 +98,29 @@ scheme/host/port 全部不同，屬於跨來源請求。`AdBridgeService` 的回
 
 **修法**：`AdBridgeService.kt` 的 `LoopbackServer.serve()` 回應加上
 `.apply { addHeader("Access-Control-Allow-Origin", "*") }`。原生程式碼改動，需要
-Android Studio 重新建置。**這是目前排查到最根本、最有信心的一個修正**——待真機驗證。
+Android Studio 重新建置。
+
+**✅ 真機驗證通過（2026-07-09）**：加上 CORS 標頭後真機重測，廣告關閉後獎勵立刻
+正確發放、Supabase 也正確寫入、按鈕狀態正常恢復。**整條「網頁按鈕 → 原生顯示 AdMob
+獎勵廣告 → 結果回報網頁 → 發放獎勵」的橋接完整打通**，本次 AdMob 整合的除錯結束。
+
+完整問題鏈回顧（8 層，每一層都是獨立的坑，供之後排查類似跨 TWA/原生橋接問題參考）：
+① PostMessage for TWA 官方方案在 LauncherActivity 架構下無解（session 拿不到+
+finish() 太快）→ 改本機 loopback server；② 前景服務仍被系統背景省電殺掉 →
+startForegroundService；③ Service 直接 startActivity 被 BAL 擋下 → 改用 Chrome
+使用者手勢導轉自訂 scheme；④ `<a>.click()` 同文件導轉觸發 TWA 離開確認框 →
+改用 `window.open`；⑤ `AppCompatActivity` 配非 AppCompat 主題直接崩潰 → 改繼承
+`Activity`；⑥ 載入廣告吃記憶體，系統把整個行程砍掉重開、新行程沒有 Service →
+`AdActivity` 自己也 `startForegroundService`；⑦ 背景分頁計時器節流延遲輪詢喚醒 →
+`visibilitychange` 事件喚醒；⑧（真因）缺 CORS 標頭，網頁端讀不到伺服器已經正確
+回應的結果 → 加 `Access-Control-Allow-Origin`。
+
+**⚠️ 上架前還沒做的事**：`AdActivity.kt` 的 `TEST_REWARDED_AD_UNIT_ID` 目前仍是
+Google 官方測試單元，尚未換成真實廣告單元 ID（revive_reward:
+`ca-app-pub-8981745966447649/1679422480`；coin_reward:
+`ca-app-pub-8981745966447649/2170377077`，依 `adType` 分流）；目前只實測過車庫
+「看廣告拿金幣」這條路徑，「看廣告復活」跟結算畫面「觀看廣告 獎勵 ×2」理論上走同一套
+橋接、應該一併正常，但建議找機會也實測一次確認。
 
 ### 🟢 2026-07-09（七度追加）：橋接本身確認打通！卡在網頁分頁背景計時器節流，改用 visibilitychange 喚醒輪詢
 
