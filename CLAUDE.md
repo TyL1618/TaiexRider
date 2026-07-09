@@ -1037,7 +1037,7 @@ session`（代表要查為什麼登入中的帳號 session 會遺失，可能是
 - **v0.12.2 已推**：全面資安檢查（報告 [SECURITY_REVIEW.md](SECURITY_REVIEW.md)，prod 依賴 0 漏洞、dev 漏洞已修餘 2 個接受）+ 監控雛形上線（`src/lib/analytics.ts` 打點 run_start/death/finish/revive，分析查詢 `supabase/analytics_queries.sql`，隱私權政策已同步補充匿名統計條款）。
   - **✅ `supabase/migration_20260702.sql` 已跑**（events 表 + log_event RPC + 資安補強，一次跑完）。
   - **✅ 使用者待辦 ②已確認完成**：`taiexrider-release.jks` + 密碼已備份雲端（SECURITY_REVIEW 🔴 項）。使用者已多次確認完成，之後不需要再詢問這件事。
-  - **⚠️ 使用者待辦 ③**：Play Console 資料安全表單日後更新時補「App 互動資料（匿名統計）」聲明（非急件，正式版送審前弄即可）。
+  - **✅ 使用者待辦 ③已完成（2026-07-09）**：Play Console 資料安全表單已更新——補上廣告 ID（收集+分享，用途廣告或行銷）、購買記錄（收集不分享，用途應用程式功能+詐欺防範，非暫時性處理，必要資料）、App 互動資料（匿名統計）三塊聲明，已送出並通過快速檢查排入審查。
 - **上架前置 + ASO**：[LAUNCH_CHECKLIST.md](LAUNCH_CHECKLIST.md)——技術面已遠端驗證 ✅（privacy/assetlinks/OG/CI 全正常），Play Console 目視清單 + 7/8 申請流程 + ASO 三版文案（建議：標題 A、簡短 B）供挑選。
 - **設計文件**：[ANTICHEAT_DESIGN.md](ANTICHEAT_DESIGN.md)（四層防禦三階段 rollout，未實作）、[RETENTION_PLAN.md](RETENTION_PLAN.md)（留存三批實作排序，等勾選）。
 - **v0.12.6 已推**（android/ 三項 + 深連結）：App 捷徑 shortcuts.xml、splash 品牌圖（SPLASH_IMAGE_DRAWABLE+FileProvider）、預測性返回 enableOnBackInvokedCallback；前端 `?goto=` 深連結（preview 實測 OK）+ PWA manifest shortcuts。**⚠️ android/ 部分 push 無效——需手動：複製 `android/` 改動到 Android Studio 專案 → versionCode 7 → Generate Signed Bundle → 上傳 Play Console**（詳 DEVDOC §9.1.1）。**⚠️ 重包後真機必測返回鍵**（預測性返回與 popstate 可能打架，出問題先拿掉該屬性）。
