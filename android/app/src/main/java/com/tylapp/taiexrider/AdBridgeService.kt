@@ -128,7 +128,14 @@ class AdBridgeService : Service() {
                     )
                 }
             }
+            // ⚠️ 真機實測抓到的關鍵坑：網頁來源是 https://taiexrider.pages.dev，
+            // 這支 server 是 http://127.0.0.1:47591——scheme/host/port 都不同，
+            // 屬於跨來源請求。沒有這個標頭，瀏覽器會照樣把請求送出去、這裡也照樣
+            // 印出正確的 log（这就是為什麼 log 一直顯示 done=true 卻始終沒發獎勵的
+            // 真因），但會擋住網頁 JS 讀取回應內容，fetch 在網頁端直接失敗，
+            // 只能不斷重試到逾時、永遠拿不到真正結果。
             return newFixedLengthResponse(Response.Status.OK, "application/json", json.toString())
+                .apply { addHeader("Access-Control-Allow-Origin", "*") }
         }
     }
 }
