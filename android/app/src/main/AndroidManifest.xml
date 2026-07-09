@@ -7,6 +7,9 @@
     <!-- AdMob SDK 讀取廣告 + 本機 loopback server（AdBridgeService）必要權限 -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- AdBridgeService 改前景服務用（避免被背景省電機制提早停掉，見該檔說明） -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
 
     <application
         android:allowBackup="true"
@@ -133,7 +136,12 @@
              呼叫；不對外 export，只有本機 loopback 能連到，另有 socket 綁 127.0.0.1 把關。 -->
         <service
             android:name=".AdBridgeService"
-            android:exported="false" />
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="ad_reward_bridge" />
+        </service>
 
         <!-- 收到廣告請求後被 AdBridge.requestRewardedAd() 啟動、實際載入/顯示 RewardedAd
              的透明畫面，沒有自己的 UI，廣告播完/失敗就 finish() 回到原本的 TWA。 -->
