@@ -112,16 +112,21 @@ class AdBridgeService : Service() {
             val json = when (session.uri) {
                 "/ad/reset" -> {
                     AdBridge.reset()
+                    Log.i(TAG, "GET /ad/reset")
                     JSONObject().put("ok", true)
                 }
                 "/ad/result" -> {
-                    JSONObject()
-                        .put("done", AdBridge.isDone())
-                        .put("granted", AdBridge.isGranted())
+                    val done = AdBridge.isDone()
+                    val granted = AdBridge.isGranted()
+                    Log.i(TAG, "GET /ad/result -> done=$done granted=$granted")
+                    JSONObject().put("done", done).put("granted", granted)
                 }
-                else -> return newFixedLengthResponse(
-                    Response.Status.NOT_FOUND, "text/plain", "not found",
-                )
+                else -> {
+                    Log.w(TAG, "404 for ${session.uri}")
+                    return newFixedLengthResponse(
+                        Response.Status.NOT_FOUND, "text/plain", "not found",
+                    )
+                }
             }
             return newFixedLengthResponse(Response.Status.OK, "application/json", json.toString())
         }

@@ -4,6 +4,7 @@ import android.app.Activity
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import android.os.Bundle
+import android.util.Log
 import com.google.android.gms.ads.AdError
 import com.google.android.gms.ads.AdRequest
 import com.google.android.gms.ads.FullScreenContentCallback
@@ -31,12 +32,14 @@ class AdActivity : Activity() {
 
     companion object {
         private const val TEST_REWARDED_AD_UNIT_ID = "ca-app-pub-3940256099942544/5224354917"
+        private const val TAG = "AdActivity"
     }
 
     private var rewardEarned = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        Log.i(TAG, "onCreate intent.data=${intent?.data}")
         window.setBackgroundDrawable(ColorDrawable(Color.BLACK))
         AdBridge.reset()
         // 目前兩種類型都還是用同一個 Google 測試單元 ID，上架前分流成真實單元時
@@ -46,31 +49,44 @@ class AdActivity : Activity() {
     }
 
     private fun loadAndShow(adType: String) {
+        Log.i(TAG, "loadAndShow adType=$adType, requesting ad load")
         RewardedAd.load(
             this,
             TEST_REWARDED_AD_UNIT_ID,
             AdRequest.Builder().build(),
             object : RewardedAdLoadCallback() {
                 override fun onAdLoaded(ad: RewardedAd) {
+                    Log.i(TAG, "onAdLoaded, showing now")
                     ad.fullScreenContentCallback = object : FullScreenContentCallback() {
                         override fun onAdDismissedFullScreenContent() {
+                            Log.i(TAG, "onAdDismissedFullScreenContent rewardEarned=$rewardEarned")
                             AdBridge.complete(rewardEarned)
                             finish()
                         }
 
                         override fun onAdFailedToShowFullScreenContent(error: AdError) {
+                            Log.e(TAG, "onAdFailedToShowFullScreenContent: ${error.message}")
                             AdBridge.complete(false)
                             finish()
                         }
                     }
-                    ad.show(this@AdActivity) { rewardEarned = true }
+                    ad.show(this@AdActivity) {
+                        Log.i(TAG, "onUserEarnedReward")
+                        rewardEarned = true
+                    }
                 }
 
                 override fun onAdFailedToLoad(error: LoadAdError) {
+                    Log.e(TAG, "onAdFailedToLoad: ${error.message} code=${error.code}")
                     AdBridge.complete(false)
                     finish()
                 }
             },
         )
+    }
+
+    override fun onDestroy() {
+        Log.i(TAG, "onDestroy")
+        super.onDestroy()
     }
 }

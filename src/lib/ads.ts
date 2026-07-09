@@ -128,9 +128,12 @@ async function requestTwaRewardedAd(kind: RewardedAdKind): Promise<boolean> {
     // window.open 開一個新的瀏覽情境去嘗試導轉——原本這份 TWA 文件本身不會跳走，
     // 新視窗解析到系統交給 Android 意圖解析（自訂 scheme 沒有網頁可顯示），不會觸發
     // TWA 的離開確認框。
+    console.info(`[ads] 導轉 taiexrider-ad://show?type=${kind}，開始輪詢結果`);
     window.open(`taiexrider-ad://show?type=${kind}`, "_blank");
 
-    return await pollAdResult();
+    const result = await pollAdResult();
+    console.info(`[ads] 輪詢結束，granted=${result}`);
+    return result;
   } catch (err) {
     console.error("[ads] TWA 原生廣告橋接失敗", err);
     return false;
@@ -146,10 +149,13 @@ async function pollAdResult(): Promise<boolean> {
       if (res.ok) {
         const data = await res.json();
         if (data.done) return !!data.granted;
+      } else {
+        console.warn(`[ads] /ad/result 回應非 ok: ${res.status}`);
       }
     } catch (err) {
       console.error("[ads] 輪詢廣告結果失敗", err);
     }
   }
+  console.warn("[ads] 輪詢逾時，視為未獲得獎勵");
   return false;
 }
