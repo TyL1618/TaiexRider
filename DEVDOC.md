@@ -508,6 +508,13 @@ TWA 沒有官方 postMessage 套件可用（androidbrowserhelper 的 `LauncherAc
   `TEST_REWARDED_AD_UNIT_ID` 仍是 Google 官方測試單元，要換成真實單元 ID
   （revive_reward: `ca-app-pub-8981745966447649/1679422480`；coin_reward:
   `ca-app-pub-8981745966447649/2170377077`，依 `intent.data` 的 `type` 參數分流）。
+- **⚠️ Android 13+ 通知權限**：`MainActivity.kt` 會在 API 33+ 請求
+  `POST_NOTIFICATIONS` 執行時權限（沒有這個權限，前景服務本身仍正常運作、廣告
+  功能不受影響，但系統會靜默不顯示常駐通知——vc15 上傳 Play Console 時因為要填
+  `FOREGROUND_SERVICE_SPECIAL_USE` 用途聲明表單才發現這個疏漏，vc16 補上）。
+- **Play Console 上傳注意**：`FOREGROUND_SERVICE_SPECIAL_USE` 權限上傳時 Google
+  會要求填「用途聲明表單」，選「其他」+ 文字說明 + **附一段示範影片連結**
+  （YouTube 不公開連結即可）證明實際用途，才能通過審查。
 - **已知殘留瑕疵**：debug 簽名跟 `assetlinks.json`（僅登記正式簽名指紋）對不上時，
   Chrome 會比較常顯示網址列；即使正式簽名，使用者第一次點看廣告仍會跳一次「本機
   網路存取」系統權限請求、網址列跟著短暫閃一下（Chrome 對任何權限請求的固定行為，

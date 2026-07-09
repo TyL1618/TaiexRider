@@ -10,6 +10,8 @@
     <!-- AdBridgeService 改前景服務用（避免被背景省電機制提早停掉，見該檔說明） -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <!-- Android 13+ 顯示任何通知（含前景服務常駐通知）必要的執行時權限 -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
         android:allowBackup="true"
