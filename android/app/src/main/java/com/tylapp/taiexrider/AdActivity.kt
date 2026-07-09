@@ -1,9 +1,9 @@
 package com.tylapp.taiexrider
 
+import android.app.Activity
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import android.os.Bundle
-import androidx.appcompat.app.AppCompatActivity
 import com.google.android.gms.ads.AdError
 import com.google.android.gms.ads.AdRequest
 import com.google.android.gms.ads.FullScreenContentCallback
@@ -23,7 +23,11 @@ import com.google.android.gms.ads.rewarded.RewardedAdLoadCallback
 //    coin_reward:   ca-app-pub-8981745966447649/2170377077
 // 目前用 Google 官方測試單元 ID，不受 AdMob 帳戶審核/廣告單元啟用狀態影響，
 // 用意是先把「網頁→原生→顯示廣告→回報結果」整條橋接跑通。
-class AdActivity : AppCompatActivity() {
+// 繼承 Activity（不是 AppCompatActivity）：這支畫面沒有工具列/Fragment，不需要
+// 任何 AppCompat 功能——⚠️ 真機實測踩過雷，AppCompatActivity 配非 AppCompat 主題
+// （這裡用的 Theme.Translucent.NoTitleBar）會直接拋 IllegalStateException 崩潰
+// （logcat 看到的現象是 AdActivity 啟動瞬間就被系統判定當機）。
+class AdActivity : Activity() {
 
     companion object {
         private const val TEST_REWARDED_AD_UNIT_ID = "ca-app-pub-3940256099942544/5224354917"
