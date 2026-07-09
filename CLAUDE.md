@@ -1036,7 +1036,7 @@ session`（代表要查為什麼登入中的帳號 session 會遺失，可能是
   - **⚠️ 未真機試玩**：落地手感（67ms 延遲結算的 toast 時機）與淺谷平底的視覺需真人確認。
 - **v0.12.2 已推**：全面資安檢查（報告 [SECURITY_REVIEW.md](SECURITY_REVIEW.md)，prod 依賴 0 漏洞、dev 漏洞已修餘 2 個接受）+ 監控雛形上線（`src/lib/analytics.ts` 打點 run_start/death/finish/revive，分析查詢 `supabase/analytics_queries.sql`，隱私權政策已同步補充匿名統計條款）。
   - **✅ `supabase/migration_20260702.sql` 已跑**（events 表 + log_event RPC + 資安補強，一次跑完）。
-  - **⚠️ 使用者待辦 ②**：確認 `taiexrider-release.jks` + 密碼已備份雲端（SECURITY_REVIEW 🔴 項）。
+  - **✅ 使用者待辦 ②已確認完成**：`taiexrider-release.jks` + 密碼已備份雲端（SECURITY_REVIEW 🔴 項）。使用者已多次確認完成，之後不需要再詢問這件事。
   - **⚠️ 使用者待辦 ③**：Play Console 資料安全表單日後更新時補「App 互動資料（匿名統計）」聲明（非急件，正式版送審前弄即可）。
 - **上架前置 + ASO**：[LAUNCH_CHECKLIST.md](LAUNCH_CHECKLIST.md)——技術面已遠端驗證 ✅（privacy/assetlinks/OG/CI 全正常），Play Console 目視清單 + 7/8 申請流程 + ASO 三版文案（建議：標題 A、簡短 B）供挑選。
 - **設計文件**：[ANTICHEAT_DESIGN.md](ANTICHEAT_DESIGN.md)（四層防禦三階段 rollout，未實作）、[RETENTION_PLAN.md](RETENTION_PLAN.md)（留存三批實作排序，等勾選）。
