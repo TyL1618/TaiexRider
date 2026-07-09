@@ -123,11 +123,12 @@ async function requestTwaRewardedAd(kind: RewardedAdKind): Promise<boolean> {
     // Chrome 才會放行自訂 scheme 導轉，不會被當成背景彈出而擋掉）。
     fetch(`http://127.0.0.1:${AD_BRIDGE_PORT}/ad/reset`).catch(() => {});
 
-    const a = document.createElement("a");
-    a.href = `taiexrider-ad://show?type=${kind}`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
+    // ⚠️ 真機實測：用 <a>.click() 在同一份文件內導轉，TWA 會判定成「要離開目前受信任
+    // 的網站」跳出確認框，按「離開」直接把整個 TWA 關掉（不是只離開去開廣告）。改用
+    // window.open 開一個新的瀏覽情境去嘗試導轉——原本這份 TWA 文件本身不會跳走，
+    // 新視窗解析到系統交給 Android 意圖解析（自訂 scheme 沒有網頁可顯示），不會觸發
+    // TWA 的離開確認框。
+    window.open(`taiexrider-ad://show?type=${kind}`, "_blank");
 
     return await pollAdResult();
   } catch (err) {
