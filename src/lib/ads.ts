@@ -112,8 +112,23 @@ export function requestRewardedAd(kind: RewardedAdKind): Promise<boolean> {
   return requestTwaRewardedAd(kind);
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+// ⚠️ 真機實測：廣告全螢幕顯示時，原本的 TWA 分頁對 Chrome 來說變成「背景分頁」，
+// setTimeout 會被大幅節流（最慢節流到每分鐘才跑一次）——單純用 setTimeout 輪詢，
+// 廣告關閉後网頁端要等超久才會醒來檢查一次，即使伺服器早就準備好結果。改成同時
+// 監聽 visibilitychange：分頁一恢復可見就立刻醒來檢查，不受計時器節流影響。
+function waitOrWake(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(finish, ms);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") finish();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    function finish() {
+      clearTimeout(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+      resolve();
+    }
+  });
 }
 
 async function requestTwaRewardedAd(kind: RewardedAdKind): Promise<boolean> {
@@ -143,7 +158,7 @@ async function requestTwaRewardedAd(kind: RewardedAdKind): Promise<boolean> {
 async function pollAdResult(): Promise<boolean> {
   const deadline = Date.now() + AD_BRIDGE_TIMEOUT_MS;
   while (Date.now() < deadline) {
-    await sleep(AD_BRIDGE_POLL_INTERVAL_MS);
+    await waitOrWake(AD_BRIDGE_POLL_INTERVAL_MS);
     try {
       const res = await fetch(`http://127.0.0.1:${AD_BRIDGE_PORT}/ad/result`);
       if (res.ok) {
