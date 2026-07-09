@@ -10,8 +10,6 @@ import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import fi.iki.elonen.NanoHTTPD
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
 import org.json.JSONObject
 
 // ============================================================
@@ -31,11 +29,18 @@ import org.json.JSONObject
 // 2026-07 查證時仍是 open、無解，結論是「除非改函式庫原始碼，沒有乾淨做法」。
 //
 // 改用完全不碰 TWA session 的「本機 loopback HTTP server」：
-// 網頁 JS 直接 fetch('http://127.0.0.1:PORT/ad/rewarded')（loopback 對 HTTPS 頁面
-// 不算 mixed content，瀏覽器允許），這支 Service 收到請求後啟動 AdActivity 顯示廣告，
-// 結果透過 AdBridge 物件傳回、擋著 HTTP 請求直到有結果才回應。
-// 這個 Service 由 MainActivity.onCreate() 啟動（見該檔），啟動後獨立於
-// LauncherActivity 存活——「started service」不會因為啟動它的 Activity finish() 而跟著死。
+// 網頁 JS 直接 fetch('http://127.0.0.1:PORT/...')（loopback 對 HTTPS 頁面不算
+// mixed content，瀏覽器允許）。這個 Service 由 MainActivity.onCreate() 啟動
+// （見該檔），啟動後獨立於 LauncherActivity 存活。
+//
+// ⚠️ 追加踩雷（真機實測）：這支 Service 原本收到請求後直接
+// context.startActivity(AdActivity) 顯示廣告，結果被 Android 的 Background
+// Activity Launch 限制擋下（logcat: BAL_BLOCK, result code=102）——即使是前景
+// 服務也不在官方文件列出的豁免條件內，只有「由目前可見的前景 App 發起」才會放行。
+// 改成：AdActivity 由網頁端用使用者手勢導轉自訂 URL scheme 啟動（Chrome 是前景
+// App，發起者是它，不是我們的 Service，因此不受 BAL 限制），這支 Service 降級
+// 成單純的「結果暫存區查詢站」（/ad/reset 清空、/ad/result 給目前狀態），
+// 網頁端用短間隔輪詢取得結果，不再需要 Service 主動開啟任何畫面。
 // ============================================================
 class AdBridgeService : Service() {
 
@@ -104,28 +109,21 @@ class AdBridgeService : Service() {
 
     private inner class LoopbackServer : NanoHTTPD("127.0.0.1", PORT) {
         override fun serve(session: IHTTPSession): Response {
-            if (session.uri != "/ad/rewarded") {
-                return newFixedLengthResponse(
+            val json = when (session.uri) {
+                "/ad/reset" -> {
+                    AdBridge.reset()
+                    JSONObject().put("ok", true)
+                }
+                "/ad/result" -> {
+                    JSONObject()
+                        .put("done", AdBridge.isDone())
+                        .put("granted", AdBridge.isGranted())
+                }
+                else -> return newFixedLengthResponse(
                     Response.Status.NOT_FOUND, "text/plain", "not found",
                 )
             }
-
-            val adType = session.parameters["type"]?.firstOrNull() ?: "coin"
-            val latch = CountDownLatch(1)
-            var granted = false
-
-            AdBridge.requestRewardedAd(applicationContext, adType) { result ->
-                granted = result
-                latch.countDown()
-            }
-
-            // 廣告載入/展示通常幾秒內完成，10s 逾時避免請求卡死不回應
-            // （逾時發生時 AdBridge 仍可能稍後才呼叫 completeWithResult，
-            // 但 HTTP 回應已經送出 granted=false，網頁端會走失敗分支，安全）。
-            latch.await(10, TimeUnit.SECONDS)
-
-            val json = JSONObject().put("granted", granted).toString()
-            return newFixedLengthResponse(Response.Status.OK, "application/json", json)
+            return newFixedLengthResponse(Response.Status.OK, "application/json", json.toString())
         }
     }
 }

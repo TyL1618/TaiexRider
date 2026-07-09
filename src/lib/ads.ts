@@ -95,8 +95,15 @@ function loadAdSense(pubId: string): void {
 // 檔頭說明——androidbrowserhelper 的 LauncherActivity 不暴露 CustomTabsSession，
 // 官方 PostMessage for TWA 走不通，改用這支不碰 TWA session 的做法）。
 // 網頁：AdSense 插頁式廣告暫緩（見 CLAUDE.md 廣告雙軌架構），先直接發獎勵。
+//
+// ⚠️ 真機實測追加：一開始讓 AdBridgeService 收到 fetch 後自己 startActivity 顯示廣告，
+// 被 Android 的 Background Activity Launch 限制擋下（前景服務也不算豁免條件，只有
+// 「由目前可見的前景 App 發起」才會放行）。改成：按鈕點擊當下（使用者手勢、Chrome 是
+// 前景 App）用一個 <a> 導轉到自訂 URL scheme 啟動 AdActivity，網頁這邊改成輪詢本機
+// server 的 /ad/result 拿結果，server 只是被動的結果暫存區查詢站。
 const AD_BRIDGE_PORT = 47591; // ⚠️ 需與 AdBridgeService.kt 的 PORT 常數保持一致
-const AD_BRIDGE_TIMEOUT_MS = 12000;
+const AD_BRIDGE_POLL_INTERVAL_MS = 500;
+const AD_BRIDGE_TIMEOUT_MS = 60000; // 廣告載入+一支 15~30s 影片+使用者關閉，留寬裕時間
 
 export type RewardedAdKind = "coin" | "revive";
 
@@ -105,21 +112,43 @@ export function requestRewardedAd(kind: RewardedAdKind): Promise<boolean> {
   return requestTwaRewardedAd(kind);
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 async function requestTwaRewardedAd(kind: RewardedAdKind): Promise<boolean> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), AD_BRIDGE_TIMEOUT_MS);
   try {
-    const res = await fetch(
-      `http://127.0.0.1:${AD_BRIDGE_PORT}/ad/rewarded?type=${kind}`,
-      { signal: controller.signal },
-    );
-    if (!res.ok) return false;
-    const data = await res.json();
-    return !!data.granted;
+    // 清掉上一次殘留的結果，避免輪詢一開始就誤讀到舊狀態（fire-and-forget，
+    // 不 await——導轉那一行必須跟按鈕的使用者手勢留在同一個同步呼叫堆疊內，
+    // Chrome 才會放行自訂 scheme 導轉，不會被當成背景彈出而擋掉）。
+    fetch(`http://127.0.0.1:${AD_BRIDGE_PORT}/ad/reset`).catch(() => {});
+
+    const a = document.createElement("a");
+    a.href = `taiexrider-ad://show?type=${kind}`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+
+    return await pollAdResult();
   } catch (err) {
     console.error("[ads] TWA 原生廣告橋接失敗", err);
     return false;
-  } finally {
-    clearTimeout(timeout);
   }
+}
+
+async function pollAdResult(): Promise<boolean> {
+  const deadline = Date.now() + AD_BRIDGE_TIMEOUT_MS;
+  while (Date.now() < deadline) {
+    await sleep(AD_BRIDGE_POLL_INTERVAL_MS);
+    try {
+      const res = await fetch(`http://127.0.0.1:${AD_BRIDGE_PORT}/ad/result`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.done) return !!data.granted;
+      }
+    } catch (err) {
+      console.error("[ads] 輪詢廣告結果失敗", err);
+    }
+  }
+  return false;
 }

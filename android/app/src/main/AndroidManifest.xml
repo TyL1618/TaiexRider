@@ -131,9 +131,11 @@
             </intent-filter>
         </service>
 
-        <!-- AdMob 獎勵廣告橋接（見 AdBridgeService.kt 檔頭說明）：
-             MainActivity 啟動時 startService 這支，網頁用 fetch(http://127.0.0.1:PORT/...)
-             呼叫；不對外 export，只有本機 loopback 能連到，另有 socket 綁 127.0.0.1 把關。 -->
+        <!-- AdMob 獎勵廣告結果查詢（見 AdBridgeService.kt 檔頭說明）：只是被動的
+             結果暫存區查詢站，不再負責啟動 AdActivity（那個角色交給下面的自訂
+             scheme intent-filter）。MainActivity 啟動時 startForegroundService 這支，
+             網頁用 fetch(http://127.0.0.1:PORT/...) 輪詢；不對外 export，只有本機
+             loopback 能連到，另有 socket 綁 127.0.0.1 把關。 -->
         <service
             android:name=".AdBridgeService"
             android:exported="false"
@@ -143,13 +145,24 @@
                 android:value="ad_reward_bridge" />
         </service>
 
-        <!-- 收到廣告請求後被 AdBridge.requestRewardedAd() 啟動、實際載入/顯示 RewardedAd
-             的透明畫面，沒有自己的 UI，廣告播完/失敗就 finish() 回到原本的 TWA。 -->
+        <!-- 實際載入/顯示 RewardedAd 的透明畫面，廣告播完/失敗就 finish() 回到原本的 TWA。
+             ⚠️ 一定要由這裡的自訂 scheme intent-filter 啟動（Chrome 使用者手勢導轉
+             taiexrider-ad://show?type=... 觸發），不能靠 Service 直接 startActivity——
+             後者會被 Android Background Activity Launch 限制擋下（真機實測 logcat:
+             BAL_BLOCK, result code=102，前景服務不算豁免條件），必須是「由目前可見的
+             前景 App（Chrome）發起」才會放行，見 AdBridge.kt 檔頭說明。 -->
         <activity
             android:name=".AdActivity"
             android:theme="@android:style/Theme.Translucent.NoTitleBar"
             android:excludeFromRecents="true"
-            android:exported="false" />
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="taiexrider-ad" android:host="show" />
+            </intent-filter>
+        </activity>
 
         <!-- androidbrowserhelper splash 圖傳遞用 FileProvider -->
         <provider

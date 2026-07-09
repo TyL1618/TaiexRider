@@ -1,26 +1,27 @@
 package com.tylapp.taiexrider
 
-import android.content.Context
-import android.content.Intent
-import java.util.concurrent.atomic.AtomicReference
-
-// AdBridgeService（處理 HTTP 請求的背景執行緒）跟 AdActivity（實際顯示廣告的 UI）
-// 同屬一個 process，用一個簡單的靜態回呼傳結果就夠，不需要真的跨 process IPC。
+// 真機實測發現：AdBridgeService 直接 context.startActivity(AdActivity) 會被 Android
+// 的 Background Activity Launch 限制擋下（logcat: BAL_BLOCK, result code=102）——
+// 前景服務並不在官方文件列出的豁免條件內，只有「由目前可見的前景 App 發起」才算數。
+// 所以 AdActivity 改成由 Chrome 使用者手勢觸發的自訂 URL scheme 導轉來啟動
+// （見 AndroidManifest.xml 的 intent-filter + src/lib/ads.ts 的 <a> 導轉），
+// 這個物件降級成單純的「結果暫存區」：AdActivity 顯示完廣告後把結果寫進來，
+// AdBridgeService 的 HTTP endpoint 被動讀出來回應網頁端的輪詢，不再需要開啟任何畫面。
 object AdBridge {
-    private val pendingCallback = AtomicReference<((Boolean) -> Unit)?>(null)
+    @Volatile private var done = false
+    @Volatile private var granted = false
 
-    fun requestRewardedAd(context: Context, adType: String, callback: (Boolean) -> Unit) {
-        // 同一時間只服務一個請求：新請求進來若還有舊的沒回應，直接判失敗，
-        // 避免 AdActivity 疊多層或回呼對象錯亂。
-        pendingCallback.getAndSet(callback)?.invoke(false)
-        val intent = Intent(context, AdActivity::class.java).apply {
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_ANIMATION)
-            putExtra(AdActivity.EXTRA_AD_TYPE, adType)
-        }
-        context.startActivity(intent)
+    fun reset() {
+        done = false
+        granted = false
     }
 
-    fun completeWithResult(granted: Boolean) {
-        pendingCallback.getAndSet(null)?.invoke(granted)
+    fun complete(result: Boolean) {
+        granted = result
+        done = true
     }
+
+    fun isDone(): Boolean = done
+
+    fun isGranted(): Boolean = granted
 }
