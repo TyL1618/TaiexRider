@@ -1,10 +1,12 @@
 package com.tylapp.taiexrider
 
 import android.app.Activity
+import android.content.Intent
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import android.os.Bundle
 import android.util.Log
+import androidx.core.content.ContextCompat
 import com.google.android.gms.ads.AdError
 import com.google.android.gms.ads.AdRequest
 import com.google.android.gms.ads.FullScreenContentCallback
@@ -41,6 +43,12 @@ class AdActivity : Activity() {
         super.onCreate(savedInstanceState)
         Log.i(TAG, "onCreate intent.data=${intent?.data}")
         window.setBackgroundDrawable(ColorDrawable(Color.BLACK))
+        // ⚠️ 真機實測發現：載入廣告影片很吃記憶體，系統可能把整個 App 行程砍掉重開，
+        // 新行程直接從這支 Activity 起頭、從未經過 MainActivity.onCreate()，導致
+        // AdBridgeService 沒有機會啟動——網頁端的 fetch 全部連不上、卡在「播放中」。
+        // 這裡也保險啟動一次（idempotent：已經在跑的話，只是多送一個 onStartCommand，
+        // 不會重複建立 server），確保不管廣告是在哪個行程播，這個行程一定有 server 在聽。
+        ContextCompat.startForegroundService(this, Intent(this, AdBridgeService::class.java))
         AdBridge.reset()
         // 目前兩種類型都還是用同一個 Google 測試單元 ID，上架前分流成真實單元時
         // 在這裡依 adType（"coin" / "revive"）換成對應的真實 ID 即可。
