@@ -104,6 +104,28 @@ true）**從一開始就只拿去改按鈕文字/樣式，`handleStart()` 從未
 TWA 環境真正呼叫原生廣告的行為，且測試環境無法登入+湊到第 3 次挑戰次數，待使用者真機
 （已登入、真的打到第 3 次）測試確認廣告有跳出、看完才進遊戲、沒看完不進遊戲/不扣次數**。
 
+### 🐛 2026-07-09（再追加）：買永久去廣告後，看廣告拿金幣/雙倍金幣按鈕整個消失（本該改成直接領取）
+
+使用者買了永久去廣告後，車庫「看廣告拿金幣」按鈕直接不見，等於花錢移除廣告反而失去
+每天 80 金幣（2×40）的機會。查發現 [Garage.tsx:204](src/screens/Garage.tsx:204) 跟
+[GameCanvas.tsx:1632](src/game/GameCanvas.tsx:1632)（結算畫面「觀看廣告 獎勵 ×2」）
+都是 `{!adsRemoved && (...)}` 整段按鈕連容器一起藏起來——只有「看廣告復活」
+（`handleWatchAdRevive`）當初有正確處理 `adsRemoved` 分支（直接復活不用看廣告），
+另外兩個拿金幣的按鈕漏做同樣的事，是不一致的實作，不是新壞的。
+
+修法：`Garage.tsx` 的 `handleWatchAd` 與 `GameCanvas.tsx` 的 `handleWatchAdDouble`
+都比照 `handleWatchAdRevive` 的既有模式，`adsRemoved` 為真時跳過 `requestRewardedAd()`
+直接呼叫發獎勵邏輯；按鈕不再用 `!adsRemoved` 整段隱藏，改成永遠顯示，文字依
+`adsRemoved` 切換「📺 看廣告 +40 金幣」/「🎁 領取 +40 金幣」（車庫）、
+「📺 觀看廣告 獎勵 ×2」/「🎁 領取 獎勵 ×2」（結算畫面），每日 2 次上限不變。
+
+typecheck 過，preview 用 `localStorage.setItem('tr_ads_removed','1')` 模擬已購買
+狀態實測：車庫按鈕正確顯示「🎁 領取 +40 金幣 (0/2)」、點擊後金幣立即從 0→40、
+次數正確累加到 (1/2)，全程沒有卡在廣告流程。結算畫面「雙倍金幣」按鈕改動邏輯與
+車庫完全對稱、typecheck 過，但需要真的跑完一局才能進到結算畫面，preview 隱藏分頁
+rAF 暫停測不到（已知限制），**待使用者真機（已買永久去廣告的帳號）確認結算畫面
+按鈕正確顯示「🎁 領取 獎勵 ×2」且點擊立即雙倍入帳**。
+
 ### 📌 待辦（vc17 做）：AdBridgeService 改成「只在看廣告時才短暫存活」
 
 **現況**：`AdBridgeService` 從 `MainActivity.onCreate()` 就啟動、整個 App 執行期間持續存活

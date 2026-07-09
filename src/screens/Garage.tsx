@@ -138,15 +138,21 @@ export default function Garage({ user, onBack }: { user: User | null; onBack: ()
 
   const handleWatchAd = () => {
     if (watchingAd || adClaims >= MAX_AD_COIN_CLAIMS_PER_DAY) return;
+    const grantAdCoins = () => {
+      incrementAdCoinClaims(dailyKey(), user?.id ?? null);
+      setAdClaims(getAdCoinClaims(dailyKey(), user?.id ?? null));
+      setCoins(addCoins(AD_COIN_REWARD));
+      earnCoins("ad").then(() => setCoins(getCoins()));
+    };
+    // 已買永久去廣告：不用看廣告，點擊直接領取（比照看廣告復活/雙倍金幣的既有作法）
+    if (adsRemoved) {
+      grantAdCoins();
+      return;
+    }
     setWatchingAd(true);
     requestRewardedAd("coin").then((ok) => {
       setWatchingAd(false);
-      if (ok) {
-        incrementAdCoinClaims(dailyKey(), user?.id ?? null);
-        setAdClaims(getAdCoinClaims(dailyKey(), user?.id ?? null));
-        setCoins(addCoins(AD_COIN_REWARD));
-        earnCoins("ad").then(() => setCoins(getCoins()));
-      }
+      if (ok) grantAdCoins();
     });
   };
 
@@ -201,19 +207,19 @@ export default function Garage({ user, onBack }: { user: User | null; onBack: ()
       <p className="garage-coins"><CoinIcon size={22} /> 金幣 {coins}</p>
       <p className="garage-coins garage-diamonds">💎 鑽石 {diamonds}</p>
       <p className="garage-intro">完賽/摔車與每日任務都能賺金幣，解鎖車皮換上場</p>
-      {!adsRemoved && (
-        <button
-          className="garage-ad-btn"
-          disabled={watchingAd || adClaims >= MAX_AD_COIN_CLAIMS_PER_DAY}
-          onClick={handleWatchAd}
-        >
-          {watchingAd
-            ? "廣告播放中…"
-            : adClaims >= MAX_AD_COIN_CLAIMS_PER_DAY
-              ? "今日已達上限"
+      <button
+        className="garage-ad-btn"
+        disabled={watchingAd || adClaims >= MAX_AD_COIN_CLAIMS_PER_DAY}
+        onClick={handleWatchAd}
+      >
+        {watchingAd
+          ? "廣告播放中…"
+          : adClaims >= MAX_AD_COIN_CLAIMS_PER_DAY
+            ? "今日已達上限"
+            : adsRemoved
+              ? `🎁 領取 +${AD_COIN_REWARD} 金幣 (${adClaims}/${MAX_AD_COIN_CLAIMS_PER_DAY})`
               : `📺 看廣告 +${AD_COIN_REWARD} 金幣 (${adClaims}/${MAX_AD_COIN_CLAIMS_PER_DAY})`}
-        </button>
-      )}
+      </button>
 
       <div className="garage-list">
         {BIKE_SKINS.filter((s) => !s.locked && s.currency !== "diamond").map(renderSkinCard)}

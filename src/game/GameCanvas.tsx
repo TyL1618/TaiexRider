@@ -195,18 +195,25 @@ export default function GameCanvas({ prices, label, name, subtitle, onExit, onGa
   const isLongMarch = analyticsMode === "long";
   const handleWatchAdDouble = () => {
     if (!coinRewardEligible || adDoubleState !== "idle") return;
+    const grantDouble = () => {
+      const progressPct = finished ? 1 : deathProgressRef.current;
+      const amount = computePlayReward(isLongMarch, finished, progressPct);
+      addCoins(grantPlayReward(dailyKey(), amount, uid));
+      const kind = isLongMarch
+        ? (finished ? "long_finish" : "long_crash")
+        : (finished ? "finish" : "crash");
+      earnCoins(kind, kind === "long_crash" ? amount : undefined);
+    };
+    // 已買永久去廣告：不用看廣告，點擊直接領取雙倍（比照看廣告復活的既有作法）
+    if (adsRemoved) {
+      setAdDoubleState("claimed");
+      grantDouble();
+      return;
+    }
     setAdDoubleState("watching");
     requestRewardedAd("coin").then((ok) => {
       setAdDoubleState(ok ? "claimed" : "idle");
-      if (ok) {
-        const progressPct = finished ? 1 : deathProgressRef.current;
-        const amount = computePlayReward(isLongMarch, finished, progressPct);
-        addCoins(grantPlayReward(dailyKey(), amount, uid));
-        const kind = isLongMarch
-          ? (finished ? "long_finish" : "long_crash")
-          : (finished ? "finish" : "crash");
-        earnCoins(kind, kind === "long_crash" ? amount : undefined);
-      }
+      if (ok) grantDouble();
     });
   };
   // 結算面板剛彈出時短暫吃掉點擊（防止摔車/完賽瞬間手指還按著油門，畫面切換後
@@ -1629,13 +1636,17 @@ let crashTimer = 0;
                   <span className="overlay-play-reward-amount">
                     本局收益 {shownReward} 金幣{adDoubleState === "claimed" && " ✓"}
                   </span>
-                  {!adsRemoved && adDoubleState !== "claimed" && (
+                  {adDoubleState !== "claimed" && (
                     <button
                       className="overlay-ad-coins-btn"
                       disabled={adDoubleState === "watching"}
                       onClick={handleWatchAdDouble}
                     >
-                      {adDoubleState === "watching" ? "廣告播放中…" : "📺 觀看廣告 獎勵 ×2"}
+                      {adDoubleState === "watching"
+                        ? "廣告播放中…"
+                        : adsRemoved
+                          ? "🎁 領取 獎勵 ×2"
+                          : "📺 觀看廣告 獎勵 ×2"}
                     </button>
                   )}
                 </div>
