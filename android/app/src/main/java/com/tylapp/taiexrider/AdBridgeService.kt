@@ -6,7 +6,9 @@ import android.app.Service
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import fi.iki.elonen.NanoHTTPD
@@ -30,8 +32,8 @@ import org.json.JSONObject
 //
 // 改用完全不碰 TWA session 的「本機 loopback HTTP server」：
 // 網頁 JS 直接 fetch('http://127.0.0.1:PORT/...')（loopback 對 HTTPS 頁面不算
-// mixed content，瀏覽器允許）。這個 Service 由 MainActivity.onCreate() 啟動
-// （見該檔），啟動後獨立於 LauncherActivity 存活。
+// mixed content，瀏覽器允許）。vc17 起這個 Service 只由 AdActivity 在看廣告時啟動
+// （不再由 MainActivity 常駐啟動），一輪結束後自動關閉，見 class 註解。
 //
 // ⚠️ 追加踩雷（真機實測）：這支 Service 原本收到請求後直接
 // context.startActivity(AdActivity) 顯示廣告，結果被 Android 的 Background
@@ -42,6 +44,11 @@ import org.json.JSONObject
 // 成單純的「結果暫存區查詢站」（/ad/reset 清空、/ad/result 給目前狀態），
 // 網頁端用短間隔輪詢取得結果，不再需要 Service 主動開啟任何畫面。
 // ============================================================
+// ⚠️ vc17 起改成「只在看廣告時才短暫存活」：不再由 MainActivity 常駐啟動，唯一啟動點
+// 是 AdActivity（使用者按下看廣告的當下）。啟動後 IDLE_TIMEOUT_MS 內沒完成就自動關閉
+// （保底，避免流程卡住讓通知永遠留著）；廣告結果出來（done 第一次變 true）後留
+// LINGER_AFTER_DONE_MS 給網頁端輪詢抓走結果，然後自動關閉。前景服務通知（Android
+// 系統強制要求，無法隱藏）只會在「點看廣告 → 廣告播完後幾秒」這段期間短暫出現。
 class AdBridgeService : Service() {
 
     companion object {
@@ -50,9 +57,32 @@ class AdBridgeService : Service() {
         private const val TAG = "AdBridgeService"
         private const val NOTIF_CHANNEL_ID = "ad_bridge"
         private const val NOTIF_ID = 1
+
+        // 保底逾時：涵蓋「廣告載入 + 一支 15~30s 影片 + 網頁端 60s 輪詢逾時」的最壞情況
+        // 還有餘裕；超過就視為這一輪流程已經死掉，自動關閉服務讓通知消失。
+        private const val IDLE_TIMEOUT_MS = 120_000L
+        // done=true 之後留給網頁端輪詢抓結果的時間（輪詢間隔 500ms + visibilitychange
+        // 喚醒，廣告一關閉分頁恢復可見就會立刻來抓，8 秒非常寬裕）。
+        private const val LINGER_AFTER_DONE_MS = 8_000L
     }
 
     private var server: LoopbackServer? = null
+    private val handler = Handler(Looper.getMainLooper())
+    // done=true 後只安排一次短延遲關閉（輪詢會重複讀 /ad/result，不能每次都重新排程）
+    @Volatile private var lingerArmed = false
+
+    private val stopRunnable = Runnable {
+        Log.i(TAG, "auto-stopping (round finished or idle timeout)")
+        stopForeground(STOP_FOREGROUND_REMOVE)
+        stopSelf()
+    }
+
+    // 重新排程自動關閉。serve() 在 NanoHTTPD 的背景執行緒呼叫，Handler post 本身是
+    // thread-safe 的，不需要額外鎖。
+    private fun scheduleStop(delayMs: Long) {
+        handler.removeCallbacks(stopRunnable)
+        handler.postDelayed(stopRunnable, delayMs)
+    }
 
     // ⚠️ 真機實測發現：MainActivity 啟動 TWA 成功後很快 finish()，App 對系統來說
     // 變成「背景無互動」，三星 One UI 在幾分鐘內就把普通 Service 判定 app idle 停掉
@@ -96,10 +126,16 @@ class AdBridgeService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        return START_STICKY
+        // 每次啟動（= AdActivity 開始新一輪看廣告）重置狀態、重新排保底逾時。
+        lingerArmed = false
+        scheduleStop(IDLE_TIMEOUT_MS)
+        // 不用 START_STICKY：這個服務只服務「當下這一輪看廣告」，被系統殺掉後
+        // 自動復活反而會讓通知在沒人看廣告時冒出來。下一輪 AdActivity 會重新啟動它。
+        return START_NOT_STICKY
     }
 
     override fun onDestroy() {
+        handler.removeCallbacks(stopRunnable)
         server?.stop()
         server = null
         super.onDestroy()
@@ -111,14 +147,23 @@ class AdBridgeService : Service() {
         override fun serve(session: IHTTPSession): Response {
             val json = when (session.uri) {
                 "/ad/reset" -> {
+                    // 新一輪看廣告開始：清狀態 + 重排保底逾時。（服務剛被 AdActivity 啟動的
+                    // 情況下 onStartCommand 也會做同樣的事，這裡涵蓋「上一輪還沒自動關閉、
+                    // 使用者又立刻點下一次」的重用路徑。）
                     AdBridge.reset()
-                    Log.i(TAG, "GET /ad/reset")
+                    lingerArmed = false
+                    scheduleStop(IDLE_TIMEOUT_MS)
                     JSONObject().put("ok", true)
                 }
                 "/ad/result" -> {
                     val done = AdBridge.isDone()
                     val granted = AdBridge.isGranted()
-                    Log.i(TAG, "GET /ad/result -> done=$done granted=$granted")
+                    if (done && !lingerArmed) {
+                        // 結果已出，留短暫時間給網頁端輪詢抓走，然後自動關閉服務
+                        lingerArmed = true
+                        Log.i(TAG, "result ready (granted=$granted), stopping in ${LINGER_AFTER_DONE_MS}ms")
+                        scheduleStop(LINGER_AFTER_DONE_MS)
+                    }
                     JSONObject().put("done", done).put("granted", granted)
                 }
                 else -> {

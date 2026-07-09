@@ -104,6 +104,11 @@ function loadAdSense(pubId: string): void {
 const AD_BRIDGE_PORT = 47591; // ⚠️ 需與 AdBridgeService.kt 的 PORT 常數保持一致
 const AD_BRIDGE_POLL_INTERVAL_MS = 500;
 const AD_BRIDGE_TIMEOUT_MS = 60000; // 廣告載入+一支 15~30s 影片+使用者關閉，留寬裕時間
+// 從頭到尾一次都沒連上本機 server 就提早放棄的門檻：涵蓋「vc17 起 server 由 AdActivity
+// 啟動、點擊後要 1~3 秒才起來」跟「行程被系統砍掉重啟」的正常晚起情況之後仍然綽綽有餘。
+// 若連 15 秒都完全連不上，代表橋接整條不可用（未來 Chrome PNA 政策擋掉公開網頁對
+// loopback 的請求，就會是這個症狀），不用讓玩家的按鈕卡滿 60 秒。
+const AD_BRIDGE_UNREACHABLE_BAIL_MS = 15000;
 
 export type RewardedAdKind = "coin" | "revive";
 
@@ -136,6 +141,8 @@ async function requestTwaRewardedAd(kind: RewardedAdKind): Promise<boolean> {
     // 清掉上一次殘留的結果，避免輪詢一開始就誤讀到舊狀態（fire-and-forget，
     // 不 await——導轉那一行必須跟按鈕的使用者手勢留在同一個同步呼叫堆疊內，
     // Chrome 才會放行自訂 scheme 導轉，不會被當成背景彈出而擋掉）。
+    // vc17 起 server 平常不在跑（只在看廣告時短暫存活），這個 fetch 失敗是常態、
+    // 可安全忽略：AdActivity.onCreate() 一定會自己 AdBridge.reset() 一次。
     fetch(`http://127.0.0.1:${AD_BRIDGE_PORT}/ad/reset`).catch(() => {});
 
     // ⚠️ 真機實測：用 <a>.click() 在同一份文件內導轉，TWA 會判定成「要離開目前受信任
@@ -156,19 +163,32 @@ async function requestTwaRewardedAd(kind: RewardedAdKind): Promise<boolean> {
 }
 
 async function pollAdResult(): Promise<boolean> {
-  const deadline = Date.now() + AD_BRIDGE_TIMEOUT_MS;
+  const start = Date.now();
+  const deadline = start + AD_BRIDGE_TIMEOUT_MS;
+  let everReached = false; // 是否曾成功連上 server（拿到任何回應都算，不管 done 與否）
+  let loggedFetchError = false;
   while (Date.now() < deadline) {
     await waitOrWake(AD_BRIDGE_POLL_INTERVAL_MS);
     try {
       const res = await fetch(`http://127.0.0.1:${AD_BRIDGE_PORT}/ad/result`);
       if (res.ok) {
+        everReached = true;
         const data = await res.json();
         if (data.done) return !!data.granted;
       } else {
         console.warn(`[ads] /ad/result 回應非 ok: ${res.status}`);
       }
     } catch (err) {
-      console.error("[ads] 輪詢廣告結果失敗", err);
+      // server 還沒起來（vc17 起由 AdActivity 啟動，點擊後 1~3 秒才就緒）每輪都會
+      // 進到這裡，只記第一次避免洗版；真正異常由下面的提早放棄/逾時 warn 收尾。
+      if (!loggedFetchError) {
+        console.error("[ads] 輪詢廣告結果失敗（同類錯誤只記第一次）", err);
+        loggedFetchError = true;
+      }
+    }
+    if (!everReached && Date.now() - start > AD_BRIDGE_UNREACHABLE_BAIL_MS) {
+      console.warn("[ads] 從未連上本機橋接 server，提早放棄（服務未啟動或 loopback 被瀏覽器政策擋下）");
+      return false;
     }
   }
   console.warn("[ads] 輪詢逾時，視為未獲得獎勵");

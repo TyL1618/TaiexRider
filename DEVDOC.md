@@ -470,9 +470,11 @@ repo `android/` 已改好以下三項，**需複製到 Android Studio 專案 →
 - API 30+：`WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE`
 - API 24–29：`View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY | HIDE_NAVIGATION | FULLSCREEN`
 
-AndroidManifest 的 activity name 改為 `.MainActivity`。啟動時額外
-`ContextCompat.startForegroundService(this, Intent(this, AdBridgeService::class.java))`
-確保廣告橋接 server 存活（見 9.4c）。
+AndroidManifest 的 activity name 改為 `.MainActivity`。另負責 Android 13+ 的
+`POST_NOTIFICATIONS` 執行時權限請求（覆寫 `shouldLaunchImmediately()` 回 `false` 延後
+TWA 自動啟動，等權限對話框有結果才 `launchTwa()`，否則瀏覽器畫面會立刻蓋掉對話框）。
+vc17 起**不再**在這裡啟動 `AdBridgeService`——服務只在看廣告時由 `AdActivity` 短暫啟動
+（見 9.4c），這裡只負責在自然的開機時機把通知權限問完。
 
 ### 9.4c AdMob 獎勵廣告橋接（`AdBridge.kt`/`AdBridgeService.kt`/`AdActivity.kt`，2026-07-09 完成）
 
@@ -487,14 +489,20 @@ TWA 沒有官方 postMessage 套件可用（androidbrowserhelper 的 `LauncherAc
   `https://taiexrider.pages.dev` 與 server `http://127.0.0.1:47591` 是跨來源，
   沒有這個標頭瀏覽器會讓請求照送、伺服器照回應，但擋住網頁 JS 讀取內容（曾是這條
   橋接卡最久的 bug，症狀是「log 顯示 done=true 但網頁端永遠拿不到」）。
+  **vc17 起改「只在看廣告時短暫存活」**：唯一啟動點是 `AdActivity`；`onStartCommand`
+  ／`/ad/reset` 都會排一個 120s 保底逾時（流程卡死也不會讓通知永遠留著）；
+  `/ad/result` 偵測到 `done` 第一次變 `true` 時改排 8s 短延遲後
+  `stopForeground()+stopSelf()`（留時間給網頁端輪詢抓走結果）。`START_NOT_STICKY`
+  （被系統殺掉不自動復活，下一輪看廣告會重新啟動）。前景服務通知（系統強制，無法
+  隱藏）因此只在「點看廣告 → 廣告播完後幾秒」短暫出現，平常通知欄乾淨。
 - **`AdActivity.kt`**：真正載入/顯示 `RewardedAd` 的透明畫面，繼承普通 `Activity`
   （**不是** `AppCompatActivity`——配上 manifest 的 `Theme.Translucent.NoTitleBar`
   會直接崩潰）。由 manifest 的自訂 URL scheme intent-filter
   （`taiexrider-ad://show?type=coin|revive`）啟動，**發起者必須是 Chrome**（使用者
-  在網頁點按鈕觸發），才不受 BAL 限制。`onCreate()` 也會自己
-  `startForegroundService` 一次啟動 Service（保險：載入廣告吃記憶體，系統可能把
-  整個 App 行程砍掉重開，新行程若直接冷啟動這支 Activity、從未經過
-  `MainActivity`，Service 就沒機會啟動）。
+  在網頁點按鈕觸發），才不受 BAL 限制。`onCreate()` 啟動 `AdBridgeService`（vc17 起
+  是唯一啟動點）——這個位置天生涵蓋「載入廣告吃記憶體，系統把整個 App 行程砍掉重開、
+  新行程直接冷啟動這支 Activity、從未經過 `MainActivity`」的坑：廣告在哪個行程播，
+  哪個行程就有 server 在聽。
 - **`AdBridge.kt`**：`AdBridgeService`/`AdActivity` 共用的簡單靜態狀態（`done`/
   `granted`），同一 process 內傳遞結果，不需要真的跨 process IPC。
 - **網頁端**（`src/lib/ads.ts` 的 `requestRewardedAd(kind)`）：按鈕點擊同步用
@@ -503,6 +511,10 @@ TWA 沒有官方 postMessage 套件可用（androidbrowserhelper 的 `LauncherAc
   按離開直接把整個 TWA 關掉），之後輪詢 `/ad/result` 直到有結果或 60 秒逾時；
   輪詢同時監聽 `visibilitychange`（廣告全螢幕顯示時原本分頁變背景分頁，
   `setTimeout` 會被 Chrome 節流，分頁一恢復可見要立刻醒來檢查，不能只靠固定間隔）。
+  **優雅降級**：若從頭到尾 15 秒完全連不上 loopback server（服務起不來，或未來
+  Chrome Private Network Access 政策把公開網頁對 127.0.0.1 的請求整個擋掉），提早
+  放棄回傳 `false`——呼叫端（復活/雙倍/拿金幣/排行榜第 3~5 次）對 `false` 一律
+  「不發獎勵、不扣次數、按鈕恢復可按」，遊戲照常進行，不會卡死。
 - **✅ 已真機驗證**：復活／結算畫面雙倍金幣／車庫看廣告拿金幣三條路徑皆確認
   正常發放獎勵、Supabase 正確寫入。**上架前待辦**：`AdActivity.kt` 的
   `TEST_REWARDED_AD_UNIT_ID` 仍是 Google 官方測試單元，要換成真實單元 ID

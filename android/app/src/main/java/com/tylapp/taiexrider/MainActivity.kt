@@ -1,7 +1,6 @@
 package com.tylapp.taiexrider
 
 import android.Manifest
-import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -33,17 +32,17 @@ class MainActivity : LauncherActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // Android 13+ 顯示任何通知（含前景服務的常駐通知）都需要使用者額外同意
+        // Android 13+ 顯示任何通知（含前景服務的通知）都需要使用者額外同意
         // POST_NOTIFICATIONS 這個執行時權限——沒要過這個權限，前景服務本身仍會
         // 拿到優先權（廣告功能不受影響），但系統會靜默不顯示通知。
+        // vc17 起 AdBridgeService 改由 AdActivity 在看廣告時才啟動（不再常駐），
+        // 這裡只負責在自然的開機時機把權限問完，之後看廣告時權限狀態已經確定。
         if (needsNotificationPermission()) {
             ActivityCompat.requestPermissions(
                 this,
                 arrayOf(Manifest.permission.POST_NOTIFICATIONS),
                 NOTIFICATION_PERMISSION_REQUEST_CODE,
             )
-        } else {
-            startAdBridgeService()
         }
         hideSystemUI()
     }
@@ -55,21 +54,10 @@ class MainActivity : LauncherActivity() {
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == NOTIFICATION_PERMISSION_REQUEST_CODE) {
-            // 不管使用者允許或拒絕都要啟動——廣告橋接本身不需要通知權限就能運作，
-            // 只是拒絕的話通知不會顯示，這裡只是確保啟動時機在權限狀態確定之後。
-            startAdBridgeService()
             // shouldLaunchImmediately() 剛才回傳了 false，TWA 還沒真的啟動，
-            // 現在權限已經有結果了，換我們手動呼叫把延後的啟動補上。
+            // 現在權限已經有結果了（允許或拒絕都行），換我們手動把延後的啟動補上。
             launchTwa()
         }
-    }
-
-    // 啟動 AdMob 獎勵廣告的本機橋接 server（見 AdBridgeService.kt 檔頭說明）。
-    // 這支 Activity 啟動 TWA 成功後很快就會 finish()，但前景服務不會跟著死，
-    // 之後網頁靠 fetch(127.0.0.1) 呼叫它都還在（普通 startService 實測會被
-    // 系統背景省電機制提早停掉，見 AdBridgeService.kt 的 startAsForeground()）。
-    private fun startAdBridgeService() {
-        ContextCompat.startForegroundService(this, Intent(this, AdBridgeService::class.java))
     }
 
     // 視窗重新取得焦點時（如彈窗關閉後）重設 immersive，避免系統列跑回來

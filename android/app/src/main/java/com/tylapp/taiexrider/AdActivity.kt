@@ -41,13 +41,13 @@ class AdActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        Log.i(TAG, "onCreate intent.data=${intent?.data}")
         window.setBackgroundDrawable(ColorDrawable(Color.BLACK))
-        // ⚠️ 真機實測發現：載入廣告影片很吃記憶體，系統可能把整個 App 行程砍掉重開，
-        // 新行程直接從這支 Activity 起頭、從未經過 MainActivity.onCreate()，導致
-        // AdBridgeService 沒有機會啟動——網頁端的 fetch 全部連不上、卡在「播放中」。
-        // 這裡也保險啟動一次（idempotent：已經在跑的話，只是多送一個 onStartCommand，
-        // 不會重複建立 server），確保不管廣告是在哪個行程播，這個行程一定有 server 在聽。
+        // vc17 起這裡是 AdBridgeService 的唯一啟動點（服務只在看廣告這一輪存活，
+        // 結束後自動關閉，見 AdBridgeService 的 class 註解）。這個位置天生涵蓋了
+        // 真機實測踩過的坑：載入廣告影片吃記憶體時，系統可能把整個 App 行程砍掉重開、
+        // 新行程直接從這支 Activity 冷啟動、從未經過 MainActivity——由這裡啟動就保證
+        // 「廣告在哪個行程播，哪個行程就有 server 在聽」。重複啟動是安全的（已在跑
+        // 只會多收一個 onStartCommand，重排逾時，不會重複建立 server）。
         ContextCompat.startForegroundService(this, Intent(this, AdBridgeService::class.java))
         AdBridge.reset()
         // 目前兩種類型都還是用同一個 Google 測試單元 ID，上架前分流成真實單元時
@@ -56,18 +56,19 @@ class AdActivity : Activity() {
         loadAndShow(adType)
     }
 
+    // Log 原則（vc17 清理後留下的都是長期可觀測性，別再砍）：错誤路徑一律 Log.e；
+    // 正常路徑只留一行「廣告關閉 + 是否拿到獎勵」——這是排查「看完沒發獎勵」類問題時
+    // 唯一需要的定罪證據（見 CLAUDE.md 2026-07-09 八層坑，當時就是靠這行找到 CORS 真因）。
     private fun loadAndShow(adType: String) {
-        Log.i(TAG, "loadAndShow adType=$adType, requesting ad load")
         RewardedAd.load(
             this,
             TEST_REWARDED_AD_UNIT_ID,
             AdRequest.Builder().build(),
             object : RewardedAdLoadCallback() {
                 override fun onAdLoaded(ad: RewardedAd) {
-                    Log.i(TAG, "onAdLoaded, showing now")
                     ad.fullScreenContentCallback = object : FullScreenContentCallback() {
                         override fun onAdDismissedFullScreenContent() {
-                            Log.i(TAG, "onAdDismissedFullScreenContent rewardEarned=$rewardEarned")
+                            Log.i(TAG, "ad dismissed, type=$adType rewardEarned=$rewardEarned")
                             AdBridge.complete(rewardEarned)
                             finish()
                         }
@@ -79,7 +80,6 @@ class AdActivity : Activity() {
                         }
                     }
                     ad.show(this@AdActivity) {
-                        Log.i(TAG, "onUserEarnedReward")
                         rewardEarned = true
                     }
                 }
@@ -91,10 +91,5 @@ class AdActivity : Activity() {
                 }
             },
         )
-    }
-
-    override fun onDestroy() {
-        Log.i(TAG, "onDestroy")
-        super.onDestroy()
     }
 }

@@ -96,6 +96,24 @@ repo 內的 `android/` 資料夾（git 追蹤）跟本機 `AndroidStudioProjects
 
 ## 目前進度
 
+### 🛠️ 2026-07-09（Fable 5 交接清單執行）：IAP 稽核報告 + vc17 廣告服務生命週期完成
+
+依 [FABLE5_HANDOFF_20260709.md](FABLE5_HANDOFF_20260709.md) 執行：
+- **優先順序 1（IAP 二次稽核）✅**：稽核報告已寫在該檔底部。**最重要發現：Edge Function
+  沒比對 Google 回應的 `productId` 跟聲稱的 `sku_id`（買便宜包冒充貴包的真錢漏洞，
+  建議修，3 行改動）**；另有退款無收回機制（建議封測期接受）等 4 個中小發現。
+  **依交接指示未動任何金流 code，等使用者拍板**。
+- **優先順序 2（vc17）✅ 程式碼完成，⚠️ 待真機測試**：`AdBridgeService` 改「只在看廣告時
+  短暫存活」——`MainActivity` 不再啟動服務（只留通知權限請求+延後 launchTwa 邏輯）、
+  `AdActivity` 成唯一啟動點、服務加 120s 保底逾時 + done 後 8s 自動關閉、
+  `START_NOT_STICKY`；診斷 log 收斂（留錯誤路徑 + 廣告關閉一行）；`ads.ts` 加
+  「15 秒完全連不上 loopback 就提早放棄」的優雅降級（兼 PNA 風險預防，交接附加項
+  一併完成）；versionCode 16→17。已同步複製到本機
+  `C:\Users\tyl16\AndroidStudioProjects\TaiexRider\`。**⚠️ vc16 還在 Play 審核中，
+  vc17 何時上傳由使用者決定；上傳前先 debug build 真機測三條廣告路徑（拿金幣/復活/
+  雙倍），確認通知只在看廣告期間出現、播完幾秒後消失**。
+- 架構說明已整併進 DEVDOC §9.4b/§9.4c（vc17 生命週期 + 優雅降級）。
+
 ### 📌 下一步版本規劃（2026-07-09 使用者拍板，vc16 已上傳等審核，先吃飯去）
 
 - **vc16（目前）**：維持現狀不動，等 Play Console 審核結果。
