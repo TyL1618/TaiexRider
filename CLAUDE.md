@@ -87,9 +87,20 @@ requestPermissions(POST_NOTIFICATIONS)`（`LauncherActivity` 繼承的是普通
 `android.app.Activity` 不是 `ComponentActivity`，不能用新版
 `registerForActivityResult`，改用經典的 `ActivityCompat`/`onRequestPermissionsResult`
 寫法），manifest 補 `<uses-permission android:name="android.permission.POST_NOTIFICATIONS" />`。
-versionCode 15→16。**待重新建置 vc16 後真機確認通知有跳出來，再用這個版本錄
-Google 要求的示範影片**（用還沒修好的 vc15 錄影片，通知本來就不會出現，等於錄了一支
-「證明不了任何事」的影片，白費工——這也是為什麼建議先修好這個 bug 再錄）。
+versionCode 15→16。
+
+**⚠️ 十度追加（vc16 重灌後仍未顯示通知，抓到第二層真因）**：重灌後確認有跳出「允許
+通知」的系統權限詢問，但實際玩遊戲通知欄還是沒東西。根因：**權限請求跟啟動服務寫在
+同一段同步程式碼裡**——`ActivityCompat.requestPermissions()` 跳出對話框後不會等待
+使用者互動（非同步、立刻往下執行），緊接著的 `startForegroundService()` 幾乎立刻
+執行，`AdBridgeService.onCreate()` 呼叫 `startForeground()` 的當下權限根本還沒生效，
+通知被系統靜默壓下；而 `Service.onCreate()` 只會執行一次，就算使用者之後真的按了
+「允許」，同一個服務實例（同一次 App 執行期間）也不會補顯示，除非整個 App 程序重啟。
+**修法**：改成「已有權限才立刻啟動服務；權限還沒決定，先發請求，改到
+`onRequestPermissionsResult()` 回呼裡才啟動服務」，確保 `startForeground()` 執行的
+當下權限狀態已經確定（不管使用者允許或拒絕都會啟動，只是拒絕的話通知不顯示、
+但廣告功能不受影響）。**待 vc16 重新建置測試**——這次應該無論使用者點允許或拒絕，
+只要點了允許，第一次執行就會正確顯示通知。
 
 ### 🔴🎉 2026-07-09（八度追加，真因）：AdBridgeService 缺 CORS 標頭，網頁端永遠讀不到伺服器已經正確回應的結果
 
