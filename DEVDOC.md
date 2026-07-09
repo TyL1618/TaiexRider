@@ -290,7 +290,7 @@ y[i] = baselineY - (price[i] - min) / (max - min) × scaledHeight
 ### 5.6 死亡後復活（Revival）
 
 - 僅每日排名賽啟用（`GameCanvas` prop `revivalEnabled={isDailyRun}`）。
-- 死亡後出現「看廣告復活」琥珀色按鈕（`.overlay-btn.ad-btn`），每局限一次（`revivalUsed` state）。
+- 死亡後出現「看廣告復活」琥珀色按鈕（`.overlay-btn.ad-btn`），每局限一次（`revivalUsed` state）。**✅ 2026-07-09 起真的會呼叫 `requestRewardedAd("revive")` 看完廣告才復活**（此前按鈕點下去是直接免費復活的殘留 bug，已修復，見 9.4c）。
 - 復活邏輯（`doRevive()`）：讀死亡時的 `chassis.position.x`，`terrainYAt()` 算地形高度，在正上方 `HOVER_HEIGHT` 重新 setPosition + setVelocity(0) + setStatic(true) → 進入懸空等待狀態。分數、計時、翻轉紀錄保留（不呼叫 `doReset()`）。
 - 實作：`reviveSignal` ref（與 `resetSignal` 平行），frame loop 偵測 signal 變化觸發 `doRevive()`。
 - 每次 `handleStartTrack` 讓 `gameKeyRef.current++`，作為 `<GameCanvas key>` 確保新局重建（`revivalUsed` 重置）。
@@ -336,7 +336,7 @@ src/
 │   ├── auth.ts               # Google One Tap 登入 / signOut
 │   ├── playerId.ts           # localStorage UUID + 暱稱（clampNameWidth 限長）
 │   ├── challengeAttempts.ts  # 每日排名賽挑戰次數（MAX 5 / FREE 2；已登入→consume_attempt RPC 真正把關，未登入→localStorage）
-│   ├── ads.ts                # TWA 環境偵測 + AdSense/AdMob 雙軌 scaffold + 看廣告拿金幣 stub
+│   ├── ads.ts                # TWA 環境偵測 + AdMob 本機橋接（requestRewardedAd，見 9.4c）+ AdSense scaffold（網頁版，暫緩）
 │   ├── adRewards.ts          # 看廣告拿金幣每日次數上限（車庫頁+結算畫面共用計數）
 │   ├── garage.ts             # 車皮清單（BIKE_SKINS）+ 金幣/鑽石雙通貨 + 擁有/裝備邏輯（已登入→伺服器錢包 RPC 為權威，未登入→純本地）
 │   ├── achievements.ts       # Q 系列成就進度（大漲/大跌完賽次數，streak 沿用 streak.ts）
@@ -390,8 +390,9 @@ src/
 | Phase 8 | ✅ | v0.9.4 連假讀取/排行榜跨連假同榜修正（`max(map_date ≤ 今天)`）；**v0.10 經典模式**（12 條歷史盤勢靜態關卡）；**v0.11 經典紀錄保持者**（`classic_records`，每關單一保持者）、返回離開改「再按一次返回鍵」、暱稱顯示寬度限長（12 寬）、每日長征 5 股預覽圖、開機深色霓虹 splash；**v0.12.0~6 懸空公平計時 + 每日排名賽每日 5 次上限 + 死後原地復活 + App 捷徑/splash 品牌圖/預測性返回（vc10，已真機驗證）** |
 | Phase 9 | ✅ | **v0.12.7~28 留存批次**：完美落地計分定案、PB 突破/streak、經典獎牌制、分享圖卡、全服死亡熱點（漸層線視覺）、隱藏統計頁、卡縫脫困 watchdog、**車庫系統**（金幣/鑽石雙通貨+B/Q/鑽石車款共 12 台正式車皮上線，P1~P5 五台鑽石車款已於 2026-07-07 全數生圖完成）、**伺服器端錢包**（`migration_20260705.sql`）、每日任務、全站盤勢主題氛圍、看廣告拿金幣（stub）、Q 系列成就進度自動解鎖裝備 |
 | Phase 10 | ✅ | **v0.12.29~32（2026-07-06）**：留存規劃第二批（狂暴盤日事件、股票圖鑑+絕版制彈窗、週任務、經典模式前三名取代單一保持者）；反作弊 Phase A（`migration_20260704.sql`）；帳號污染修復（暱稱/成就/streak 搬 DB）；ETF/字母尾代號涵蓋範圍修正（`/^\d{4,6}[A-Z]?$/`，修正前濾掉 20% 股票）；**鑽石購買 + 永久去除廣告 IAP 全面上線**（Digital Goods API + 本專案第一支 Edge Function `verify-iap-purchase` + Google Play Billing 原生橋接，四個 SKU 已在 Play Console 建立啟用：`diamonds_100/350/1200` 消耗型、`remove_ads_forever` 非消耗型）；Android versionCode 10→11 |
+| Phase 11 | ✅ | **2026-07-09：AdMob 獎勵廣告原生橋接完成並真機驗證**（`AdBridge.kt`/`AdBridgeService.kt`/`AdActivity.kt`，見 9.4c）——復活／結算畫面雙倍金幣／車庫看廣告拿金幣三條路徑皆確認正常發放。目前用 Google 測試廣告單元 ID，真實單元 ID 待上架前替換。Android versionCode 14→15 |
 
-> **🟠 待辦（正式上架後）**：反作弊 Phase B/C 尚未實作（Phase A 已完成，見 [ANTICHEAT_DESIGN.md](ANTICHEAT_DESIGN.md)）；廣告 **AdMob 優先**（IAP 的「永久去除廣告」已上架但目前無真廣告可移除，屬已知且使用者接受的暫時狀態），AdSense（網頁版）2026-07-07 決定暫緩——目前不打算公開網址宣傳，網頁版只給少數認識的 iOS 朋友玩，等網頁玩家變多再加；殼版本更新提示（v0.9.5b 設計，2026-07-07 決定不單獨重包，等下次任何原因需要重包 AAB 時順便一起做）；**清空伺服器所有玩家遊戲數據**（daily_scores/daily_scores_ranked/classic_records/events，但保留已註冊 Google 帳號，2026-07-04 使用者交代，上架當天才執行）。
+> **🟠 待辦（正式上架後）**：反作弊 Phase B/C 尚未實作（Phase A 已完成，見 [ANTICHEAT_DESIGN.md](ANTICHEAT_DESIGN.md)）；AdMob 橋接已完成但**廣告單元 ID 仍是測試用**，上架前要換成真實 ID（見 9.4c）；AdSense（網頁版）2026-07-07 決定暫緩——目前不打算公開網址宣傳，網頁版只給少數認識的 iOS 朋友玩，等網頁玩家變多再加；殼版本更新提示（v0.9.5b 設計，2026-07-07 決定不單獨重包，等下次任何原因需要重包 AAB 時順便一起做）；**清空伺服器所有玩家遊戲數據**（daily_scores/daily_scores_ranked/classic_records/events，但保留已註冊 Google 帳號，2026-07-04 使用者交代，上架當天才執行）。
 
 ---
 
@@ -469,7 +470,50 @@ repo `android/` 已改好以下三項，**需複製到 Android Studio 專案 →
 - API 30+：`WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE`
 - API 24–29：`View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY | HIDE_NAVIGATION | FULLSCREEN`
 
-AndroidManifest 的 activity name 改為 `.MainActivity`。
+AndroidManifest 的 activity name 改為 `.MainActivity`。啟動時額外
+`ContextCompat.startForegroundService(this, Intent(this, AdBridgeService::class.java))`
+確保廣告橋接 server 存活（見 9.4c）。
+
+### 9.4c AdMob 獎勵廣告橋接（`AdBridge.kt`/`AdBridgeService.kt`/`AdActivity.kt`，2026-07-09 完成）
+
+TWA 沒有官方 postMessage 套件可用（androidbrowserhelper 的 `LauncherActivity` 不暴露
+`CustomTabsSession`），改用**本機 loopback HTTP server** 橋接原生 AdMob：
+
+- **`AdBridgeService.kt`**：前景服務（`specialUse` 類型），內建 NanoHTTPD 監聽
+  `127.0.0.1:47591`，只有兩個被動查詢端點：`/ad/reset`（清空狀態）、
+  `/ad/result`（回報 `{done, granted}`）。**不負責啟動任何畫面**（Service 直接
+  `startActivity` 會被 Android Background Activity Launch 限制擋下，`result code=102
+  BAL_BLOCK`）。回應必須帶 `Access-Control-Allow-Origin: *`——網頁來源
+  `https://taiexrider.pages.dev` 與 server `http://127.0.0.1:47591` 是跨來源，
+  沒有這個標頭瀏覽器會讓請求照送、伺服器照回應，但擋住網頁 JS 讀取內容（曾是這條
+  橋接卡最久的 bug，症狀是「log 顯示 done=true 但網頁端永遠拿不到」）。
+- **`AdActivity.kt`**：真正載入/顯示 `RewardedAd` 的透明畫面，繼承普通 `Activity`
+  （**不是** `AppCompatActivity`——配上 manifest 的 `Theme.Translucent.NoTitleBar`
+  會直接崩潰）。由 manifest 的自訂 URL scheme intent-filter
+  （`taiexrider-ad://show?type=coin|revive`）啟動，**發起者必須是 Chrome**（使用者
+  在網頁點按鈕觸發），才不受 BAL 限制。`onCreate()` 也會自己
+  `startForegroundService` 一次啟動 Service（保險：載入廣告吃記憶體，系統可能把
+  整個 App 行程砍掉重開，新行程若直接冷啟動這支 Activity、從未經過
+  `MainActivity`，Service 就沒機會啟動）。
+- **`AdBridge.kt`**：`AdBridgeService`/`AdActivity` 共用的簡單靜態狀態（`done`/
+  `granted`），同一 process 內傳遞結果，不需要真的跨 process IPC。
+- **網頁端**（`src/lib/ads.ts` 的 `requestRewardedAd(kind)`）：按鈕點擊同步用
+  `window.open('taiexrider-ad://show?type=...', '_blank')` 觸發（**不能用
+  `<a>.click()` 同文件內導轉**——TWA 會判定成「離開受信任來源」跳出確認框，
+  按離開直接把整個 TWA 關掉），之後輪詢 `/ad/result` 直到有結果或 60 秒逾時；
+  輪詢同時監聽 `visibilitychange`（廣告全螢幕顯示時原本分頁變背景分頁，
+  `setTimeout` 會被 Chrome 節流，分頁一恢復可見要立刻醒來檢查，不能只靠固定間隔）。
+- **✅ 已真機驗證**：復活／結算畫面雙倍金幣／車庫看廣告拿金幣三條路徑皆確認
+  正常發放獎勵、Supabase 正確寫入。**上架前待辦**：`AdActivity.kt` 的
+  `TEST_REWARDED_AD_UNIT_ID` 仍是 Google 官方測試單元，要換成真實單元 ID
+  （revive_reward: `ca-app-pub-8981745966447649/1679422480`；coin_reward:
+  `ca-app-pub-8981745966447649/2170377077`，依 `intent.data` 的 `type` 參數分流）。
+- **已知殘留瑕疵**：debug 簽名跟 `assetlinks.json`（僅登記正式簽名指紋）對不上時，
+  Chrome 會比較常顯示網址列；即使正式簽名，使用者第一次點看廣告仍會跳一次「本機
+  網路存取」系統權限請求、網址列跟著短暫閃一下（Chrome 對任何權限請求的固定行為，
+  跟簽名/信任狀態無關），之後同一次安裝不會再跳。**若要完全消除**，需之後評估
+  改用真正的 PostMessage for TWA（放棄 `LauncherActivity`、自己管理
+  `CustomTabsSession`）或整專案改用 Capacitor（詳見 CLAUDE.md「廣告雙軌架構」段落）。
 
 ### 9.5 打包流程（每次更新）
 
@@ -499,11 +543,12 @@ AndroidManifest 的 activity name 改為 `.MainActivity`。
 
 ## 10. 未來待辦
 
-- **AdMob 廣告（Phase 7 後段）**：
-  - 方案 B（Native SDK）：在 Android 專案加 Gradle dependency + JS Bridge
-  - 死亡後「看廣告復活？」→ `window.AdBridge.showRewardedAd()` → 回調復活
-  - IAP：Google Play Billing API（同樣走 JS Bridge）
-- **商業模式**：看廣告復活一次（AdMob Rewarded）/ IAP 永久去廣告
+- **AdMob 廣告**：✅ 已完成（見 9.4c），本機 loopback server 橋接（非原本規劃的
+  JS Bridge/`window.AdBridge` 全域物件，實際做法是 `src/lib/ads.ts` 的
+  `requestRewardedAd(kind)` + 自訂 URL scheme 觸發）。剩真實廣告單元 ID 待上架前換上。
+- **IAP**：✅ 已完成（Google Play Billing API + Digital Goods API，見 §「鑽石車款」）。
+- **商業模式**：看廣告復活一次／雙倍金幣／車庫拿金幣（AdMob Rewarded，✅ 已上線）
+  / IAP 永久去廣告（✅ 已上線，待真廣告可移除才有實際意義）
 
 ---
 

@@ -47,9 +47,10 @@
   驗證，`isOwned()` 讀的擁有清單來自伺服器（已登入時），不能再靠改 localStorage 免費解鎖。
   **真錢 IAP（Google Play Billing）串接時**，仍需額外驗證 Play Developer API 購買憑證後才呼叫
   `wallet_spend_skin`（或另建對應 RPC），現在的鑽石中介層本身不是真錢驗證，只是防「改本地數字」。
-- 看廣告拿金幣 stub（`ads.ts requestRewardedCoins()` 現在直接 resolve(true)）——真廣告 SDK 串接後，
-  「看完才發幣」的 callback 本來就在 SDK/伺服器側；每日 2 次上限現在已是 `wallet_earn('ad')` 的
-  伺服器端 cap（`tr_ad_coin_claims_*` 只是顯示計數），現況接受。
+- 看廣告拿金幣：✅ 2026-07-09 真廣告 SDK 已串接（`ads.ts` 的 `requestRewardedAd(kind)`，見
+  DEVDOC.md §9.4c），「看完才發幣」的 callback 由 Android 端 `RewardedAd` 的
+  `onUserEarnedReward`/`onAdDismissedFullScreenContent` 把關；每日 2 次上限仍是
+  `wallet_earn('ad')` 的伺服器端 cap（`tr_ad_coin_claims_*` 只是顯示計數），結論不變，現況接受。
 
 ### 開發者測試帳號（App.tsx 明碼 email 比對）
 

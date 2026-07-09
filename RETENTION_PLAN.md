@@ -46,7 +46,7 @@
 - **軟通貨（金幣）v1 已上線**（[x] v0.12.16，見 CLAUDE.md 進度）：完賽 +10／摔車 +3／每日任務 +25／看廣告 +20（伺服器端每日上限見 wallet_earn RPC）。
 - ~~任務車款解鎖~~：✅ **v0.12.23~24 已上線**——Q1/Q2/Q3 綁大盤大漲/大跌日完賽次數＋streak 里程碑（`src/lib/achievements.ts`），不需要新資料結構，全部沿用既有 localStorage 系統（進度仍純前端，解鎖結果已搬伺服器）。
 - **鑽石車款**：P1/P2 已用「鑽石」軟通貨開放測試（2026-07-04），真正販售給一般玩家仍需接 Google Play Billing（IAP）+ 鑽石購買頁，排在其他項目之後，且是唯一需要處理金流/收據驗證的項目。
-- ~~看廣告拿金幣~~：✅ **v0.12.21~22 已上線（stub 階段）**。車庫頁+結算畫面各一顆按鈕，每日合計上限 2 次、每次 +20 金幣（`src/lib/adRewards.ts`），邏輯比照 `challengeAttempts.ts` 的次數計數模式。**真廣告 SDK 尚未串接**（`ads.ts requestRewardedCoins()` 現在直接 resolve(true) 發幣）——AdMob/AdSense 都要正式上架後才能申請，屬於下方「廣告雙軌架構」同一批工程，屆時只需替換 `requestRewardedCoins()` 函式本體。
+- ~~看廣告拿金幣~~：✅ **v0.12.21~22 上線 stub，2026-07-09 真廣告 SDK 已完成串接**。車庫頁+結算畫面各一顆按鈕，每日合計上限 2 次、每次 +20 金幣（`src/lib/adRewards.ts`），邏輯比照 `challengeAttempts.ts` 的次數計數模式。**真廣告已串接**：`ads.ts` 的 `requestRewardedAd(kind)`（原 `requestRewardedCoins()` 已改名）透過本機 loopback server 橋接原生 AdMob，詳見 CLAUDE.md「2026-07-09」系列段落 + DEVDOC.md §9.4c，已真機驗證正常發放。
 
 ## 每日任務（2026-07-03 新增，第一批可上）
 

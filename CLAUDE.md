@@ -985,7 +985,7 @@ session`（代表要查為什麼登入中的帳號 session 會遺失，可能是
 
 > **2026-07-04 全面盤點**：[FABLE5_HANDOFF.md](FABLE5_HANDOFF.md) 清單裡 debug/監控/內容改善/原生體驗/拉霸音效/OG分享/留存規劃/android三項/上架檢查/ASO **全部已完成並上線**；[BETA_FEEDBACK.md](BETA_FEEDBACK.md) 的 #1/#2/#3 也都已解決。反作弊 Phase A 已於 2026-07-04 下午實作完成（migration 已跑）——見下方「真正還沒做的事」第 1 項。
 
-- **廣告第二階段（正式上架後）**：填入真實 `ADSENSE_PUB_ID`（`ca-pub-8981745966447649`）→ 網頁版 AdSense 生效；復活按鈕先播廣告再 `requestRevive()`；Android 原生層串 AdMob Rewarded（TWA intent bridge）；車庫「看廣告拿金幣」也要換掉 `ads.ts requestRewardedCoins()` 的 stub。
+- **廣告第二階段（正式上架後）**：✅ **Android 原生層 AdMob Rewarded 已於 2026-07-09 完成並真機驗證**（復活/雙倍金幣/車庫拿金幣三條路徑，見下方「2026-07-09」系列段落 + DEVDOC §9.4c），`requestRewardedCoins()` stub 已換成真實橋接 `requestRewardedAd(kind)`。剩下：① 上架前把 `AdActivity.kt` 的測試廣告單元 ID 換成真實 ID；② 填入真實 `ADSENSE_PUB_ID`（`ca-pub-8981745966447649`）讓網頁版 AdSense 生效——這項仍暫緩（見下方廣告雙軌架構段落，網頁版流量小不急）。
 - **✅ 待真機驗證累積項已確認（2026-07-03）**：v0.12.0 懸空計時/復活、v0.11.0 TWA 返回離開、經典模式 12 條地形手感、v0.12.3 地形變高手感、v0.12.4 震動/拉霸音效手感，皆 OK。
 
 ### 🎯 真正還沒做的事（2026-07-04 盤點，非本週交接清單順序）
@@ -1007,7 +1007,7 @@ session`（代表要查為什麼登入中的帳號 session 會遺失，可能是
 5. ~~**BETA #4（前翻/煞車鈕操控）**~~：**2026-07-04 使用者決定不做，取消**（見 [BETA_FEEDBACK.md](BETA_FEEDBACK.md) #4）。
 6. ~~**Web Push 通知**~~：**使用者 2026-07-07 決定取消**——判斷「想玩的玩家會自己來玩」，且遊戲類推播通知自己也不太會點，加上需另申請 Firebase/FCM 專案工程量不小，投報率不划算，不再規劃。
 7. **殼版本更新提示**：設計已備妥（DEVDOC §9.5b 方案 A），**2026-07-07 使用者決定不必單獨為此重包一次 AAB，改成「下次不管什麼原因需要重包 AAB 時（例如之後 AdMob 原生串接需要動 android/），順便一起包進去」**。
-8. **廣告正式串接**（見上方「廣告第二階段」）：技術阻塞在「必須先正式上架」，非能力問題。
+8. ~~**廣告正式串接**~~：✅ **2026-07-09 已完成**（見上方「廣告第二階段」+ 下方廣告雙軌架構段落），不必等正式上架，測試單元 ID 開發期就能做，上架前只需換真實單元 ID。
 9. **📌 正式上架後：清空伺服器所有玩家「玩過的遊戲數據」**——**✅ 2026-07-09 SQL 已寫好備用**：
    [supabase/prelaunch_cleanup.sql](supabase/prelaunch_cleanup.sql)，清 `daily_scores`／
    `classic_records`／`events`／`daily_diamond_settlement`／`classic_diamond_settlement`
@@ -1081,6 +1081,14 @@ session`（代表要查為什麼登入中的帳號 session 會遺失，可能是
 - **#10 每日挑戰 + 廣告 + IAP（商業模式）**：基本分＝跑完即固定底分；加分＝完美落地次數×N；**同分用時間排名**（越短越前）；死亡→看 15s 廣告復活一次；IAP＝買斷永久去廣告。需 Phase 4 後端 + 排行榜 API；廣告 AdMob、IAP Google Play Billing。**結算已先備好 totalFlips/perfectLandings/timer 三項數據，排名所需欄位齊全。**
 
 - **廣告雙軌架構（2026-06-23 決策，2026-07-07 調整優先序）**：
+
+  > ✅ **2026-07-09 已動工並完成、真機驗證通過**——下面這整段（含「📋 2026-07-09 技術方案研究」）
+  > 是**動工前的研究筆記**，記錄的「PostMessage 主線方案」**實際查證後在我們的架構下走不通**
+  > （見下方研究段落內的「❌ 已排除」「保底方案」更新），**最終改用「本機 loopback HTTP
+  > server + 自訂 URL scheme 觸發」這個方案**，完整實作細節、8 層問題鏈、真機驗證結果見上方
+  > 「2026-07-09（晚間）」開始的一系列段落 + [DEVDOC.md](DEVDOC.md) §9.4c。這裡的研究筆記
+  > 保留是因為裡面「Capacitor 最終保底」的分析未來如果要根除殘留的網址列/權限彈窗瑕疵時
+  > 還用得到，不是過時廢棄，只是不再是「待辦」，已經是「已完成，未來若要優化可參考」。
   - **Android APK（TWA）** → AdMob 原生 SDK（Rewarded Ad，死亡復活）**優先做**。
   - **網頁版 / iOS Safari** → Google AdSense（Interstitial 插頁式）**暫緩，不急**——2026-07-07 使用者說明：目前沒打算公開 `taiexrider.pages.dev` 網址宣傳，網頁版只給認識的 iOS 朋友玩，量很小，先不串 AdSense 也沒差；**之後如果偵測到網頁玩家變多再加**（`src/lib/ads.ts` 的 TWA/網頁分流偵測已做好，屆時隨時可補上 `ADSENSE_PUB_ID` 開通，不用重新設計）。
   - **避免雙重廣告**：TWA/網頁分流偵測已做（`src/lib/ads.ts`，display-mode 偵測，referrer 在此 TWA 不可靠）
