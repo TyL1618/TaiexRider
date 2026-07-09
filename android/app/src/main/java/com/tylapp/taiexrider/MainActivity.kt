@@ -18,23 +18,25 @@ class MainActivity : LauncherActivity() {
         private const val NOTIFICATION_PERMISSION_REQUEST_CODE = 1001
     }
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        // ⚠️ 真機實測發現兩層坑：
-        // 1) Android 13+ 顯示任何通知（含前景服務的常駐通知）都需要使用者額外同意
-        //    POST_NOTIFICATIONS 這個執行時權限——沒要過這個權限，前景服務本身仍會
-        //    拿到優先權（廣告功能不受影響），但系統會靜默不顯示通知。
-        // 2) 一開始把「請求權限」跟「啟動服務」寫在同一段同步執行——權限對話框跳出來
-        //    需要使用者互動時間，但 startForegroundService() 幾乎立刻執行，服務的
-        //    startForeground() 第一次呼叫時權限根本還沒生效，通知被系統靜默壓下，
-        //    且 Service.onCreate() 只會跑一次，之後就算使用者按了允許，同一個服務
-        //    實例的生命週期裡也不會補顯示。修法：權限已經有才立刻啟動服務；權限
-        //    還沒決定，改成請求完、等 onRequestPermissionsResult 回呼後才啟動，
-        //    確保 startForeground() 執行的當下權限狀態已經確定。
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+    private fun needsNotificationPermission(): Boolean =
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) !=
                 PackageManager.PERMISSION_GRANTED
-        ) {
+
+    // ⚠️ 真機實測發現最根本的一層坑：LauncherActivity.onCreate() 本身就會（在
+    // super.onCreate() 呼叫當下）自動立刻啟動 TWA 瀏覽器畫面，跟我們稍後才發出的
+    // 通知權限對話框搶 Activity 焦點——瀏覽器畫面幾乎立刻蓋上來，把還沒來得及讓
+    // 使用者互動的權限對話框直接蓋掉（症狀：對話框閃現不到一秒就消失）。
+    // LauncherActivity 原本就提供這個擴充點處理「啟動前要先做非同步任務」的情境：
+    // 回傳 false 延後自動啟動，改由我們自己在權限確定後呼叫 launchTwa()。
+    override fun shouldLaunchImmediately(): Boolean = !needsNotificationPermission()
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        // Android 13+ 顯示任何通知（含前景服務的常駐通知）都需要使用者額外同意
+        // POST_NOTIFICATIONS 這個執行時權限——沒要過這個權限，前景服務本身仍會
+        // 拿到優先權（廣告功能不受影響），但系統會靜默不顯示通知。
+        if (needsNotificationPermission()) {
             ActivityCompat.requestPermissions(
                 this,
                 arrayOf(Manifest.permission.POST_NOTIFICATIONS),
@@ -56,6 +58,9 @@ class MainActivity : LauncherActivity() {
             // 不管使用者允許或拒絕都要啟動——廣告橋接本身不需要通知權限就能運作，
             // 只是拒絕的話通知不會顯示，這裡只是確保啟動時機在權限狀態確定之後。
             startAdBridgeService()
+            // shouldLaunchImmediately() 剛才回傳了 false，TWA 還沒真的啟動，
+            // 現在權限已經有結果了，換我們手動呼叫把延後的啟動補上。
+            launchTwa()
         }
     }
 
