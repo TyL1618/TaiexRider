@@ -492,12 +492,18 @@ APK 是誰簽的」，不是「上傳前是誰簽的」。
 
 ### 正式切換時要建的 Android OAuth Client（package 一律填 `com.tylapp.taiexrider`）
 
-1. 🔴 **Play 簽署金鑰的 SHA-1** ← **最重要**。玩家從商店下載的版本靠這個。
-   來源：Play Console → **應用程式完整性 (App integrity)** → 應用程式簽署金鑰憑證（該頁
-   SHA-1 / SHA-256 都會列出來）。
+1. 🔴✅ **Play 簽署金鑰的 SHA-1** ← **最重要**。玩家從商店下載的版本靠這個。
+   來源：Play Console → **應用程式完整性 (App integrity)** → 應用程式簽署金鑰憑證。
+   **2026-07-10 使用者已抄到**：`87:74:F0:B1:43:BD:43:C3:47:E2:20:C4:5A:D0:AA:DC:63:CF:14:64`
+   （下一步：去 Cloud Console 用這組建 Android OAuth Client，package 填
+   `com.tylapp.taiexrider`）。
 2. 🟠 **上傳金鑰 `taiexrider-release.jks` 的 SHA-1** ← 自己側載 signed release APK 測試時靠這個。
    來源：`keytool -list -v -keystore taiexrider-release.jks -alias taiexrider`
+   （檔案在 `C:\Users\tyl16\Documents\taiexrider-release.jks`，需要金鑰密碼，使用者
+   本機執行，Claude 沒有密碼無法代跑）。⬜ 尚未做。
 3. ⚪（選配）實驗版那顆 debug 的，留著繼續開發測試用，不刪也無害。
+   `29:08:B4:C2:4A:CD:4B:FE:DA:ED:3E:83:10:8B:BA:05:60:16:BA:DC`（本機共用 debug
+   keystore）。⬜ 尚未做。
 
 > ⚠️ **DEVDOC §9.2 記的是 SHA-256**（assetlinks 用的格式），但 OAuth Android Client 要的是
 > **SHA-1**，兩者是不同雜湊、**不能換算**，到時候必須重新抓一次 SHA-1。
