@@ -44,6 +44,14 @@
 .garage-ad-btn:disabled { opacity: 0.5; cursor: default; }
 .garage-ad-btn:not(:disabled):active { transform: scale(0.96); }
 
+/* 伺服器回報「今日已達領取上限」時的說明（見 Garage.tsx handleWatchAd）。
+   往上貼齊按鈕（抵銷按鈕的 margin-bottom），不要多撐開一段版面。 */
+.garage-ad-notice {
+  margin: -0.9rem 0 1.2rem;
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.55);
+}
+
 .garage-list {
   display: flex;
   flex-direction: column;

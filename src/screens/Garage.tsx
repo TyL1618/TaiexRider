@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { BIKE_SKINS, getCoins, getDiamonds, isOwned, getActiveSkinId, purchaseSkin, setActiveSkin, addCoins, earnCoins, unlockAchievementSkin, syncWalletFromServer, writeDiamondsCache, getAdsRemoved, markAdsRemoved, type BikeSkin } from "../lib/garage";
+import { BIKE_SKINS, getCoins, getDiamonds, isOwned, getActiveSkinId, purchaseSkin, setActiveSkin, addCoins, earnCoins, unlockAchievementSkin, syncWalletFromServer, fetchDailyUsage, writeDiamondsCache, getAdsRemoved, markAdsRemoved, type BikeSkin } from "../lib/garage";
 import { requestRewardedAd } from "../lib/ads";
-import { AD_COIN_REWARD, MAX_AD_COIN_CLAIMS_PER_DAY, getAdCoinClaims, incrementAdCoinClaims } from "../lib/adRewards";
+import { AD_COIN_REWARD, MAX_AD_COIN_CLAIMS_PER_DAY, getAdCoinClaims, incrementAdCoinClaims, setAdCoinClaims } from "../lib/adRewards";
 import { getAchievementBikes, type AchvBikeView } from "../lib/achievements";
 import { getStreak } from "../lib/streak";
 import { resolveSessionDate } from "../lib/dailyMap";
@@ -30,6 +30,7 @@ export default function Garage({ user, onBack }: { user: User | null; onBack: ()
   const [buyError, setBuyError] = useState("");
   const [priceDiag, setPriceDiag] = useState("");
   const [priceLoading, setPriceLoading] = useState(false);
+  const [adNotice, setAdNotice] = useState("");
   const [, forceRender] = useState(0);
 
   // 鑽石購買 + 永久去廣告：只有 Android TWA + 瀏覽器支援 Digital Goods API 才顯示
@@ -106,8 +107,17 @@ export default function Garage({ user, onBack }: { user: User | null; onBack: ()
       await refreshAchvBikes(() => alive);
       if (alive) forceRender((n) => n + 1);
     });
+    // 看廣告次數同樣以伺服器為準：本地計數被清掉（清除資料/重裝/換殼換 origin）時，
+    // 畫面會顯示「還能再看 2 次」但伺服器記得已領滿，玩家看完廣告拿不到錢
+    // （2026-07-10 真機實測，見 migration_20260710.sql）。訪客拿到 null，沿用本地計數。
+    fetchDailyUsage().then((usage) => {
+      if (!alive || !usage) return;
+      setAdCoinClaims(dailyKey(), user?.id ?? null, usage.adClaims);
+      setAdClaims(getAdCoinClaims(dailyKey(), user?.id ?? null));
+    });
     return () => { alive = false; };
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
 
   // 成就達成＋美術已到位（BIKE_SKINS 有登記對應 id）就自動解鎖擁有，不用另外按按鈕
   // （unlockAchievementSkin 本身冪等，重複呼叫不影響已擁有狀態；已登入時會走伺服器 RPC）。
@@ -139,10 +149,22 @@ export default function Garage({ user, onBack }: { user: User | null; onBack: ()
   const handleWatchAd = () => {
     if (watchingAd || adClaims >= MAX_AD_COIN_CLAIMS_PER_DAY) return;
     const grantAdCoins = () => {
+      setAdNotice("");
       incrementAdCoinClaims(dailyKey(), user?.id ?? null);
       setAdClaims(getAdCoinClaims(dailyKey(), user?.id ?? null));
       setCoins(addCoins(AD_COIN_REWARD));
-      earnCoins("ad").then(() => setCoins(getCoins()));
+      // granted===false：伺服器明確拒絕（當日已達上限）。earnCoins 已把餘額覆寫回真實值，
+      // 這裡把畫面次數也校正成滿檔並說明原因——否則玩家只看到金幣閃一下就消失、沒有
+      // 任何提示，體感像是被吃錢（2026-07-10 真機實測回報）。
+      // granted===null（未登入/RPC 失敗/DB 還沒跑 migration）維持原本「樂觀值先頂著」行為。
+      earnCoins("ad").then((granted) => {
+        setCoins(getCoins());
+        if (granted === false) {
+          setAdCoinClaims(dailyKey(), user?.id ?? null, MAX_AD_COIN_CLAIMS_PER_DAY);
+          setAdClaims(MAX_AD_COIN_CLAIMS_PER_DAY);
+          setAdNotice("今日領取次數已用完，明天再來");
+        }
+      });
     };
     // 已買永久去廣告：不用看廣告，點擊直接領取（比照看廣告復活/雙倍金幣的既有作法）
     if (adsRemoved) {
@@ -220,6 +242,7 @@ export default function Garage({ user, onBack }: { user: User | null; onBack: ()
               ? `🎁 領取 +${AD_COIN_REWARD} 金幣 (${adClaims}/${MAX_AD_COIN_CLAIMS_PER_DAY})`
               : `📺 看廣告 +${AD_COIN_REWARD} 金幣 (${adClaims}/${MAX_AD_COIN_CLAIMS_PER_DAY})`}
       </button>
+      {adNotice && <p className="garage-ad-notice">{adNotice}</p>}
 
       <div className="garage-list">
         {BIKE_SKINS.filter((s) => !s.locked && s.currency !== "diamond").map(renderSkinCard)}

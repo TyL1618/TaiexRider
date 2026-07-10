@@ -28,3 +28,15 @@ export function incrementAdCoinClaims(day: string, uid: string | null = null): v
     if (n < MAX_AD_COIN_CLAIMS_PER_DAY) localStorage.setItem(storageKey(uid, day), String(n + 1));
   } catch { /* 靜默 */ }
 }
+
+// 用伺服器認定的次數覆蓋本地計數（garage.ts fetchDailyUsage() 拿到的值）。
+// 2026-07-10：本地計數只要 localStorage 被清掉就歸零（清除資料/重裝，或 TWA→Capacitor
+// 讓 web origin 從 pages.dev 變成 localhost），畫面會顯示「還能再看 2 次廣告」，但
+// 伺服器記得已經領滿——玩家看完 30 秒廣告拿不到錢。真正的上限一直在伺服器端把關
+// （清資料刷不出額外金幣），這裡只是把「顯示」對齊事實。
+export function setAdCoinClaims(day: string, uid: string | null, n: number): void {
+  try {
+    const clamped = Math.max(0, Math.min(n, MAX_AD_COIN_CLAIMS_PER_DAY));
+    localStorage.setItem(storageKey(uid, day), String(clamped));
+  } catch { /* 靜默 */ }
+}

@@ -54,3 +54,15 @@ export function incrementAttempts(sessionDate: string, uid: string | null): void
     if (n < MAX_ATTEMPTS) localStorage.setItem(storageKey(sessionDate, uid), String(n + 1));
   } catch {}
 }
+
+// 用伺服器認定的次數覆蓋本地顯示快取（garage.ts fetchDailyUsage() 拿到的值）。
+// 2026-07-10：真正的把關一直是 consume_attempt() 伺服器端（第 6 次回 ok=false），
+// 清 localStorage 打不了第 6 場；但本地「顯示」計數會歸零（清除資料/重裝，或
+// TWA→Capacitor 讓 web origin 從 pages.dev 變成 localhost），畫面會誤導玩家以為
+// 次數重置了，按下去才發現被伺服器擋。
+export function setAttempts(sessionDate: string, uid: string | null, n: number): void {
+  try {
+    const clamped = Math.max(0, Math.min(n, MAX_ATTEMPTS));
+    localStorage.setItem(storageKey(sessionDate, uid), String(clamped));
+  } catch {}
+}

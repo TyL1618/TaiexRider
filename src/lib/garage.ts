@@ -235,22 +235,47 @@ export function addDiamonds(n: number): number {
 // 若伺服器判定當日該管道已達上限，樂觀加的量會被這次覆寫收回，不留竄改空間。
 // p_amount 只有 kind==="long_crash" 才會用到（依行駛距離比例的變動金額，伺服器仍會
 // clamp 在 0~30，不信任前端傳的數字超出範圍）；其餘 kind 一律由伺服器決定固定面額。
+//
+// 回傳值：true=伺服器真的加了錢；false=伺服器明確拒絕（當日該管道已達上限）；
+// null=沒登入／RPC 失敗／網路斷（樂觀值先頂著，無法判定）。呼叫端拿到 false 時應該
+// 明確告訴玩家「今日已達上限」——2026-07-10 真機實測發現，看完 30 秒廣告卻只看到
+// 金幣數字閃一下就被伺服器權威值蓋回去、毫無提示，體感像是被吃錢（見 migration_20260710.sql）。
 export async function earnCoins(
   kind: "finish" | "crash" | "long_finish" | "long_crash" | "quest" | "ad",
   amount?: number,
-): Promise<void> {
+): Promise<boolean | null> {
   const uid = await getUid();
   // 2026-07-09 診斷：wallet_earn_log 對某些帳號完全查不到任何一筆紀錄，代表問題可能
   // 發生在「連 RPC 都沒送出去」這個更早的環節（getUid() 拿到 null，Supabase session
   // 遺失/尚未還原），而不是「RPC 送出去但被拒絕」。用 console.warn（非 error，guest
   // 玩家沒登入本來就會走這條，不算異常）先把這個分支印出來，區分兩種情況。
-  if (!uid) { console.warn(`[wallet] earnCoins(${kind}) 略過：目前沒有登入 session`); return; }
+  if (!uid) { console.warn(`[wallet] earnCoins(${kind}) 略過：目前沒有登入 session`); return null; }
   const { data, error } = await supabase.rpc("wallet_earn", { p_kind: kind, p_amount: amount ?? null });
   if (error) console.error(`[wallet] wallet_earn(${kind}) 失敗，伺服器沒有記到這筆`, error);
-  if (error || !data || !data[0]) return; // RPC 尚未建立/網路失敗：樂觀值先頂著
-  const row = data[0] as { coins: number; diamonds: number };
+  if (error || !data || !data[0]) return null; // RPC 尚未建立/網路失敗：樂觀值先頂著
+  const row = data[0] as { coins: number; diamonds: number; granted?: boolean };
   writeCoinsCache(row.coins);
   writeDiamondsCache(row.diamonds);
+  // granted 是 migration_20260710.sql 才加的欄位；舊版 RPC 還沒跑 migration 時會是
+  // undefined，此時回 null（＝「無法判定」）而不是 false，避免對還沒更新 DB 的環境
+  // 誤報「已達上限」。
+  return typeof row.granted === "boolean" ? row.granted : null;
+}
+
+// 伺服器認定的「今日已用次數」（看廣告拿金幣次數 / 排名賽挑戰次數）。
+// 前端的次數原本只存 localStorage，清除資料/重裝/換殼（TWA→Capacitor 讓 web origin
+// 從 pages.dev 變成 localhost）都會歸零，跟伺服器對不起來——真正的上限一直是伺服器
+// 在把關（清資料刷不出額外金幣/場次），但畫面會誤導玩家「還能再看 2 次廣告」。
+// 進車庫/進排行榜時呼叫這支覆蓋本地計數，畫面才會反映真實剩餘次數。
+// 回傳 null 代表未登入／RPC 失敗（呼叫端沿用本地計數即可，訪客本來就是純本地）。
+export async function fetchDailyUsage(): Promise<{ adClaims: number; attemptsUsed: number } | null> {
+  const uid = await getUid();
+  if (!uid) return null;
+  const { data, error } = await supabase.rpc("wallet_daily_usage");
+  if (error) { console.error("[wallet] wallet_daily_usage 失敗，沿用本地次數快取", error); return null; }
+  if (!data || !data[0]) return null;
+  const row = data[0] as { ad_claims: number; attempts_used: number };
+  return { adClaims: row.ad_claims, attemptsUsed: row.attempts_used };
 }
 
 export function getOwnedSkins(): string[] {

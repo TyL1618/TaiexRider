@@ -5,12 +5,12 @@ import { fetchDailyTop, invalidateDailyTop, isLeaderboardConfigured, type ScoreR
 import { fetchHardestDailyMap, resolveSessionDate, resolveSessionDisplayDate } from "../lib/dailyMap";
 import { signInWithGoogle, type User } from "../lib/auth";
 import { getPlayerName } from "../lib/playerId";
-import { getAttempts, incrementAttempts, consumeAttemptServer, MAX_ATTEMPTS, FREE_ATTEMPTS } from "../lib/challengeAttempts";
+import { getAttempts, incrementAttempts, setAttempts as writeAttemptsCache, consumeAttemptServer, MAX_ATTEMPTS, FREE_ATTEMPTS } from "../lib/challengeAttempts";
 import { recordStreak, getStreak, playedThisSession, writeStreakCache } from "../lib/streak";
 import { fetchDeathHeatmap, type HeatBucket } from "../lib/deathHeatmap";
 import { getDailyQuests } from "../lib/quests";
 import { getWeeklyQuests, syncWeeklyFromServer, weekKey, type WeeklyQuestView } from "../lib/weeklyQuests";
-import { getAdsRemoved, syncWalletFromServer } from "../lib/garage";
+import { getAdsRemoved, syncWalletFromServer, fetchDailyUsage } from "../lib/garage";
 import { requestRewardedAd } from "../lib/ads";
 import { checkPendingSettlement, ackSettlement, type PendingSettlement } from "../lib/dailyDiamondSettlement";
 import CoinIcon from "../components/CoinIcon";
@@ -128,6 +128,14 @@ export default function DailyChallenge({
         setStreak(getStreak(key));
         setStreakLive(playedThisSession(key));
       }
+      // 挑戰次數以伺服器為準：本地只是顯示快取，被清掉（清除資料/重裝/換殼換 origin）
+      // 會歸零，畫面誤導玩家以為次數重置了（真正的把關是 consume_attempt()，按下去
+      // 才會被擋）。訪客拿到 null，沿用本地計數。見 migration_20260710.sql。
+      fetchDailyUsage().then((usage) => {
+        if (!alive || !usage) return;
+        writeAttemptsCache(key, user?.id ?? null, usage.attemptsUsed);
+        setAttempts(getAttempts(key, user?.id ?? null));
+      });
       return fetchDailyTop(key);
     }).then((r) => {
       if (alive) { setRows(r); setLoaded(true); }
