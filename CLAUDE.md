@@ -141,12 +141,19 @@ repo 內的 `android/` 資料夾（git 追蹤）跟本機 `AndroidStudioProjects
    見 [RETENTION_PLAN.md](RETENTION_PLAN.md)。
 6. **AdSense 網頁版**：暫緩，偵測到網頁玩家變多再評估（`ads.ts` 分流已備好，填
    `ADSENSE_PUB_ID` 即開通，記得同步補 CSP 白名單）。
-6b. **Capacitor 遷移實驗（2026-07-10 研究完成，⚠️ 尚未動工，未建骨架）**：使用者考慮
-   長期把 TWA 架構換成 Capacitor（現有橋接坑太多、跳 Chrome 不美觀）。完整研究結論
-   + 實驗步驟已寫在 [CAPACITOR_EXPERIMENT.md](CAPACITOR_EXPERIMENT.md)——重點：AdMob/
-   Billing 都有成熟外掛可用，但**多發現一項 Google 登入在 Capacitor 系統 WebView 下
-   會撞到 Google `disallowed_useragent` 政策擋下**，需要換一個原生登入外掛，是原本
-   沒設想到的第三座橋。使用者說之後有空才會另開 session 做，這裡先備查。
+6b. **Capacitor 遷移實驗（2026-07-10 動工，骨架＋Google 登入已建好，⚠️ 待真機驗證）**：
+   使用者用 CyberMind 專案先試過 Capacitor 打包、體感非常好（有原生感、不跳 Chrome
+   提示），決定讓 TaiexRider 也做同樣的實驗。骨架建在平行資料夾
+   `C:\Users\tyl16\Documents\Private\TaiexRider-cap\`（不進 git 版控），
+   `applicationId=com.tylapp.taiexrider.captest`，已裝 `@capacitor/android` +
+   `@capgo/capacitor-social-login`（原研究段建議的 `@codetrix-studio/capacitor-google-auth`
+   不支援 Capacitor 8，臨時換這顆），`auth.ts` 已串好原生 Google 登入分流，本機
+   `gradlew assembleDebug` 已 BUILD SUCCESSFUL。**下一步待辦（卡在使用者手動操作，
+   非 code）**：去 Google Cloud Console 註冊 Android OAuth Client（package name +
+   debug SHA-1，完整步驟在 [CAPACITOR_EXPERIMENT.md](CAPACITOR_EXPERIMENT.md) 待辦區）
+   → 才能真機側載驗證登入是否連回同一顆 Supabase 帳號。AdMob／Play Billing 兩座橋
+   使用者要求先緩，驗完登入+原生手感有信心後同一天下午可能接著做。完整細節/踩雷見
+   [CAPACITOR_EXPERIMENT.md](CAPACITOR_EXPERIMENT.md)。
 7. **選配資安收尾**：Google Cloud 舊服務帳號金鑰（`aabce7b...`，2026-07-06 建、私鑰已
    遺失）新金鑰已驗證能用、可去 GCP 刪除；Google 登入 OAuth client_secret 曾在對話中
    顯示過，封測期風險低，在意的話可 rotate。
