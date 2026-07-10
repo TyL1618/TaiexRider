@@ -154,6 +154,11 @@ repo 內的 `android/` 資料夾（git 追蹤）跟本機 `AndroidStudioProjects
    → 才能真機側載驗證登入是否連回同一顆 Supabase 帳號。AdMob／Play Billing 兩座橋
    使用者要求先緩，驗完登入+原生手感有信心後同一天下午可能接著做。完整細節/踩雷見
    [CAPACITOR_EXPERIMENT.md](CAPACITOR_EXPERIMENT.md)。
+   🔴 **真的要正式切 Capacitor 出貨時，先讀 CAPACITOR_EXPERIMENT.md 的「正式遷移
+   Google 登入 checklist」**：Android OAuth Client 要註冊 **Google Play 簽署金鑰的
+   SHA-1**（不是上傳金鑰 `taiexrider-release.jks`），漏了會「自己側載測全過、玩家從
+   商店下載全部登不進去」，且 Play Console 不能回滾版本。跟當年 assetlinks.json 是
+   同一個坑。使用者已明示不需自己記細節，由 Claude 負責在該時機主動提醒＋執行。
 7. **選配資安收尾**：Google Cloud 舊服務帳號金鑰（`aabce7b...`，2026-07-06 建、私鑰已
    遺失）新金鑰已驗證能用、可去 GCP 刪除；Google 登入 OAuth client_secret 曾在對話中
    顯示過，封測期風險低，在意的話可 rotate。

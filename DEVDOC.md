@@ -509,6 +509,13 @@ repo `android/` 已改好以下三項，**需複製到 Android Studio 專案 →
 | minSdk / targetSdk | 24 / 36 |
 
 > Google Play App Signing 重新簽署 AAB，assetlinks.json 必須用 **Google Play 的 SHA-256**（上傳金鑰不同）。
+>
+> ⚠️ **同一個坑會在換 Capacitor 時再出現一次**：Google 登入的 Android OAuth Client 綁
+> 「package name + 簽章 **SHA-1**」，一樣要用 **Google Play 簽署金鑰**（不是上傳金鑰），
+> 否則自己側載測都過、玩家從商店下載卻全部登不進去。注意這裡要 **SHA-1**，上表記的是
+> SHA-256，兩者不能換算，要重抓。完整 checklist 見
+> [CAPACITOR_EXPERIMENT.md](CAPACITOR_EXPERIMENT.md)「正式遷移到 Capacitor 出貨時的
+> Google 登入 checklist」。
 
 ### 9.3 AndroidManifest.xml 關鍵 meta-data
 
