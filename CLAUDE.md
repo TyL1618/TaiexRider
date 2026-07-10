@@ -141,19 +141,19 @@ repo 內的 `android/` 資料夾（git 追蹤）跟本機 `AndroidStudioProjects
    見 [RETENTION_PLAN.md](RETENTION_PLAN.md)。
 6. **AdSense 網頁版**：暫緩，偵測到網頁玩家變多再評估（`ads.ts` 分流已備好，填
    `ADSENSE_PUB_ID` 即開通，記得同步補 CSP 白名單）。
-6b. **Capacitor 遷移實驗（2026-07-10 動工，骨架＋Google 登入已建好，⚠️ 待真機驗證）**：
-   使用者用 CyberMind 專案先試過 Capacitor 打包、體感非常好（有原生感、不跳 Chrome
-   提示），決定讓 TaiexRider 也做同樣的實驗。骨架建在平行資料夾
-   `C:\Users\tyl16\Documents\Private\TaiexRider-cap\`（不進 git 版控），
-   `applicationId=com.tylapp.taiexrider.captest`，已裝 `@capacitor/android` +
-   `@capgo/capacitor-social-login`（原研究段建議的 `@codetrix-studio/capacitor-google-auth`
-   不支援 Capacitor 8，臨時換這顆），`auth.ts` 已串好原生 Google 登入分流，本機
-   `gradlew assembleDebug` 已 BUILD SUCCESSFUL。**下一步待辦（卡在使用者手動操作，
-   非 code）**：去 Google Cloud Console 註冊 Android OAuth Client（package name +
-   debug SHA-1，完整步驟在 [CAPACITOR_EXPERIMENT.md](CAPACITOR_EXPERIMENT.md) 待辦區）
-   → 才能真機側載驗證登入是否連回同一顆 Supabase 帳號。AdMob／Play Billing 兩座橋
-   使用者要求先緩，驗完登入+原生手感有信心後同一天下午可能接著做。完整細節/踩雷見
-   [CAPACITOR_EXPERIMENT.md](CAPACITOR_EXPERIMENT.md)。
+6b. **Capacitor 遷移實驗（2026-07-10 動工，✅ 登入/原生手感真機驗證全過）**：
+   使用者用 CyberMind 專案先試過 Capacitor 打包、體感非常好，決定讓 TaiexRider 也做
+   同樣的實驗。骨架建在平行資料夾 `C:\Users\tyl16\Documents\Private\TaiexRider-cap\`
+   （不進 git 版控），`applicationId=com.tylapp.taiexrider.captest`。**下午真機側載
+   驗證三項全過**：①原生手感佳、無 Chrome 提示 ②看廣告不跳前景服務通知（核心假設
+   成立）③ Google 登入（`@capgo/capacitor-social-login`，Credential Manager 系統
+   選擇器）連回同一顆 Supabase 帳號，車庫金幣/車皮/暱稱跟 TWA 正式版完全一致。過程
+   修了三個真機才會發現的坑（WebView 字型縮放致版面放大、登入 scopes 參數誤用致靜默
+   失敗、App icon 誤用變成安卓預設機器人）——完整除錯過程見
+   [CAPACITOR_EXPERIMENT.md](CAPACITOR_EXPERIMENT.md)「🎉 真機驗證結果」。
+   **下一步**：AdMob／Play Billing 兩座橋（2026-07-10 下午接著做）；順帶一提
+   `detectEnv()` 目前在 Capacitor 殼裡誤判成 `web`（靠 TWA 特徵判斷），串廣告/購買
+   分流前要先補上 `Capacitor.isNativePlatform()` 判斷，不然會走錯路徑。
    🔴 **真的要正式切 Capacitor 出貨時，先讀 CAPACITOR_EXPERIMENT.md 的「正式遷移
    Google 登入 checklist」**：Android OAuth Client 要註冊 **Google Play 簽署金鑰的
    SHA-1**（不是上傳金鑰 `taiexrider-release.jks`），漏了會「自己側載測全過、玩家從
