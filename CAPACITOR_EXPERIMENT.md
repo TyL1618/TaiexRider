@@ -7,6 +7,20 @@
 
 ## 🔧 目前進度（2026-07-10 中午）
 
+- **首次真機測試回饋（使用者側載 debug APK 實測）**：整體執行「真的很好」、**沒跳出任何
+  Google 前景服務通知**（＝驗證了研究段的核心假設：Capacitor 同進程 plugin bridge 不需要
+  TWA 那種跨進程前景服務，通知那整塊坑直接消失）。發現兩個問題，已修（見下方）：
+  1. **整個畫面等比放大一點點** → 首頁標題變寬、跟右上角設定鈕重疊。**根因**：Capacitor 用
+     系統 WebView，預設會把使用者的「系統字型大小 / 顯示大小」縮放乘進預設 16px（＝1rem），
+     整個 rem 版面就放大；Chrome Custom Tabs（TWA）不吃這設定所以正式版沒事。**修法**：
+     `MainActivity.java` 的 `onCreate` 加 `getBridge().getWebView().getSettings().setTextZoom(100)`
+     把文字縮放釘死 100%，整體縮放就跟 TWA 一致。（CyberMind 之前同款問題同款解。）
+     另在 `src/screens/Home.css` 把首頁頂部 padding 從 2rem→3.2rem 當版面安全邊界。
+  2. 使用者要求**沉浸式全螢幕**（隱藏頂部狀態列＋底部三鍵導覽列）→ `MainActivity.java` 用
+     `WindowInsetsControllerCompat.hide(systemBars())` +
+     `BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE`（immersive sticky：從邊緣滑出的系統列短暫顯示後
+     自動收回，不會把版面往下推），並 `WindowCompat.setDecorFitsSystemWindows(false)` edge-to-edge。
+     `onWindowFocusChanged` 重新取得焦點時再套一次，避免系統列停留。
 - **實驗專案位置**：`C:\Users\tyl16\Documents\Private\TaiexRider-cap\`（跟 `TaiexRider`
   平行的資料夾，**不在 git 版控裡**，純本機檔案；複製自 `TaiexRider` 的 `src/`、
   `public/`、`index.html`、`vite.config.ts`、`tsconfig*.json`，不含 `android/`）。
