@@ -170,14 +170,13 @@ log 一起回滾，前端又慣例把 RPC 失敗靜默吞掉 → 玩家只是「
 ⑥ 付款成功不發鑽石（Edge Function 全 500）＝服務帳號**多行 PEM 私鑰用 `supabase secrets set --env-file` 被折行吃掉只剩第一行** → 用 `JSON.stringify(private_key)` 保持單行+`\n` 轉義寫入（詳見 CLAUDE.md 踩雷筆記）；
 ⑦ 鑽石入帳被 42702 擋（見 §2.5 的 PL/pgSQL 踩雷）。
 **二次稽核（2026-07-09，見 [FABLE5_HANDOFF_20260709.md](FABLE5_HANDOFF_20260709.md) 報告）發現的缺口**：
-- 🔴✅ **2026-07-10 已修（code），⚠️ 部署待補**：Edge Function 原本未比對 Google 回應
+- 🔴✅ **2026-07-10 已修＋已部署上線**：Edge Function 原本未比對 Google 回應
   `productId` 與聲稱 `sku_id`（便宜包冒充貴包的真錢漏洞）。`verifyPurchase()` 現在讀
   `GooglePurchase.productId`，主流程在 `purchaseState` 通過後多一關：
   `purchase.productId && purchase.productId !== sku_id` 就拒絕（`productId` 回傳
-  "may not be present"，只在有值時比對，避免誤擋合法購買）。**這是純 Edge Function
-  程式碼，push GitHub 不會生效，要 `npx supabase functions deploy
-  verify-iap-purchase --project-ref cjnwwtrpveejhbwalncy` 才算真的修好**，部署前
-  漏洞仍在。
+  "may not be present"，只在有值時比對，避免誤擋合法購買）。已用
+  `npx supabase functions deploy verify-iap-purchase --project-ref cjnwwtrpveejhbwalncy`
+  部署成功，這個缺口結案。
 - 🟠 退款後無收回機制（封測期接受，正式上架後視退款率決定是否接 Voided Purchases API）。
 
 ### 2.8 金幣/鑽石經濟總覽（2026-07-08 大改版定案，v0.12.33 起）
