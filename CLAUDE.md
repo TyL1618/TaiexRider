@@ -157,9 +157,10 @@ repo 內的 `android/` 資料夾（git 追蹤）跟本機 `AndroidStudioProjects
    listing/封測名單/AdMob App/IAP 商品全部不用重建）、`versionCode` 接續到 18。
    本機 debug build 已驗證成功。**舊 TWA 專案完整備份在
    `C:\Users\tyl16\Documents\Private\TaiexRider-TWA-backup\`**（含完整 git 歷史，
-   要回退隨時可用，不會被後續開發覆蓋）。完整合併細節、踩的雷（Gradle daemon 髒了
-   讓 AAPT2 莫名崩潰，`--no-daemon` 治本）、已知功能落差（App 捷徑/Splash Screen
-   還沒搬過來，非阻塞）見 [CAPACITOR_EXPERIMENT.md](CAPACITOR_EXPERIMENT.md)
+   要回退隨時可用，不會被後續開發覆蓋）。完整合併細節、踩的雷（AAPT2 莫名崩潰真因是
+   第三方防毒軟體狂擋建置，不是 Gradle daemon——事後確認沒有檔案被隔離/砍掉，結果
+   沒受影響）、已知功能落差（App 捷徑/Splash Screen 還沒搬過來，非阻塞）見
+   [CAPACITOR_EXPERIMENT.md](CAPACITOR_EXPERIMENT.md)
    「🔀 正式合併進主專案」。
    🔴 **下一步是使用者待辦，Claude 無法自動化**：Google Cloud Console 建立 Android
    OAuth Client（`com.tylapp.taiexrider` package 從沒為 Credential Manager
