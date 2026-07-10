@@ -17,6 +17,7 @@
 
 
     <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
-        <item name="android:background">@drawable/splash</item>
+        <!-- 冷啟動窗景改成純品牌底色（原本是 Capacitor 預設 @drawable/splash 白圖，會閃一下）。 -->
+        <item name="android:background">@drawable/splash_solid</item>
     </style>
 </resources>

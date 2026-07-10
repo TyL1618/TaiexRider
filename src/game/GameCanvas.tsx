@@ -11,7 +11,7 @@ import { haptics } from "../lib/haptics";
 import { fetchDeathHeatmap } from "../lib/deathHeatmap";
 import { startWakeLock } from "../lib/wakeLock";
 import { getActiveBikeSkin, addCoins, earnCoins, getAdsRemoved } from "../lib/garage";
-import { requestRewardedAd } from "../lib/ads";
+import { requestRewardedAd, preloadRewardedAd } from "../lib/ads";
 import { grantPlayReward, computePlayReward } from "../lib/playRewards";
 import { dailyKey } from "../data/pick";
 
@@ -260,10 +260,19 @@ export default function GameCanvas({ prices, label, name, subtitle, onExit, onGa
     });
   };
 
+  // 進遊戲就在背景把「復活」廣告備好——摔車是隨時可能發生、也最想「立刻復活」的
+  // 情境，事先備好使用者點下去幾乎瞬開（見 ads.ts preloadRewardedAd）。
+  useEffect(() => {
+    preloadRewardedAd("revive");
+  }, []);
+
   // 結算面板出現後 350ms 才接受點擊（見上方 resultReady 註解）
   useEffect(() => {
     if (!crashed && !finished) { setResultReady(false); return; }
     setResultReady(false);
+    // 遊戲結束、結算畫面彈出：背景備好「結算雙倍」用的廣告（跟復活是不同備載槽，
+    // 這裡重備成 coin），使用者點「領取 ×2」時也能瞬開。
+    preloadRewardedAd("coin");
     const t = setTimeout(() => setResultReady(true), 350);
     return () => clearTimeout(t);
   }, [crashed, finished]);

@@ -27,6 +27,8 @@ import { collectStock } from "./lib/collection";
 import { resolveMarketMood, type MarketMood } from "./lib/marketMood";
 import { recordFinish } from "./lib/achievements";
 import { grantPlayReward, computePlayReward } from "./lib/playRewards";
+import { Capacitor } from "@capacitor/core";
+import { App as CapApp } from "@capacitor/app";
 
 export default function App() {
   const [screen, setScreen]         = useState<Screen>("home");
@@ -142,8 +144,12 @@ export default function App() {
         leavingRef.current = true;       // 阻止後續 popstate 補哨兵
         confirmLeaveRef.current = false;
         setConfirmLeave(false);
-        window.close();                   // 桌機 PWA 有效；TWA 被封鎖則由下一行接手
-        window.history.go(-window.history.length);
+        if (Capacitor.isNativePlatform()) {
+          CapApp.exitApp();               // Capacitor 原生殼：真正結束 App（window.close 無效）
+        } else {
+          window.close();                 // 桌機 PWA 有效；TWA 被封鎖則由下一行接手
+          window.history.go(-window.history.length);
+        }
         return;
       }
 
@@ -165,11 +171,22 @@ export default function App() {
       e.preventDefault(); // 桌機 PWA 關視窗時跳瀏覽器原生「離開網站？」確認框
     };
 
+    // Capacitor 原生殼：實體返回鍵 → 轉成 window.history.back()，交給上面同一套 popstate
+    // 邏輯處理（子頁→首頁、首頁→確認離開、確認離開→exitApp），跟 TWA 時代實體返回鍵
+    // 行為完全一致。Capacitor 把實體返回鍵委派給 @capacitor/app 的 backButton 事件——
+    // 不裝/不接的話返回鍵完全沒反應，這正是換殼後「叫出導覽列按返回沒作用」的根因。
+    let backHandle: { remove: () => void } | undefined;
+    if (Capacitor.isNativePlatform()) {
+      CapApp.addListener("backButton", () => { window.history.back(); })
+        .then((h) => { backHandle = h; });
+    }
+
     window.addEventListener("popstate", onPop);
     window.addEventListener("beforeunload", onBeforeUnload);
     return () => {
       window.removeEventListener("popstate", onPop);
       window.removeEventListener("beforeunload", onBeforeUnload);
+      backHandle?.remove();
     };
   }, []); // 只在 App 掛載時執行一次，永遠不移除
 

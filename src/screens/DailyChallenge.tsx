@@ -11,7 +11,7 @@ import { fetchDeathHeatmap, type HeatBucket } from "../lib/deathHeatmap";
 import { getDailyQuests } from "../lib/quests";
 import { getWeeklyQuests, syncWeeklyFromServer, weekKey, type WeeklyQuestView } from "../lib/weeklyQuests";
 import { getAdsRemoved, syncWalletFromServer, fetchDailyUsage } from "../lib/garage";
-import { requestRewardedAd } from "../lib/ads";
+import { requestRewardedAd, preloadRewardedAd } from "../lib/ads";
 import { checkPendingSettlement, ackSettlement, type PendingSettlement } from "../lib/dailyDiamondSettlement";
 import CoinIcon from "../components/CoinIcon";
 import type { TrackData } from "../data/tracks";
@@ -116,6 +116,8 @@ export default function DailyChallenge({
         setIsLive(true);
       }
     });
+    // 排行榜第 3~5 次「看廣告開始」會用到廣告，進畫面就在背景先備好，點下去幾乎瞬開。
+    preloadRewardedAd("coin");
     return () => { alive = false; };
   }, []);
 

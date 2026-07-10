@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { BIKE_SKINS, getCoins, getDiamonds, isOwned, getActiveSkinId, purchaseSkin, setActiveSkin, addCoins, earnCoins, unlockAchievementSkin, syncWalletFromServer, fetchDailyUsage, writeDiamondsCache, getAdsRemoved, markAdsRemoved, type BikeSkin } from "../lib/garage";
-import { requestRewardedAd } from "../lib/ads";
+import { requestRewardedAd, preloadRewardedAd } from "../lib/ads";
 import { AD_COIN_REWARD, MAX_AD_COIN_CLAIMS_PER_DAY, getAdCoinClaims, incrementAdCoinClaims, setAdCoinClaims } from "../lib/adRewards";
 import { getAchievementBikes, type AchvBikeView } from "../lib/achievements";
 import { getStreak } from "../lib/streak";
@@ -90,6 +90,8 @@ export default function Garage({ user, onBack }: { user: User | null; onBack: ()
   useEffect(() => {
     let alive = true;
     refreshAchvBikes(() => alive);
+    // 進車庫就在背景把「看廣告拿金幣」的廣告備好，使用者點下去時幾乎瞬開（見 ads.ts）。
+    preloadRewardedAd("coin");
     return () => { alive = false; };
   }, []);
 

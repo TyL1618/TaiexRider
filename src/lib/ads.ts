@@ -237,6 +237,39 @@ function ensureAdMobInit(): Promise<void> {
   return admobInitPromise;
 }
 
+// ── 原生廣告預載入 ─────────────────────────────────────────────────────────────
+// prepareRewardVideoAd() 是實際跟 AdMob 伺服器要一支廣告的網路請求；舊版是「使用者
+// 點下去才現場 prepare」，把整段網路延遲直接壓在使用者的點擊當下，網路差時要等很久。
+// 改成進入會用到廣告的畫面（車庫/排行榜/遊戲中）時就在背景先 prepare 好，使用者真的
+// 點擊時 showRewardVideoAd() 幾乎瞬開。備好的廣告 show 一次就消耗掉，播完要再備下一支。
+// 只保留單一備載槽（同時間只會播一支廣告），種類不符時重備即可。
+type PreparedAd = { kind: RewardedAdKind; promise: Promise<void> };
+let preparedAd: PreparedAd | null = null;
+
+function prepareNativeAd(kind: RewardedAdKind): Promise<void> {
+  const p = ensureAdMobInit().then(() =>
+    AdMob.prepareRewardVideoAd({
+      adId: NATIVE_AD_UNIT_IDS[kind],
+      isTesting: true,
+      // immersiveMode:true 讓外掛顯示廣告當下自己套用沉浸式全螢幕，避免底部被系統三鍵
+      // 導覽列蓋住（MainActivity 的沉浸式只套在自己的 window，AdMob 另開 Activity）。
+      immersiveMode: true,
+    }).then(() => {})
+  );
+  preparedAd = { kind, promise: p };
+  // 備載失敗不留殘狀態，下次 preload/點擊會重備。
+  p.catch(() => { if (preparedAd?.promise === p) preparedAd = null; });
+  return p;
+}
+
+// 進入會用到廣告的畫面時呼叫，背景先把廣告備好（非原生殼＝no-op，網頁/TWA 各有自己路徑）。
+// 同種已在備載中就不重複；種類不同會重備成新種類。
+export function preloadRewardedAd(kind: RewardedAdKind): void {
+  if (detectEnv() !== "native") return;
+  if (preparedAd && preparedAd.kind === kind) return;
+  prepareNativeAd(kind).catch((err) => console.warn("[ads] 廣告預載入失敗（點擊時會重試）", err));
+}
+
 // ⚠️ 外掛的 showRewardVideoAd() 回傳的 Promise 只在「使用者實際看完、拿到獎勵」時
 // resolve（原生端 OnUserEarnedRewardListener 才呼叫 call.resolve，見外掛原始碼
 // RewardedAdCallbackAndListeners.kt）。使用者中途關閉廣告（沒拿到獎勵）只會發
@@ -244,13 +277,11 @@ function ensureAdMobInit(): Promise<void> {
 // 它，必須另外監聽 Dismissed/FailedToShow 事件才能涵蓋「沒看完」的路徑。
 async function requestNativeRewardedAd(kind: RewardedAdKind): Promise<boolean> {
   try {
-    await ensureAdMobInit();
-    // ⚠️ 真機實測：廣告播放時畫面底部被系統三鍵導覽列蓋住（MainActivity 設的沉浸式
-    // 全螢幕只套用在自己的 Activity window，AdMob 播廣告用的是另一個 Activity，
-    // 不會繼承那個設定）。immersiveMode:true 讓外掛在顯示廣告當下自己套用
-    // SYSTEM_UI_FLAG_IMMERSIVE_STICKY + HIDE_NAVIGATION（見外掛
-    // RewardedAdCallbackAndListeners.kt 的 ad.setImmersiveMode()）。
-    await AdMob.prepareRewardVideoAd({ adId: NATIVE_AD_UNIT_IDS[kind], isTesting: true, immersiveMode: true });
+    // 優先用預載好的廣告（進畫面時已在背景 prepare）；沒有或種類不符就現場備一支
+    // （fallback，行為等同舊版「點了才要」，只是多數情況已經被 preload 搶先備好了）。
+    const prep = (preparedAd && preparedAd.kind === kind) ? preparedAd.promise : prepareNativeAd(kind);
+    await prep;
+    preparedAd = null; // 這支即將被 show 消耗掉，清空備載槽
 
     return await new Promise<boolean>((resolve) => {
       let rewarded = false;
@@ -261,6 +292,7 @@ async function requestNativeRewardedAd(kind: RewardedAdKind): Promise<boolean> {
         if (settled) return;
         settled = true;
         cleanup();
+        preloadRewardedAd(kind); // 播完立刻在背景備下一支，下次點擊也能瞬開
         resolve(granted);
       };
 
@@ -283,6 +315,7 @@ async function requestNativeRewardedAd(kind: RewardedAdKind): Promise<boolean> {
     });
   } catch (err) {
     console.error("[ads] 原生廣告載入失敗", err);
+    preloadRewardedAd(kind); // 備載失敗也重備一次，讓下次點擊有機會瞬開
     return false;
   }
 }

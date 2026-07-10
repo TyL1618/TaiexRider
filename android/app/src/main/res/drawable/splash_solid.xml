@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 原生冷啟動 splash：純品牌底色 #05080f，不放任何圖（品牌動畫由 index.html 的
+     boot-splash 在 WebView 首次 paint 時接手播放）。這樣冷啟動→boot-splash 全程同底色，
+     不會有 Capacitor 預設 splash.png 白圖閃一下。 -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <solid android:color="#05080f" />
+</shape>
