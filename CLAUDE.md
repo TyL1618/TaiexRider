@@ -88,7 +88,14 @@ repo 內的 `android/` 資料夾（git 追蹤）跟本機 `AndroidStudioProjects
 
 ## 目前進度
 
-### 🎯 現在的狀態（2026-07-09 晚，Fable 5 交接清單三項全部執行完畢）
+> 🔀 **2026-07-10 晚起，主專案架構已從 TWA 正式切換到 Capacitor**（見待辦 6b）。
+> 下面「vc16/vc17/vc18」等 TWA 版號的內容是切換**之前**的狀態快照：vc16 已上傳
+> Play Console 封測、仍在跑審核流程（不受影響，繼續等結果），但 **vc17 起不會再
+> 出 TWA 版**——vc17 的原生手感/通知修復已經是 Capacitor 架構下的行為（不跳前景
+> 服務通知本來就是 Capacitor 的天生優勢，不用另外修）。之後的新版號會建立在
+> Capacitor 之上，開工前先讀 6b＋CAPACITOR_EXPERIMENT.md 掌握現況。
+
+### 🎯 現在的狀態（2026-07-09 晚，Fable 5 交接清單三項全部執行完畢——TWA 時代快照）
 
 - **vc16 已上傳 Play Console 封測軌道，等審核結果**（AdMob 橋接 + 通知權限修復版）。
 - **vc17 程式碼已完成、已同步本機 AS 專案，⚠️ 待真機測試後擇時上傳**：`AdBridgeService`
@@ -141,43 +148,28 @@ repo 內的 `android/` 資料夾（git 追蹤）跟本機 `AndroidStudioProjects
    見 [RETENTION_PLAN.md](RETENTION_PLAN.md)。
 6. **AdSense 網頁版**：暫緩，偵測到網頁玩家變多再評估（`ads.ts` 分流已備好，填
    `ADSENSE_PUB_ID` 即開通，記得同步補 CSP 白名單）。
-6b. **Capacitor 遷移實驗（2026-07-10 動工，✅ 三座橋——登入/AdMob/Play Billing 降級
-   ——全數真機驗證完畢）**：
-   使用者用 CyberMind 專案先試過 Capacitor 打包、體感非常好，決定讓 TaiexRider 也做
-   同樣的實驗。骨架建在平行資料夾 `C:\Users\tyl16\Documents\Private\TaiexRider-cap\`
-   （不進 git 版控），`applicationId=com.tylapp.taiexrider.captest`。**下午真機側載
-   驗證三項全過**：①原生手感佳、無 Chrome 提示 ②看廣告不跳前景服務通知（核心假設
-   成立）③ Google 登入（`@capgo/capacitor-social-login`，Credential Manager 系統
-   選擇器）連回同一顆 Supabase 帳號，車庫金幣/車皮/暱稱跟 TWA 正式版完全一致。過程
-   修了三個真機才會發現的坑（WebView 字型縮放致版面放大、登入 scopes 參數誤用致靜默
-   失敗、App icon 誤用變成安卓預設機器人）——完整除錯過程見
-   [CAPACITOR_EXPERIMENT.md](CAPACITOR_EXPERIMENT.md)「🎉 真機驗證結果」。
-   **2026-07-10 晚：AdMob＋Play Billing 兩座橋程式碼串接＋真機驗證全數完成**
-   （`@capacitor-community/admob`、`capacitor-native-purchases`，`detectEnv()`
-   已補上 `Capacitor.isNativePlatform()` 判斷，不再誤判成 `web`）。**AdMob 真機
-   實測三條路徑（車庫拿金幣/復活/結算雙倍）發放/次數/未看完不發全部正確**；踩了一個
-   坑並已修：廣告播放時導覽列蓋住畫面（外掛 `showRewardVideoAd()` 用另一個 Activity
-   顯示廣告，不會繼承 `MainActivity` 的沉浸式全螢幕設定），補上
-   `prepareRewardVideoAd({immersiveMode:true})` 後重 build 確認修好。**Play Billing
-   確認優雅降級**：查無定價時正確顯示錯誤、不 crash（`com.tylapp.taiexrider.captest`
-   沒上架 Play Console，本來就查不到商品）——使用者決定真實購買彈窗+入帳流程延後到
-   正式遷移、沿用正式 App 既有 Play Console 商品時再測，現階段不用特地為 captest 建
-   商品。過程另外發現一個純程式碼層級的限制（非阻塞，正式遷移前才需處理）：Play
-   Billing 外掛的 `purchasesUpdatedListener` 對所有 INAPP 商品一律自動 consume，
-   不分消耗型/非消耗型，導致 `remove_ads_forever`（買一次終身有效）理論上可以被
-   重複購買——目前靠車庫畫面 UI 層擋（`adsRemoved=true` 後不顯示購買按鈕）當防線，
-   不影響安全性（後端 purchase_token 防重放/冪等不受影響）。完整細節見
-   [CAPACITOR_EXPERIMENT.md](CAPACITOR_EXPERIMENT.md)「🌉 兩座橋接完成」。另外本機
-   JDK 環境也踩了一個雷：Eclipse Adoptium JDK 25 跟現在的 Gradle 8.14.3 不相容
-   （class file major version 69），改指到 Android Studio 內建 JBR（JDK 21）才編
-   得過，見同節「建置環境踩雷」。今天的 AAB 上傳照原計畫走 TWA vc17，跟 Capacitor
-   進度脫鉤。三座橋都驗證完畢，**下一步是使用者評估要不要正式決定切換到 Capacitor
-   出貨**（若決定切換，見下方 checklist）。
-   🔴 **真的要正式切 Capacitor 出貨時，先讀 CAPACITOR_EXPERIMENT.md 的「正式遷移
-   Google 登入 checklist」**：Android OAuth Client 要註冊 **Google Play 簽署金鑰的
-   SHA-1**（不是上傳金鑰 `taiexrider-release.jks`），漏了會「自己側載測全過、玩家從
-   商店下載全部登不進去」，且 Play Console 不能回滾版本。跟當年 assetlinks.json 是
-   同一個坑。使用者已明示不需自己記細節，由 Claude 負責在該時機主動提醒＋執行。
+6b. **✅ 2026-07-10 晚：已正式切換到 Capacitor，TWA 實驗結束**：
+   Capacitor 沙盒（登入/AdMob/Play Billing 三座橋皆真機驗證通過後）已正式併回主專案
+   `TaiexRider`——`android/` 整個換成 Capacitor 版本（舊 TWA 的
+   `AdActivity.kt`/`AdBridgeService.kt`/`DelegationService.kt` 等土炮橋接檔案移除，
+   仍完整保留在備份與 git 歷史）、`applicationId` 轉回正式的
+   `com.tylapp.taiexrider`（沿用 TWA 版本來就在用的那個，Play Console
+   listing/封測名單/AdMob App/IAP 商品全部不用重建）、`versionCode` 接續到 18。
+   本機 debug build 已驗證成功。**舊 TWA 專案完整備份在
+   `C:\Users\tyl16\Documents\Private\TaiexRider-TWA-backup\`**（含完整 git 歷史，
+   要回退隨時可用，不會被後續開發覆蓋）。完整合併細節、踩的雷（Gradle daemon 髒了
+   讓 AAPT2 莫名崩潰，`--no-daemon` 治本）、已知功能落差（App 捷徑/Splash Screen
+   還沒搬過來，非阻塞）見 [CAPACITOR_EXPERIMENT.md](CAPACITOR_EXPERIMENT.md)
+   「🔀 正式合併進主專案」。
+   🔴 **下一步是使用者待辦，Claude 無法自動化**：Google Cloud Console 建立 Android
+   OAuth Client（`com.tylapp.taiexrider` package 從沒為 Credential Manager
+   註冊過，現在登入會完全失敗）。**必須用 Google Play 簽署金鑰的 SHA-1**（不是
+   上傳金鑰 `taiexrider-release.jks`），漏了會「自己側載測全過、玩家從商店下載
+   全部登不進去」，且 Play Console 不能回滾版本，跟當年 assetlinks.json 是同一個坑
+   ——完整步驟、兩把金鑰差異、失敗模式見 CAPACITOR_EXPERIMENT.md 文末 checklist，
+   現在就是照著做的時候。做完＋生效後，才能：①真機測登入 ②AdMob 廣告單元換真實
+   ID（上架前必做）③build 正式簽署 AAB 上傳 Play Console（不可逆，Claude 不會
+   未經確認自動執行這步）。
 7. **選配資安收尾**：Google Cloud 舊服務帳號金鑰（`aabce7b...`，2026-07-06 建、私鑰已
    遺失）新金鑰已驗證能用、可去 GCP 刪除；Google 登入 OAuth client_secret 曾在對話中
    顯示過，封測期風險低，在意的話可 rotate。

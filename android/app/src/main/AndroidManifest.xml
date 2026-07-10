@@ -1,182 +1,52 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools">
-
-    <!-- Google Play Billing（鑽石購買/永久去廣告 IAP）必要權限 -->
-    <uses-permission android:name="com.android.vending.BILLING" />
-    <!-- AdMob SDK 讀取廣告 + 本機 loopback server（AdBridgeService）必要權限 -->
-    <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-    <!-- AdBridgeService 改前景服務用（避免被背景省電機制提早停掉，見該檔說明） -->
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
-    <!-- Android 13+ 顯示任何通知（含前景服務常駐通知）必要的執行時權限 -->
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <application
         android:allowBackup="true"
-        android:dataExtractionRules="@xml/data_extraction_rules"
-        android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:enableOnBackInvokedCallback="true"
-        android:theme="@style/Theme.TaiexRider">
-
-        <!-- assetlinks.json 的本機鏡像，官方 TWA/Play Billing 範例都有宣告這塊，
-             原本缺漏，補上一起排查 getDetails() 失敗問題 -->
-        <meta-data
-            android:name="asset_statements"
-            android:resource="@string/asset_statements" />
-
-        <!-- AdMob App ID（真實值，測試階段仍用真的 App ID，只有廣告單元 ID 用 Google
-             測試單元，見 AdActivity.kt 檔頭說明） -->
-        <meta-data
-            android:name="com.google.android.gms.ads.APPLICATION_ID"
-            android:value="ca-app-pub-8981745966447649~3758790919" />
+        android:theme="@style/AppTheme">
 
         <activity
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation|density"
             android:name=".MainActivity"
+            android:label="@string/title_activity_main"
+            android:theme="@style/AppTheme.NoActionBarLaunch"
+            android:launchMode="singleTask"
             android:exported="true">
-
-            <meta-data
-                android:name="android.support.customtabs.trusted.DEFAULT_URL"
-                android:value="@string/twa_url" />
-
-            <meta-data
-                android:name="android.support.customtabs.trusted.DISPLAY_MODE"
-                android:value="sticky-immersive" />
-
-                <!-- ⚠️ 必須用 android:resource 引用 @color，不能用 android:value 塞色碼字面值：
-                 androidbrowserhelper 會把讀到的 int 當資源 ID 查表，
-                 字面值 → Resources$NotFoundException 啟動即崩（vc9 事故根因） -->
-            <meta-data
-                android:name="android.support.customtabs.trusted.SPLASH_SCREEN_BACKGROUND_COLOR"
-                android:resource="@color/color_splash_bg" />
-
-            <meta-data
-                android:name="android.support.customtabs.trusted.SPLASH_SCREEN_FADE_OUT_DURATION"
-                android:value="300" />
-
-            <!-- Splash 品牌圖（v0.12.6）：splash 期間置中顯示的 icon，
-                 需搭配下方 FileProvider 把圖傳給 Chrome -->
-            <meta-data
-                android:name="android.support.customtabs.trusted.SPLASH_IMAGE_DRAWABLE"
-                android:resource="@drawable/splash_icon" />
-
-            <meta-data
-                android:name="android.support.customtabs.trusted.FILE_PROVIDER_AUTHORITY"
-                android:value="@string/provider_authority" />
-
-            <!-- 長按圖示 App 捷徑（每日排名賽 / 隨機拉霸） -->
-            <meta-data
-                android:name="android.app.shortcuts"
-                android:resource="@xml/shortcuts" />
 
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
-            <intent-filter android:autoVerify="true">
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data
-                    android:scheme="https"
-                    android:host="taiexrider.pages.dev" />
-            </intent-filter>
         </activity>
 
-        <activity
-            android:name="com.google.androidbrowserhelper.trusted.ManageDataLauncherActivity"
-            android:exported="false" />
-
-        <!-- 自訂子類別（見 DelegationService.kt），預設實作不會接上 Play Billing
-             的 Digital Goods 處理器，一定要換成自己的子類別 + 這個 intent-filter，
-             Chrome 才找得到人處理 getDetails()/listPurchases()。
-             ⚠️ 絕對不能加 android:permission="android.permission.BIND_JOB_SERVICE"：
-             那是系統簽章權限，Chrome 沒有 → 會被擋在 bindService() 那一關，
-             getDetails() 直接失敗（vc12/13 卡關真因）。Google 官方 twa-play-billing
-             範例的這個 service 就是「exported=true + 只有 intent-filter，無 permission」，
-             呼叫端身分驗證由 TrustedWebActivityService 內部比對簽章完成，不靠這個權限。 -->
-        <service
-            android:name=".DelegationService"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.support.customtabs.trusted.TRUSTED_WEB_ACTIVITY_SERVICE" />
-                <category android:name="android.intent.category.DEFAULT" />
-            </intent-filter>
-        </service>
-
-        <!-- Play Billing 付款橋接元件（androidbrowserhelper:billing），
-             Chrome 透過這兩個元件跟 Play Billing 溝通付款流程。 -->
-        <activity
-            android:name="com.google.androidbrowserhelper.playbilling.provider.PaymentActivity"
-            android:theme="@android:style/Theme.Translucent.NoTitleBar"
-            android:configChanges="keyboardHidden|keyboard|orientation|screenLayout|screenSize"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="org.chromium.intent.action.PAY" />
-            </intent-filter>
-            <meta-data
-                android:name="org.chromium.default_payment_method_name"
-                android:value="https://play.google.com/billing" />
-        </activity>
-
-        <service
-            android:name="com.google.androidbrowserhelper.playbilling.provider.PaymentService"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="org.chromium.intent.action.IS_READY_TO_PAY" />
-            </intent-filter>
-        </service>
-
-        <!-- AdMob 獎勵廣告結果查詢（見 AdBridgeService.kt 檔頭說明）：只是被動的
-             結果暫存區查詢站，不再負責啟動 AdActivity（那個角色交給下面的自訂
-             scheme intent-filter）。MainActivity 啟動時 startForegroundService 這支，
-             網頁用 fetch(http://127.0.0.1:PORT/...) 輪詢；不對外 export，只有本機
-             loopback 能連到，另有 socket 綁 127.0.0.1 把關。 -->
-        <service
-            android:name=".AdBridgeService"
-            android:exported="false"
-            android:foregroundServiceType="specialUse">
-            <property
-                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="ad_reward_bridge" />
-        </service>
-
-        <!-- 實際載入/顯示 RewardedAd 的透明畫面，廣告播完/失敗就 finish() 回到原本的 TWA。
-             ⚠️ 一定要由這裡的自訂 scheme intent-filter 啟動（Chrome 使用者手勢導轉
-             taiexrider-ad://show?type=... 觸發），不能靠 Service 直接 startActivity——
-             後者會被 Android Background Activity Launch 限制擋下（真機實測 logcat:
-             BAL_BLOCK, result code=102，前景服務不算豁免條件），必須是「由目前可見的
-             前景 App（Chrome）發起」才會放行，見 AdBridge.kt 檔頭說明。 -->
-        <activity
-            android:name=".AdActivity"
-            android:theme="@android:style/Theme.Translucent.NoTitleBar"
-            android:excludeFromRecents="true"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="taiexrider-ad" android:host="show" />
-            </intent-filter>
-        </activity>
-
-        <!-- androidbrowserhelper splash 圖傳遞用 FileProvider -->
         <provider
             android:name="androidx.core.content.FileProvider"
-            android:authorities="@string/provider_authority"
-            android:grantUriPermissions="true"
-            android:exported="false">
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
             <meta-data
                 android:name="android.support.FILE_PROVIDER_PATHS"
-                android:resource="@xml/filepaths" />
+                android:resource="@xml/file_paths"></meta-data>
         </provider>
 
+        <!-- AdMob App ID（跟正式 TWA 版共用同一個 AdMob 帳戶下的 App，見 CLAUDE.md
+             廣告雙軌架構段落）。這只是「註冊」用途，實際播放哪支廣告單元由
+             src/lib/ads.ts 呼叫 AdMob.prepareRewardVideoAd({adId}) 決定。 -->
+        <meta-data
+            android:name="com.google.android.gms.ads.APPLICATION_ID"
+            android:value="ca-app-pub-8981745966447649~3758790919" />
     </application>
 
+    <!-- Permissions -->
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Google Play Billing（鑽石購買/永久去廣告 IAP）必要權限。capacitor-native-purchases
+         外掛本身的 AndroidManifest 是空的（不像 admob 外掛會自動帶 INTERNET 權限），
+         這條要手動補，漏了 Play Billing 會直接連不上。 -->
+    <uses-permission android:name="com.android.vending.BILLING" />
 </manifest>

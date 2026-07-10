@@ -9,7 +9,10 @@
      且置中內容無法用捲動看到被裁掉的頂部（scrollTop 到不了負值）——矮螢幕會真的看不到標題。 */
   justify-content: flex-start;
   gap: 0;
-  padding: calc(2rem + env(safe-area-inset-top, 0px)) 1.25rem calc(2rem + env(safe-area-inset-bottom, 0px));
+  /* 頂部留 3.2rem：讓 <h1> 標題清楚落在右上角 .settings-corner-btn（top 0.9rem、高約 1.5rem，
+     底邊約 2.4rem）下方，避免標題與設定鈕重疊。根因（Capacitor WebView 整體放大）已由
+     MainActivity 的 setTextZoom(100) 修掉，這裡是額外的版面安全邊界。 */
+  padding: calc(3.2rem + env(safe-area-inset-top, 0px)) 1.25rem calc(2rem + env(safe-area-inset-bottom, 0px));
   box-sizing: border-box;
   text-align: center;
   overflow-y: auto;

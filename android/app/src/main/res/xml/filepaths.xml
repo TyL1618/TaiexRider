@@ -1,5 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!-- androidbrowserhelper splash：FileProvider 把 splash 圖傳給 Chrome 用 -->
-<paths>
-    <files-path path="twa_splash/" name="twa_splash" />
-</paths>

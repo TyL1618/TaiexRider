@@ -20,7 +20,14 @@
 // ⚠️ 第一階段（目前）：ADSENSE_PUB_ID 留空 → 任何環境都「不載入任何廣告」。
 //    純粹放偵測骨架，先在真機驗證偵測正確分流。
 //    驗證 OK + AdSense 審核通過後，第二階段才填入真實 pub ID 與廣告版位。
+//
+// ⚠️ 2026-07-10 cap 沙盒新增第三種環境「native」（Capacitor 原生殼，非 TWA）：
+//    廣告改走 @capacitor-community/admob 直接呼叫原生 SDK，不需要 TWA 那套
+//    loopback server + 自訂 scheme 橋接（那整塊坑是 androidbrowserhelper 專屬）。
 // ============================================================
+
+import { Capacitor } from "@capacitor/core";
+import { AdMob, RewardAdPluginEvents } from "@capacitor-community/admob";
 
 // 第二階段填入，例："ca-pub-8981745966447649"。留空 = 不載入任何廣告（第一階段）。
 const ADSENSE_PUB_ID = "";
@@ -48,9 +55,17 @@ export function isInsideTWA(): boolean {
   return false;
 }
 
-export type AdEnv = "twa" | "web";
+export type AdEnv = "native" | "twa" | "web";
+
+// Capacitor 原生殼（cap 沙盒／未來若正式遷移）：跟 TWA 是兩條不同的原生橋接路徑，
+// 要分開判斷，不能沿用 isInsideTWA() 的 display-mode 訊號（Capacitor 系統 WebView
+// 不一定回報 standalone/fullscreen）。
+function isCapacitorNative(): boolean {
+  return Capacitor.isNativePlatform();
+}
 
 export function detectEnv(): AdEnv {
+  if (isCapacitorNative()) return "native";
   return isInsideTWA() ? "twa" : "web";
 }
 
@@ -59,7 +74,7 @@ export function initAds(): void {
   const env = detectEnv();
   console.info(`[ads] env=${env} ${getAdDebugInfo()}`);
 
-  if (env === "twa") return; // App：不載 AdSense（AdMob 由原生層處理）
+  if (env !== "web") return; // App（native/twa）：不載 AdSense（廣告由原生層處理）
   if (!ADSENSE_PUB_ID) return; // 第一階段：無 pub ID → 不載入任何廣告
   loadAdSense(ADSENSE_PUB_ID);
 }
@@ -113,8 +128,10 @@ const AD_BRIDGE_UNREACHABLE_BAIL_MS = 15000;
 export type RewardedAdKind = "coin" | "revive";
 
 export function requestRewardedAd(kind: RewardedAdKind): Promise<boolean> {
-  if (detectEnv() !== "twa") return Promise.resolve(true);
-  return requestTwaRewardedAd(kind);
+  const env = detectEnv();
+  if (env === "native") return requestNativeRewardedAd(kind);
+  if (env === "twa") return requestTwaRewardedAd(kind);
+  return Promise.resolve(true); // 網頁版：直接發獎勵（見檔頭說明）
 }
 
 // ⚠️ 真機實測：廣告全螢幕顯示時，原本的 TWA 分頁對 Chrome 來說變成「背景分頁」，
@@ -193,4 +210,79 @@ async function pollAdResult(): Promise<boolean> {
   }
   console.warn("[ads] 輪詢逾時，視為未獲得獎勵");
   return false;
+}
+
+// ── Capacitor 原生殼：@capacitor-community/admob，同進程 plugin bridge ──────────
+// 不需要 TWA 那套 loopback server + 自訂 scheme 導轉——AdMob SDK 直接跑在同一個
+// WebView 所在的原生行程裡，官方 API 就有 prepare/show，不用自己土炮繞背景服務。
+//
+// ⚠️ 廣告單元 ID 目前用 Google 官方測試單元（不受 AdMob 帳戶審核/廣告單元啟用狀態
+// 影響，先把橋接跑通），跟 TWA 版 AdActivity.kt 目前的作法一致。上架前才換成真實
+// 單元 ID（revive_reward: ca-app-pub-8981745966447649/1679422480；coin_reward:
+// ca-app-pub-8981745966447649/2170377077，依 kind 分流；同時 isTesting 記得拿掉）。
+const NATIVE_TEST_REWARD_AD_UNIT_ID = "ca-app-pub-3940256099942544/5224354917";
+const NATIVE_AD_UNIT_IDS: Record<RewardedAdKind, string> = {
+  coin: NATIVE_TEST_REWARD_AD_UNIT_ID,
+  revive: NATIVE_TEST_REWARD_AD_UNIT_ID,
+};
+
+let admobInitPromise: Promise<void> | null = null;
+function ensureAdMobInit(): Promise<void> {
+  if (!admobInitPromise) {
+    admobInitPromise = AdMob.initialize({ initializeForTesting: true }).catch((err) => {
+      admobInitPromise = null; // 初始化失敗不快取，下次重試
+      throw err;
+    });
+  }
+  return admobInitPromise;
+}
+
+// ⚠️ 外掛的 showRewardVideoAd() 回傳的 Promise 只在「使用者實際看完、拿到獎勵」時
+// resolve（原生端 OnUserEarnedRewardListener 才呼叫 call.resolve，見外掛原始碼
+// RewardedAdCallbackAndListeners.kt）。使用者中途關閉廣告（沒拿到獎勵）只會發
+// Dismissed 事件，showRewardVideoAd() 的 Promise 永遠不會 settle——不能只 await
+// 它，必須另外監聽 Dismissed/FailedToShow 事件才能涵蓋「沒看完」的路徑。
+async function requestNativeRewardedAd(kind: RewardedAdKind): Promise<boolean> {
+  try {
+    await ensureAdMobInit();
+    // ⚠️ 真機實測：廣告播放時畫面底部被系統三鍵導覽列蓋住（MainActivity 設的沉浸式
+    // 全螢幕只套用在自己的 Activity window，AdMob 播廣告用的是另一個 Activity，
+    // 不會繼承那個設定）。immersiveMode:true 讓外掛在顯示廣告當下自己套用
+    // SYSTEM_UI_FLAG_IMMERSIVE_STICKY + HIDE_NAVIGATION（見外掛
+    // RewardedAdCallbackAndListeners.kt 的 ad.setImmersiveMode()）。
+    await AdMob.prepareRewardVideoAd({ adId: NATIVE_AD_UNIT_IDS[kind], isTesting: true, immersiveMode: true });
+
+    return await new Promise<boolean>((resolve) => {
+      let rewarded = false;
+      let settled = false;
+      const handles: Array<{ remove(): void }> = [];
+      const cleanup = () => handles.forEach((h) => h.remove());
+      const finish = (granted: boolean) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        resolve(granted);
+      };
+
+      AdMob.addListener(RewardAdPluginEvents.Rewarded, () => {
+        rewarded = true;
+      }).then((h) => handles.push(h));
+      AdMob.addListener(RewardAdPluginEvents.Dismissed, () => {
+        console.info(`[ads] 原生廣告關閉，granted=${rewarded}`);
+        finish(rewarded);
+      }).then((h) => handles.push(h));
+      AdMob.addListener(RewardAdPluginEvents.FailedToShow, (err) => {
+        console.error("[ads] 原生廣告顯示失敗", err);
+        finish(false);
+      }).then((h) => handles.push(h));
+
+      AdMob.showRewardVideoAd().catch((err) => {
+        console.error("[ads] 呼叫顯示原生廣告失敗", err);
+        finish(false);
+      });
+    });
+  } catch (err) {
+    console.error("[ads] 原生廣告載入失敗", err);
+    return false;
+  }
 }

@@ -1,8 +1,97 @@
-# Capacitor 遷移可行性實驗計畫（2026-07-10 動工，三座橋全數真機驗證✅通過）
+# Capacitor 遷移可行性實驗計畫（2026-07-10 動工，✅ 已正式切換，實驗結束）
 
-> **狀態：三座橋（Google 登入／AdMob／Play Billing）全數完成真機驗證，見下方
-> 「🎉 真機驗證結果」與「🌉 AdMob + Play Billing 兩座橋接完成」兩節。下一步：
-> 評估是否要讓 vc18+ 正式切換到 Capacitor 出貨（見文末「正式遷移 checklist」）。**
+> **狀態：2026-07-10 晚，使用者確認正式切換到 Capacitor 出貨。實驗沙盒
+> `TaiexRider-cap` 的成果已併回主專案 `TaiexRider`（`android/` 整個換成 Capacitor
+> 版本，applicationId 轉回正式的 `com.tylapp.taiexrider`），本機 debug build 已驗證
+> 成功。**舊 TWA 版完整備份在 `C:\Users\tyl16\Documents\Private\TaiexRider-TWA-backup\`
+> （含完整 git 歷史，未來要回退隨時可用）**。詳見下方「🔀 2026-07-10 晚：正式合併
+> 進主專案」。**下一步是使用者手動完成的 Google OAuth 設定，見該節「待辦」。**
+
+## 🔀 2026-07-10 晚：正式合併進主專案
+
+使用者確認三座橋（登入/AdMob/Play Billing）驗證都過關後，決定不再猶豫，直接讓
+Capacitor 變成 `TaiexRider` 主專案本身，TWA 版整份備份保留、不刪除。
+
+### 做了什麼
+
+1. **備份舊 TWA 專案**：`robocopy` 整份 `TaiexRider`（含 `.git`）鏡像複製到平行資料夾
+   `C:\Users\tyl16\Documents\Private\TaiexRider-TWA-backup\`（414MB，獨立完整的 git
+   checkout，可以直接在裡面 `git log` 操作，完全不受主專案後續變動影響）。
+2. **清掉主專案的舊 TWA android/ 專案**：`AdActivity.kt`／`AdBridge.kt`／
+   `AdBridgeService.kt`／`DelegationService.kt`（TWA 專屬的原生橋接土炮）、舊版
+   `MainActivity.kt`、androidbrowserhelper 相關 build.gradle 設定全部移除（仍完整
+   保留在上面的備份與 git 歷史裡，不是真的消失）。
+3. **把 `TaiexRider-cap/android` 整包搬進來**，改回正式 identity：
+   - `applicationId`／`namespace`：`com.tylapp.taiexrider.captest` →
+     `com.tylapp.taiexrider`（沿用正式 TWA 版本來就在用的那個，Play Console
+     listing/封測名單/AdMob App/IAP 商品全部原封不動接續，見下方「為什麼
+     applicationId 沿用」）。
+   - `versionCode`：`18`（接續 TWA 版最後一版 vc17，Play Console 只認
+     applicationId+versionCode 單調遞增，不因為換底層原生框架而歸零）。
+   - `strings.xml` app_name/title 拿掉「(Cap)」字樣，正式 App 名稱回歸「TaiexRider」。
+   - `MainActivity.java` 從 `.../captest/` package 資料夾搬到正式 package 路徑。
+   - `AndroidManifest.xml` 補上 `com.android.vending.BILLING` 權限（
+     `capacitor-native-purchases` 外掛本身的 manifest 是空的，不像 admob 外掛會
+     自動帶 INTERNET 權限，這條必須手動補，漏了 Play Billing 會直接連不上——這是
+     這次合併新發現的坑，cap 沙盒當時測試優雅降級時還沒補這條，回頭看那次「查無
+     定價」的降級測試其實可能兩種原因都有份，不影響結論但值得記一筆）。
+   - `src/lib/{ads,billing,auth}.ts`、`src/screens/Home.{tsx,css}`、
+     `capacitor.config.ts`（`appId`/`appName` 改回正式值）、
+     `scripts/gen-android-icons.mjs`：從 cap 沙盒複製過來，`package.json` 合併
+     5 個 Capacitor 相關 npm 套件依賴。
+4. **本機 debug build 驗證成功**（過程踩了一個大坑，見下方「踩雷」），
+   `BUILD SUCCESSFUL`，`app-debug.apk` ~30MB。
+
+### 🕳️ 踩雷：Gradle daemon 髒了會讓 AAPT2 莫名其妙崩潰，`--no-daemon` 治本
+
+合併後第一次 build 直接炸：`AAPT2 ... Daemon #0: Unexpected error during link`（
+process 無聲無息 exit，錯誤輸出是空的）。逐一排除 BILLING 權限、strings.xml 內容、
+applicationId 本身（換成從沒用過的全新值一樣炸）都不是兇手，資源檔案跟 cap 沙盒
+逐位元組比對完全一致；但拿**一模一樣**的內容去 cap 沙盒（`TaiexRider-cap`）重建卻
+一次過關。最後用 `./gradlew assembleDebug --no-daemon` 繞開 Gradle daemon 重用機制
+直接成功——**確認是這次 session 反覆在兩個專案間來回 build 累積出的 daemon 髒狀態**
+（單純 `./gradlew --stop` 沒用，daemon 停了但某個殘留的 AAPT2 子行程/暫存狀態沒清
+乾淨）。**遇到同類「莫名其妙 AAPT2 崩潰、內容比對不出問題」的狀況，直接
+`--no-daemon` 重跑最快**，不用浪費時間繼續排查資源檔案本身。
+
+### 為什麼 applicationId 沿用正式版、Play Console 不會歸零
+
+DEVDOC §10 已確認過：Google Play 只認 `applicationId` + 簽署金鑰這組配對，只要這兩個
+不變，底層原生框架從 TWA 換成 Capacitor 完全不影響 Play Console 的 App
+listing／封測名單／版本歷史／評論。IAP 商品 SKU、AdMob App ID 也是同理，全部
+綁在 applicationId，不用重建。
+
+### 📋 使用者待辦（Claude 無法自動化，且做錯代價很高，務必依序做）
+
+這是**這次合併後唯一還沒完成的事**，做完才能讓真機測試/正式簽署版走得通：
+
+1. 🔴 **Google Cloud Console 建立 Android OAuth Client**（否則 Google 登入會完全
+   失敗——`com.tylapp.taiexrider` 這個 package 從沒為 Credential Manager 註冊過，
+   TWA 時代走的是純網頁 OAuth，不需要這個）。詳細步驟、兩把金鑰的差異、最惡劣的
+   失敗模式，見文末「🚨 正式遷移到 Capacitor 出貨時的 Google 登入 checklist」，
+   這節在動工前就寫好了，現在正是要照著做的時候。**本機除錯用的 debug keystore
+   SHA-1 沿用同一支**：`29:08:B4:C2:4A:CD:4B:FE:DA:ED:3E:83:10:8B:BA:05:60:16:BA:DC`
+   （這台機器全部 Android 專案共用的 `~/.android/debug.keystore`）。
+2. 🟡 **AdMob 廣告單元 ID 換真實值**（上架前必做，目前 `src/lib/ads.ts` 的
+   `NATIVE_AD_UNIT_IDS` 仍是 Google 官方測試單元，故意先不換，避免側載測試時對
+   正式廣告單元產生無效流量。換的時機：確定要 build 最終簽署版時再換，見
+   ads.ts 檔頭註解）：revive_reward=`ca-app-pub-8981745966447649/1679422480`、
+   coin_reward=`ca-app-pub-8981745966447649/2170377077`。
+3. ⚪ **正式簽署 AAB build + 上傳 Play Console**：Claude 尚未執行、也不會未經確認
+   自動執行（不可逆、Play Console 無法回滾版本）。等第 1 項 OAuth Client 生效
+   （數十分鐘~數小時）、確認真機側載測試（含登入）都正常後，才進行這一步。
+
+### ⚠️ 已知功能落差（合併時發現，非阻塞，先記錄留待之後評估要不要補）
+
+- **App 捷徑（長按圖示「排名賽」/「隨機拉霸」）沒有搬過來**：舊 TWA 版靠
+  `res/xml/shortcuts.xml` + manifest meta-data，用 `targetPackage`/`targetClass`
+  直接指定 Intent 給 `MainActivity` 解析 URL query。Capacitor 的 `BridgeActivity`
+  預設不會這樣解析外部傳入的 URL data，要另外寫 `onNewIntent()` 攔截+透過
+  Capacitor bridge 通知 JS 層導頁，屬於要重新設計的原生小工程，這次合併範圍沒做。
+- **開屏 Splash Screen 沒有設定**：舊 TWA 版靠 androidbrowserhelper 自己的
+  splash 機制（品牌色+置中 icon）；cap 沙盒從沒裝 `@capacitor/splash-screen`
+  外掛，目前是系統預設（可能是短暫黑白閃一下）。要補的話裝該官方外掛+設定
+  `capacitor.config.ts` 的 `SplashScreen` 區塊即可，不難，只是這次沒做。
 
 ## 🎉 2026-07-10 下午：真機驗證結果（三項全過）
 

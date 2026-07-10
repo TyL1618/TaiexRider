@@ -204,7 +204,7 @@ export default function Home({
             </div>
 
             <div className="settings-meta-row">
-              <span className="settings-version-text" onClick={handleVersionTap}>版本 v{APP_VERSION}・{detectEnv() === "twa" ? "App" : "網頁"}</span>
+              <span className="settings-version-text" onClick={handleVersionTap}>版本 v{APP_VERSION}・{detectEnv() === "web" ? "網頁" : "App"}</span>
               <button
                 className="settings-changelog-btn"
                 onClick={() => { setShowSettings(false); setShowHelp(true); }}
