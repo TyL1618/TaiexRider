@@ -151,13 +151,21 @@ repo 內的 `android/` 資料夾（git 追蹤）跟本機 `AndroidStudioProjects
    修了三個真機才會發現的坑（WebView 字型縮放致版面放大、登入 scopes 參數誤用致靜默
    失敗、App icon 誤用變成安卓預設機器人）——完整除錯過程見
    [CAPACITOR_EXPERIMENT.md](CAPACITOR_EXPERIMENT.md)「🎉 真機驗證結果」。
-   **下一步**：AdMob／Play Billing 兩座橋，使用者決定**另開新 session** 處理（context
-   window 較乾淨）——交接細節（含「今天不用趕金流時程」的風險釐清、build variant
-   分環境設定建議）已整理在 [CAPACITOR_EXPERIMENT.md](CAPACITOR_EXPERIMENT.md)「📌 給
-   下一個 session 的交接」，新 session 直接讀那份接續。今天的 AAB 上傳照原計畫走 TWA
-   vc17，跟 Capacitor 進度脫鉤。順帶一提 `detectEnv()` 目前在 Capacitor 殼裡誤判成
-   `web`（靠 TWA 特徵判斷），串廣告/購買分流前要先補上 `Capacitor.isNativePlatform()`
-   判斷，不然會走錯路徑。
+   **2026-07-10 晚：AdMob＋Play Billing 兩座橋程式碼串接完成、本機 debug build
+   成功**（`@capacitor-community/admob`、`capacitor-native-purchases`，`detectEnv()`
+   已補上 `Capacitor.isNativePlatform()` 判斷，不再誤判成 `web`）。⬜ **尚待真機側載
+   驗證**（廣告顯示+發獎勵、Play Billing 購買鑽石包+入帳）。過程發現兩個值得記住的
+   細節：① AdMob 外掛的 `showRewardVideoAd()` 只在使用者看完拿到獎勵才 resolve，
+   使用者中途關閉要另外監聽 Dismissed 事件才抓得到；② Play Billing 外掛
+   （`capacitor-native-purchases`）對所有 INAPP 商品一律自動 consume，不分消耗型/
+   非消耗型，導致 `remove_ads_forever`（買一次終身有效）理論上可以被重複購買——
+   目前靠車庫畫面 UI 層擋（`adsRemoved=true` 後不顯示購買按鈕）當防線，不影響安全性
+   （後端 purchase_token 防重放/冪等不受影響），但**正式遷移出貨前要重新評估**這個
+   外掛限制。完整細節見 [CAPACITOR_EXPERIMENT.md](CAPACITOR_EXPERIMENT.md)「🌉
+   兩座橋接完成」。另外本機 JDK 環境也踩了一個雷：Eclipse Adoptium JDK 25 跟現在的
+   Gradle 8.14.3 不相容（class file major version 69），改指到 Android Studio
+   內建 JBR（JDK 21）才編得過，見同節「建置環境踩雷」。今天的 AAB 上傳照原計畫走
+   TWA vc17，跟 Capacitor 進度脫鉤。
    🔴 **真的要正式切 Capacitor 出貨時，先讀 CAPACITOR_EXPERIMENT.md 的「正式遷移
    Google 登入 checklist」**：Android OAuth Client 要註冊 **Google Play 簽署金鑰的
    SHA-1**（不是上傳金鑰 `taiexrider-release.jks`），漏了會「自己側載測全過、玩家從
