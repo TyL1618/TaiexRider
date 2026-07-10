@@ -494,9 +494,10 @@ APK 是誰簽的」，不是「上傳前是誰簽的」。
 
 1. 🔴✅ **Play 簽署金鑰的 SHA-1** ← **最重要**。玩家從商店下載的版本靠這個。
    來源：Play Console → **應用程式完整性 (App integrity)** → 應用程式簽署金鑰憑證。
-   **2026-07-10 使用者已抄到**：`87:74:F0:B1:43:BD:43:C3:47:E2:20:C4:5A:D0:AA:DC:63:CF:14:64`
-   （下一步：去 Cloud Console 用這組建 Android OAuth Client，package 填
-   `com.tylapp.taiexrider`）。
+   SHA-1＝`87:74:F0:B1:43:BD:43:C3:47:E2:20:C4:5A:D0:AA:DC:63:CF:14:64`。**2026-07-10
+   Android OAuth Client 已在 Google Cloud Console 建好**（package=
+   `com.tylapp.taiexrider`，這組 SHA-1）。⏳ 要等 Cloud Console 生效（數十分鐘~數小時）
+   才能實測登入。
 2. 🟠 **上傳金鑰 `taiexrider-release.jks` 的 SHA-1** ← 自己側載 signed release APK 測試時靠這個。
    來源：`keytool -list -v -keystore taiexrider-release.jks -alias taiexrider`
    （檔案在 `C:\Users\tyl16\Documents\taiexrider-release.jks`，需要金鑰密碼，使用者
