@@ -499,13 +499,15 @@ APK 是誰簽的」，不是「上傳前是誰簽的」。
    `com.tylapp.taiexrider`，這組 SHA-1）。⏳ 要等 Cloud Console 生效（數十分鐘~數小時）
    才能實測登入。
 2. 🟠✅ **上傳金鑰 `taiexrider-release.jks` 的 SHA-1** ← 自己側載 signed release APK
-   測試時靠這個。**2026-07-10 使用者已用 keytool 抄到**：
-   `6B:18:63:B2:BB:59:D4:F6:13:43:CC:1B:DD:B2:01:57:AF:3B:7C:4C`
-   （keystore 建立日期 2026-06-18，別名 `taiexrider`）。⬜ 尚未去 Cloud Console
-   建對應的 Android OAuth Client（package=`com.tylapp.taiexrider`，這組 SHA-1）。
-3. ⚪（選配）實驗版那顆 debug 的，留著繼續開發測試用，不刪也無害。
-   `29:08:B4:C2:4A:CD:4B:FE:DA:ED:3E:83:10:8B:BA:05:60:16:BA:DC`（本機共用 debug
-   keystore）。⬜ 尚未做。
+   測試時靠這個。SHA-1＝`6B:18:63:B2:BB:59:D4:F6:13:43:CC:1B:DD:B2:01:57:AF:3B:7C:4C`
+   （keystore 建立日期 2026-06-18，別名 `taiexrider`）。**2026-07-10 Android OAuth
+   Client 已建好**（Cloud Console 上顯示名稱 `com.tylapp.taiexrider`）。⏳ 同樣要等
+   生效。
+3. ⚪（選配，尚未做）：正式 `com.tylapp.taiexrider` 這個 package 若也想搭配本機
+   debug keystore 測（不用等簽署版就能側載測登入），SHA-1 用
+   `29:08:B4:C2:4A:CD:4B:FE:DA:ED:3E:83:10:8B:BA:05:60:16:BA:DC`。目前 Cloud
+   Console 上的 `TaiexRider Cap Test (debug)` 是舊沙盒 `.captest` package 的，跟
+   正式 package 不通用，不能省略這步。不建也不影響正式上架。
 
 > ⚠️ **DEVDOC §9.2 記的是 SHA-256**（assetlinks 用的格式），但 OAuth Android Client 要的是
 > **SHA-1**，兩者是不同雜湊、**不能換算**，到時候必須重新抓一次 SHA-1。
