@@ -15,10 +15,12 @@
    Google `sub`、不管哪個 Client 發起登入」的推論成立。使用者回饋這個系統選擇器 UI
    「比 TWA 那個好看，確實大部分 App 看到的都是這種」。
 
-**唯一的小瑕疵**：登出比網頁版稍慢——原因是 `signOut()` 會 `await
-SocialLogin.logout()`，原生 Credential Manager 的 `clearCredentialState()` 要跟系統層
-做一次同步清除，比網頁版純前端的 `google.accounts.id.cancel()` 多一截延遲。不影響正確性，
-純體感問題，優先度低、暫不處理。
+**登出手感已優化**：原本 `signOut()` 會 `await SocialLogin.logout()`，原生 Credential
+Manager 的 `clearCredentialState()` 要跟系統層做一次同步清除，比網頁版純前端的
+`google.accounts.id.cancel()` 多一截延遲，使用者回報「操作手感有點卡」。**改法**：
+不 await 那個原生呼叫（改 fire-and-forget + `.catch()` 靜默吞錯），因為它只影響「下次
+登入要不要跳帳號選擇器」，跟 Supabase 登出／本地快取清空（這兩件才是真正決定畫面狀態、
+必須 await 的事）無關。已 build 新 APK。
 
 ### 過程中修掉的三個坑（真機測試才會發現，記錄避免下次重踩）
 
