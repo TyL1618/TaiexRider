@@ -7,6 +7,7 @@
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
+        android:enableOnBackInvokedCallback="true"
         android:theme="@style/AppTheme">
 
         <activity
@@ -49,4 +50,10 @@
          外掛本身的 AndroidManifest 是空的（不像 admob 外掛會自動帶 INTERNET 權限），
          這條要手動補，漏了 Play Billing 會直接連不上。 -->
     <uses-permission android:name="com.android.vending.BILLING" />
+    <!-- 2026-07-10 上傳 Play Console 時報錯發現：新版 play-services-ads SDK（20.4.0+）
+         不會自動帶這條權限，Play Console 的「廣告 ID 宣告」若勾了「應用程式使用
+         廣告 ID」但 manifest 沒這條，廣告 ID 會被清成一串零，影響廣告投放/數據分析/
+         收益。@capacitor-community/admob 外掛的 manifest 也沒帶這條（只有
+         INTERNET/ACCESS_NETWORK_STATE），要手動補。 -->
+    <uses-permission android:name="com.google.android.gms.permission.AD_ID" />
 </manifest>

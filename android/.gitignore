@@ -16,8 +16,8 @@
 bin/
 gen/
 out/
-#  Uncomment the following line in case you need and you don't have the release build type files in your app
-# release/
+# 簽署版輸出（apk/aab/mapping/baselineProfiles 等），本機打包產物不進版控
+app/release/
 
 # Gradle files
 .gradle/

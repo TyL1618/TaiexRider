@@ -3,6 +3,15 @@
 > 概念：將台股每日走勢轉換成 2D 機車越野賽道（StonkRider 概念的台股本地化版本）。
 > 玩家每天看到的賽道，是**前一個交易日**的真實資料 — 全離線可玩、無需即時行情。
 
+> 🔀 **2026-07-10 起：Android 原生殼已從 TWA 正式切換到 Capacitor**，見
+> [CLAUDE.md](CLAUDE.md) 待辦 6b 與 [CAPACITOR_EXPERIMENT.md](CAPACITOR_EXPERIMENT.md)
+> 掌握最新狀態。下面 §9.4c（AdMob 8 層坑）、§2.7（IAP 除錯鏈）、§9.2（TWA 簽署金鑰/
+> assetlinks）等段落記的是 **TWA 時代的技術決策與踩雷歷史**，保留作為歷史紀錄（部分
+> 踩雷結論如「Play App Signing 重新簽署」在 Capacitor 時代仍然適用，只是換了個機制
+> 表現出來，見 CAPACITOR_EXPERIMENT.md 的 Google 登入 checklist），但**架構現況請
+> 以上面兩份文件為準**，不要照著 TWA 段落提到的程式碼路徑（`AdActivity.kt` 等）去找
+> 現在的檔案，那些已經不存在了。
+
 ---
 
 ## 0. 部署架構
