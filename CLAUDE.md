@@ -98,10 +98,15 @@ repo 內的 `android/` 資料夾（git 追蹤）跟本機 `AndroidStudioProjects
   兩次廣告（第二次緊接著點）也正常。
 - **vc18（下一版）**：殼版本更新提示（設計 DEVDOC §9.5b 方案 A），跟 vc17 之後任何
   需要重包的機會一起做。
-- **IAP 金流二次稽核已完成，發現待使用者拍板**（報告全文在
-  [FABLE5_HANDOFF_20260709.md](FABLE5_HANDOFF_20260709.md) 底部）：
-  1. 🔴 **Edge Function 未比對 Google 回應的 `productId` 與聲稱的 `sku_id`**——「買便宜
-     包冒充貴包」的真錢漏洞，建議修（3 行改動），**等使用者說動工才改**。
+- **IAP 金流二次稽核**（報告全文在 [FABLE5_HANDOFF_20260709.md](FABLE5_HANDOFF_20260709.md) 底部）：
+  1. 🔴✅ **2026-07-10 已修**：`supabase/functions/verify-iap-purchase/index.ts` 加了
+     `productId` 比對（Google 回應的 `productId` 跟前端聲稱的 `sku_id` 不符就拒絕），
+     堵住「買便宜包冒充貴包」的真錢漏洞。**⚠️ Code 已改但尚未部署**——這台電腦目前登入
+     的 Supabase CLI 帳號沒有這個專案的權限（`npx supabase functions deploy` 回
+     403），需要用對的帳號 `npx supabase login` 後重新
+     `npx supabase functions deploy verify-iap-purchase --project-ref cjnwwtrpveejhbwalncy`
+     才會生效（純 push GitHub 不會部署 Edge Function，見開發守則）。**部署前這個漏洞
+     仍然存在，部署後才算真的修好。**
   2. 🟠 退款後無收回機制——建議封測期接受，正式上架後視退款率再決定接 Voided Purchases API。
   3. 🟡 三個小項（Google 5xx 誤標、防重放並發 500、replay 分支假設錢包存在）——皆會
      自我修復或機率極低，可不修，詳見報告。
@@ -112,7 +117,8 @@ repo 內的 `android/` 資料夾（git 追蹤）跟本機 `AndroidStudioProjects
 
 ### ⚠️ 待真機驗證清單（累積中，測完劃掉）
 
-- [ ] vc17 三條廣告路徑 + 通知短暫存活行為（見上）。
+- [ ] ~~vc17 三條廣告路徑 + 通知短暫存活行為~~：**使用者 2026-07-10 決定跳過真機測試，
+  直接上傳 vc17 到 Play Console 封測、信任已完成的 code review**（不接線測，省時間）。
 - [ ] 排行榜第 3~5 次「看廣告開始」真的觸發廣告（需已登入、真的打到第 3 次；修復見
   已完結索引 7/9）。
 - [ ] 已買永久去廣告帳號：結算畫面顯示「🎁 領取 獎勵 ×2」且點擊立即雙倍入帳

@@ -98,6 +98,7 @@ async function getGoogleAccessToken(): Promise<string> {
 interface GooglePurchase {
   purchaseState: number;    // 0 = purchased
   consumptionState: number; // 0 = yet to be consumed
+  productId?: string;       // Google 文件註明「可能不存在」，只在有值時比對
 }
 
 async function verifyPurchase(productId: string, token: string, accessToken: string): Promise<GooglePurchase | null> {
@@ -180,6 +181,14 @@ Deno.serve(async (req) => {
     const purchase = await verifyPurchase(sku_id, purchase_token, accessToken);
     if (!purchase || purchase.purchaseState !== 0) {
       return new Response(JSON.stringify({ ok: false, error: "purchase not valid" }),
+        { status: 400, headers: CORS_HEADERS });
+    }
+    // 🔴 2026-07-10 修：防止「花便宜商品的 token，謊報成貴商品的 sku_id」換錯獎勵。
+    // Google 文件註明 productId「可能不存在」，只在有回傳時比對；此欄位由 Google 回應
+    // 決定，不是前端傳的，攻擊者無法偽造成一致。
+    if (purchase.productId && purchase.productId !== sku_id) {
+      console.error(`[iap] productId 不符：sku_id=${sku_id} google 回傳 productId=${purchase.productId}`);
+      return new Response(JSON.stringify({ ok: false, error: "product mismatch" }),
         { status: 400, headers: CORS_HEADERS });
     }
 
