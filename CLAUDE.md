@@ -151,9 +151,13 @@ repo 內的 `android/` 資料夾（git 追蹤）跟本機 `AndroidStudioProjects
    修了三個真機才會發現的坑（WebView 字型縮放致版面放大、登入 scopes 參數誤用致靜默
    失敗、App icon 誤用變成安卓預設機器人）——完整除錯過程見
    [CAPACITOR_EXPERIMENT.md](CAPACITOR_EXPERIMENT.md)「🎉 真機驗證結果」。
-   **下一步**：AdMob／Play Billing 兩座橋（2026-07-10 下午接著做）；順帶一提
-   `detectEnv()` 目前在 Capacitor 殼裡誤判成 `web`（靠 TWA 特徵判斷），串廣告/購買
-   分流前要先補上 `Capacitor.isNativePlatform()` 判斷，不然會走錯路徑。
+   **下一步**：AdMob／Play Billing 兩座橋，使用者決定**另開新 session** 處理（context
+   window 較乾淨）——交接細節（含「今天不用趕金流時程」的風險釐清、build variant
+   分環境設定建議）已整理在 [CAPACITOR_EXPERIMENT.md](CAPACITOR_EXPERIMENT.md)「📌 給
+   下一個 session 的交接」，新 session 直接讀那份接續。今天的 AAB 上傳照原計畫走 TWA
+   vc17，跟 Capacitor 進度脫鉤。順帶一提 `detectEnv()` 目前在 Capacitor 殼裡誤判成
+   `web`（靠 TWA 特徵判斷），串廣告/購買分流前要先補上 `Capacitor.isNativePlatform()`
+   判斷，不然會走錯路徑。
    🔴 **真的要正式切 Capacitor 出貨時，先讀 CAPACITOR_EXPERIMENT.md 的「正式遷移
    Google 登入 checklist」**：Android OAuth Client 要註冊 **Google Play 簽署金鑰的
    SHA-1**（不是上傳金鑰 `taiexrider-release.jks`），漏了會「自己側載測全過、玩家從
