@@ -8,6 +8,15 @@
 // 用真正的 buildTerrainBodies（terrain.ts，未修改，測目前上線版本）+ 完整複製
 // GameCanvas.tsx 的 applyControls（含 slopeAt 對齊、watchdog）跑一次完整下坡→平地。
 //
+// 🚨 2026-07-10 複驗發現本腳本兩個量測缺陷，數字不可直接採信（結論已被推翻）：
+//   1. 沒有摔車判定 → 車子翻覆後仍繼續模擬，回報的「深陷 117px」全部發生在真實
+//      遊戲早已判死之後（見 scripts/simSinkTrace.ts 加上 topHit/stuckMidAir 後複驗，
+//      存活期間深陷 = 0）。
+//   2. sink 公式「輪心y − (地表y − r)」只在平地成立。斜坡上輪子靜止時輪心是沿法線
+//      離地表 r，垂直距離是 r/cosθ；75° 坡完美貼地會被誤算成 ∓17px。
+//      正解見 scripts/simSinkScan.ts 的 surfaceDist()（點到折線最短距離）。
+// 真正能重現玩家「騎乘中陷進地形」的腳本是 scripts/simSinkScan.ts（真實股價地形）。
+//
 // 執行：
 //   ./node_modules/.bin/esbuild scripts/simSteepLanding.ts --bundle --platform=node \
 //     --format=cjs --outfile=sim-build/simSteepLanding.cjs
