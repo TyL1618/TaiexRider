@@ -38,8 +38,10 @@ const GROUPS: Record<GroupName, Record<string, number>> = {
 
 export const PARAMS: ParamDef[] = [
   // ── 碰撞正確性（這次修 bug 的主角）──
+  { group: "PHYSICS", key: "depenetrate", label: "穿透修正", min: 0, max: 1, step: 1,
+    hint: "1=開(建議)。每幀把陷進地形的輪子推回表面，修破圖/假死；只在穿透時作用，手感零改變" },
   { group: "PHYSICS", key: "subSteps", label: "物理子步數", min: 1, max: 4, step: 1,
-    hint: "單步位移 = 巡航速度 ÷ 子步數，必須 < 輪半徑才不會穿進地形" },
+    hint: "另一條路：單步位移=巡航速度÷子步數，需<輪半徑。真機會掉幀，故預設不用，留著對照" },
   { group: "PHYSICS", key: "positionIterations", label: "位置迭代", min: 2, max: 20, step: 1,
     hint: "Matter 預設 6；提高只能緩解深穿透，不治本" },
   { group: "PHYSICS", key: "velocityIterations", label: "速度迭代", min: 2, max: 20, step: 1, hint: "Matter 預設 4" },

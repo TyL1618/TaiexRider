@@ -30,7 +30,13 @@ const RUNS = parseInt((args.find((a) => a.startsWith("runs=")) || "runs=1500").s
 const BOT_ARG = (args.find((a) => a.startsWith("bot=")) || "bot=all").split("=")[1];
 // sub=N：物理子步數，與 GameCanvas 的 PHYSICS.subSteps 同語意（含相同等比換算）。
 const SUB = Math.max(1, parseInt((args.find((a) => a.startsWith("sub=")) || "sub=1").split("=")[1], 10));
-PHYSICS.subSteps = SUB; // createBike() 的 frictionAir 換算會讀它，必須在建車前設好
+PHYSICS.subSteps = SUB;
+// wr=N：覆寫車輪半徑（不用子步、單靠加大輪徑消除穿透的替代路線）。必須在建車前設好。
+const WR_ARG = args.find((a) => a.startsWith("wr="));
+if (WR_ARG) (BIKE as unknown as Record<string, number>).wheelRadius = parseFloat(WR_ARG.split("=")[1]);
+// depen=on：每幀 Engine.update 後偵測輪子有沒有陷進地表，有的話沿法線推回表面 +
+// 消掉往內速度（穿透修正）。不加子步、不改手感/輪徑，只在真的穿透時才作用。
+const DEPEN = (args.find((a) => a.startsWith("depen=")) || "depen=off").split("=")[1] === "on";
 
 type BotKind = "safe" | "hold" | "random";
 const BOTS: BotKind[] = BOT_ARG === "all" ? ["safe", "hold", "random"] : [BOT_ARG as BotKind];
@@ -196,6 +202,37 @@ function simulate(seed: number, bot: BotKind, trace = false): RunResult {
   };
   const sinkOf = (b: Body) => BIKE.wheelRadius - surfaceDist(b.position);
 
+  // ── 穿透修正 ──
+  // 回傳最近地形段的「向外(朝上)法線」+ 到折線的帶號距離。
+  // 段 a→b（x 遞增）方向 (dx,dy)，向外法線 = (dy,−dx)/len（y 向下座標系，這支的 y 分量 <0＝朝上）。
+  const closestSurf = (p: { x: number; y: number }): { dist: number; nx: number; ny: number } => {
+    const v = track.vertices;
+    const i = segIdxOf(track, p.x);
+    let best = Infinity, nx = 0, ny = -1;
+    for (let k = Math.max(0, i - 2); k <= Math.min(v.length - 2, i + 2); k++) {
+      const a = v[k], b = v[k + 1];
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const L2 = dx * dx + dy * dy;
+      const t = L2 > 0 ? Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / L2)) : 0;
+      const d = Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
+      if (d < best) { best = d; const L = Math.sqrt(L2) || 1; nx = dy / L; ny = -dx / L; }
+    }
+    return { dist: p.y < terrainYAt(track, p.x) ? best : -best, nx, ny };
+  };
+  const DEPEN_TOL = 1.0;   // 陷入超過 1px 才修（正常貼地本來就會小小重疊，別去動它）
+  const DEPEN_MAXPUSH = BIKE.wheelRadius; // 單幀最多推回一個輪半徑，避免深穿透時瞬移彈飛
+  const depenetrate = (w: Body) => {
+    const { dist, nx, ny } = closestSurf(w.position);
+    const pen = BIKE.wheelRadius - dist; // >0 = 陷入（輪面已在地表下）
+    if (pen <= DEPEN_TOL) return;
+    const push = Math.min(pen, DEPEN_MAXPUSH);
+    Body.setPosition(w, { x: w.position.x + nx * push, y: w.position.y + ny * push });
+    // 消掉「往地表內」的速度分量（per-baseDelta），否則下一幀又鑽回去
+    const v = Body.getVelocity(w);
+    const vn = v.x * nx + v.y * ny;
+    if (vn < 0) Body.setVelocity(w, { x: v.x - vn * nx, y: v.y - vn * ny });
+  };
+
   // ⚠️ 只在「輪子確實位於折線 x 範圍內」時才量 sink。超出最後一個頂點之後，
   // terrainYAt/segIdxOf 都會箝制在最後一段，而梯形碰撞體的右側斜牆（隱形幾何）
   // 仍然存在 → 車子踩在看不見的牆上，sink 會被誤算成 30px+。那是終點邊界假象，
@@ -247,6 +284,7 @@ function simulate(seed: number, bot: BotKind, trace = false): RunResult {
     for (let s = 0; s < SUB; s++) {
       applyControls(rc > 0 || fc > 0, thr);
       Engine.update(engine, SUB_DELTA);
+      if (DEPEN) { depenetrate(bike.rearWheel); depenetrate(bike.frontWheel); }
     }
 
     const c = bike.chassis;

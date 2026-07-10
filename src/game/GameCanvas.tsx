@@ -5,7 +5,7 @@ import "./GameCanvas.css";
 // [DEV ONLY] 手感調參面板。三元的 false 分支讓 Vite 在正式建置直接消掉這個 import，
 // 面板與 devSinkSim/devTuning 都不會進玩家的 bundle。
 const DevTuner = import.meta.env.DEV ? lazy(() => import("./DevTuner")) : null;
-import { pricesToTrack, buildTerrainBodies, slopeAt, surfaceDistance, terrainYAt, type Track } from "./terrain";
+import { pricesToTrack, buildTerrainBodies, slopeAt, surfaceDistance, surfaceNormal, terrainYAt, type Track } from "./terrain";
 import { createBike, resetBike, type Bike } from "./bike";
 import { BIKE, CAMERA, COLOR, DRIVE, PHYSICS, RULES } from "./constants";
 import { APP_VERSION } from "../version";
@@ -758,6 +758,22 @@ let crashTimer = 0;
       }
     };
 
+    // 穿透修正：每個子步 Engine.update 後，把陷進地表的輪子沿地形法線推回表面 +
+    // 消掉往內速度。cruiseSpeed(6.9) ≥ 輪半徑(6) 讓輪子第一次接觸就埋進去，solver 會愈推
+    // 愈深 → 卡住/假死。這裡每幀主動修正，不讓穿透累積。只在陷入 >1px 時才作用，正常
+    // 貼地(輪子本來就會微重疊)不動它，故手感零改變。單幀最多推一個輪半徑，避免瞬移彈飛。
+    const DEPEN_TOL = 1.0;
+    const depenetrate = (w: typeof bike.rearWheel) => {
+      const { dist, nx, ny } = surfaceNormal(track, w.position);
+      const pen = BIKE.wheelRadius - dist; // >0 = 輪面已陷入地表
+      if (pen <= DEPEN_TOL) return;
+      const push = Math.min(pen, BIKE.wheelRadius);
+      Body.setPosition(w, { x: w.position.x + nx * push, y: w.position.y + ny * push });
+      const v = Body.getVelocity(w);
+      const vn = v.x * nx + v.y * ny;
+      if (vn < 0) Body.setVelocity(w, { x: v.x - vn * nx, y: v.y - vn * ny });
+    };
+
     // 結算一趟翻轉（落地當下 or 飛越終點線時強制結算，見下方兩處呼叫）：
     // 給分／toast／音效／震動／特效全部集中在這裡，避免兩處呼叫各寫一份分岔。
     const settleFlip = (rot: number, air: number, angle: number, x: number) => {
@@ -831,9 +847,11 @@ let crashTimer = 0;
       // 子步：把這一幀拆成 subSteps 次較小的 Engine.update，讓碰撞取樣更密
       // （單步位移 = cruiseSpeed/subSteps，subSteps≥2 時就小於輪半徑，不會一接觸就埋進去）。
       // 控制律每個子步都要套用，否則驅動只生效 1/n 幀。
+      const doDepen = PHYSICS.depenetrate !== 0;
       for (let s = 0; s < subSteps; s++) {
         applyControls(rearContacts > 0 || frontContacts > 0, uprightNow);
         Engine.update(engine, SUB_DELTA);
+        if (doDepen) { depenetrate(bike.rearWheel); depenetrate(bike.frontWheel); }
       }
 
       const c = bike.chassis;

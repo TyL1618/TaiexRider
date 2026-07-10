@@ -173,6 +173,24 @@ export function surfaceDistance(track: Track, p: Vec2): number {
   return p.y < terrainYAt(track, p.x) ? best : -best;
 }
 
+// 最近地形段的「向外(朝上)法線」+ 輪心到折線的帶號距離（正=地表上方，負=已陷入）。
+// 段 a→b（x 遞增）方向 (dx,dy) → 向外法線 = (dy,−dx)/len（y 向下座標系，y 分量 <0＝朝上）。
+// 供穿透修正（de-penetration）用：把陷進地形的輪子沿這個法線推回表面。
+export function surfaceNormal(track: Track, p: Vec2): { dist: number; nx: number; ny: number } {
+  const v = track.vertices;
+  const i = segIdx(v, p.x);
+  let best = Infinity, nx = 0, ny = -1;
+  for (let k = Math.max(0, i - 2); k <= Math.min(v.length - 2, i + 2); k++) {
+    const a = v[k], b = v[k + 1];
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const len2 = dx * dx + dy * dy;
+    const t = len2 > 0 ? Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / len2)) : 0;
+    const d = Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
+    if (d < best) { best = d; const len = Math.sqrt(len2) || 1; nx = dy / len; ny = -dx / len; }
+  }
+  return { dist: p.y < terrainYAt(track, p.x) ? best : -best, nx, ny };
+}
+
 // 賽道頂點 → 靜態碰撞體：每段一個「實心梯形」（凸四邊形）
 // 上緣 = 折線本身、兩側垂直、下緣拉到 baseY（賽道下方全部填滿）。
 // 相鄰梯形共用一條垂直邊 → 零縫、零凸角、頂面 = 折線本身 → 結構性根治

@@ -11,7 +11,7 @@
 // ============================================================
 
 import { Engine, Events, Composite, Body, type IEventCollision } from "matter-js";
-import { pricesToTrack, buildTerrainBodies, surfaceDistance, terrainYAt, type Track } from "./terrain";
+import { pricesToTrack, buildTerrainBodies, surfaceDistance, surfaceNormal, terrainYAt, type Track } from "./terrain";
 import { createBike } from "./bike";
 import { BIKE, DRIVE, PHYSICS, RULES } from "./constants";
 
@@ -136,6 +136,18 @@ function simulateOne(seed: number): { outcome: Outcome; maxSinkAlive: number } {
     }
   };
 
+  // 穿透修正（與 GameCanvas 同邏輯）：陷入 >1px 就沿地形法線推回，消掉往內速度
+  const depen = (w: Body) => {
+    const { dist, nx, ny } = surfaceNormal(track, w.position);
+    const pen = BIKE.wheelRadius - dist;
+    if (pen <= 1.0) return;
+    const push = Math.min(pen, BIKE.wheelRadius);
+    Body.setPosition(w, { x: w.position.x + nx * push, y: w.position.y + ny * push });
+    const v = Body.getVelocity(w);
+    const vn = v.x * nx + v.y * ny;
+    if (vn < 0) Body.setVelocity(w, { x: v.x - vn * nx, y: v.y - vn * ny });
+  };
+
   const vFirst = track.vertices[0].x;
   const vLast = track.vertices[track.vertices.length - 1].x;
   const inRange = (b: Body) => b.position.x > vFirst + 2 && b.position.x < vLast - 2;
@@ -163,6 +175,7 @@ function simulateOne(seed: number): { outcome: Outcome; maxSinkAlive: number } {
     for (let s = 0; s < sub; s++) {
       applyControls(rc > 0 || fc > 0, thr);
       Engine.update(engine, subDelta);
+      if (PHYSICS.depenetrate !== 0) { depen(bike.rearWheel); depen(bike.frontWheel); }
     }
 
     const c = bike.chassis;
