@@ -498,10 +498,11 @@ APK 是誰簽的」，不是「上傳前是誰簽的」。
    Android OAuth Client 已在 Google Cloud Console 建好**（package=
    `com.tylapp.taiexrider`，這組 SHA-1）。⏳ 要等 Cloud Console 生效（數十分鐘~數小時）
    才能實測登入。
-2. 🟠 **上傳金鑰 `taiexrider-release.jks` 的 SHA-1** ← 自己側載 signed release APK 測試時靠這個。
-   來源：`keytool -list -v -keystore taiexrider-release.jks -alias taiexrider`
-   （檔案在 `C:\Users\tyl16\Documents\taiexrider-release.jks`，需要金鑰密碼，使用者
-   本機執行，Claude 沒有密碼無法代跑）。⬜ 尚未做。
+2. 🟠✅ **上傳金鑰 `taiexrider-release.jks` 的 SHA-1** ← 自己側載 signed release APK
+   測試時靠這個。**2026-07-10 使用者已用 keytool 抄到**：
+   `6B:18:63:B2:BB:59:D4:F6:13:43:CC:1B:DD:B2:01:57:AF:3B:7C:4C`
+   （keystore 建立日期 2026-06-18，別名 `taiexrider`）。⬜ 尚未去 Cloud Console
+   建對應的 Android OAuth Client（package=`com.tylapp.taiexrider`，這組 SHA-1）。
 3. ⚪（選配）實驗版那顆 debug 的，留著繼續開發測試用，不刪也無害。
    `29:08:B4:C2:4A:CD:4B:FE:DA:ED:3E:83:10:8B:BA:05:60:16:BA:DC`（本機共用 debug
    keystore）。⬜ 尚未做。
