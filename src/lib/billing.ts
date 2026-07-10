@@ -399,7 +399,17 @@ async function reconcilePurchasesNative(): Promise<{ diamonds?: number; adsRemov
       if (tx.responseCode !== 0 || !tx.data?.purchaseToken) continue;
       if (done.has(tx.data.purchaseToken)) continue;
       const data = await submitPurchaseToken(sku, tx.data.purchaseToken);
-      if (!data) continue;
+      if (!data) {
+        // ⚠️ 2026-07-10 真機實測發現：getLatestTransaction() 查的是購買*歷史*（見上方
+        // 檔案說明），本來就會撈到早就失效/退款過的舊紀錄（例如開發過程中的舊測試
+        // 購買），Google 驗證回「purchase not valid」是這種情況的預期結果，不是
+        // 「使用者剛付款但發放失敗」——那種真正該讓玩家知道的錯誤（grant error／
+        // consume pending／acknowledge pending）Google 那邊會回真的驗證通過。
+        // 每次進車庫都把這種舊噪音當警告跳出來會嚇到玩家，這裡靜默清掉，只留下
+        // 真正代表「有效購買但我們這邊沒處理成功」的錯誤讓上層顯示。
+        if (_lastPurchaseError.includes("purchase not valid")) _lastPurchaseError = "";
+        continue;
+      }
       markReconciled(tx.data.purchaseToken);
       if (typeof data.diamonds === "number") { result.diamonds = data.diamonds; changed = true; }
       if (typeof data.adsRemoved === "boolean") { result.adsRemoved = data.adsRemoved; changed = true; }
