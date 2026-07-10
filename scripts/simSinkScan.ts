@@ -22,12 +22,15 @@
 import { Engine, Events, Composite, Body, type IEventCollision } from "matter-js";
 import { pricesToTrack, buildTerrainBodies, terrainYAt, type Track } from "../src/game/terrain";
 import { createBike, type Bike } from "../src/game/bike";
-import { BIKE, DRIVE, RULES } from "../src/game/constants";
+import { BIKE, DRIVE, PHYSICS, RULES } from "../src/game/constants";
 
 const STEP = 1000 / 60;
 const args = process.argv.slice(2);
 const RUNS = parseInt((args.find((a) => a.startsWith("runs=")) || "runs=1500").split("=")[1], 10);
 const BOT_ARG = (args.find((a) => a.startsWith("bot=")) || "bot=all").split("=")[1];
+// sub=N：物理子步數，與 GameCanvas 的 PHYSICS.subSteps 同語意（含相同等比換算）。
+const SUB = Math.max(1, parseInt((args.find((a) => a.startsWith("sub=")) || "sub=1").split("=")[1], 10));
+PHYSICS.subSteps = SUB; // createBike() 的 frictionAir 換算會讀它，必須在建車前設好
 
 type BotKind = "safe" | "hold" | "random";
 const BOTS: BotKind[] = BOT_ARG === "all" ? ["safe", "hold", "random"] : [BOT_ARG as BotKind];
@@ -89,12 +92,16 @@ interface RunResult {
   maxSinkAlive: number;
   firstDeep?: SinkEvent;
   traceRows?: string[];
+  finishStep?: number;
 }
 
 function simulate(seed: number, bot: BotKind, trace = false): RunResult {
   const { prices } = genPrices(seed);
   const engine = Engine.create();
-  engine.gravity.y = 0.5;
+  engine.gravity.y = PHYSICS.gravityY * SUB; // 重力 ×n（見 constants.ts PHYSICS 說明）
+  engine.positionIterations = PHYSICS.positionIterations;
+  engine.velocityIterations = PHYSICS.velocityIterations;
+  const SUB_DELTA = STEP / SUB;
   const track = pricesToTrack(prices);
   Composite.add(engine.world, buildTerrainBodies(track));
 
@@ -127,6 +134,9 @@ function simulate(seed: number, bot: BotKind, trace = false): RunResult {
     return decideThrottle(grounded);
   };
 
+  // 單位鐵則見 GameCanvas.tsx applyControls 上方註解：讀取一律 Body.getVelocity/
+  // getAngularVelocity（per-baseDelta），寫入用原始常數；只有「每子步累加」的增量 ÷n。
+  const easeSub = SUB === 1 ? DRIVE.groundLockEase : 1 - Math.pow(1 - DRIVE.groundLockEase, 1 / SUB);
   const applyControls = (grounded: boolean, thr: boolean) => {
     const c = bike.chassis;
     if (grounded) {
@@ -137,14 +147,17 @@ function simulate(seed: number, bot: BotKind, trace = false): RunResult {
         const tx = dx / len, ty = dy / len;
         const nx = ty, ny = -tx;
         for (const b of [c, bike.rearWheel, bike.frontWheel]) {
-          const vn = b.velocity.x * nx + b.velocity.y * ny;
-          if (vn > 0) Body.setVelocity(b, { x: b.velocity.x - vn * nx, y: b.velocity.y - vn * ny });
+          const v = Body.getVelocity(b);
+          const vn = v.x * nx + v.y * ny;
+          if (vn > 0) Body.setVelocity(b, { x: v.x - vn * nx, y: v.y - vn * ny });
         }
         if (thr) {
-          const vt = c.velocity.x * tx + c.velocity.y * ty;
-          const dv = (DRIVE.cruiseSpeed - vt) * DRIVE.groundLockEase;
+          const vc = Body.getVelocity(c);
+          const vt = vc.x * tx + vc.y * ty;
+          const dv = (DRIVE.cruiseSpeed - vt) * easeSub;
           for (const b of [c, bike.rearWheel, bike.frontWheel]) {
-            Body.setVelocity(b, { x: b.velocity.x + dv * tx, y: b.velocity.y + dv * ty });
+            const v = Body.getVelocity(b);
+            Body.setVelocity(b, { x: v.x + dv * tx, y: v.y + dv * ty });
           }
         }
       }
@@ -155,11 +168,11 @@ function simulate(seed: number, bot: BotKind, trace = false): RunResult {
       if (Math.abs(av) > DRIVE.groundedAvMax) av = Math.sign(av) * DRIVE.groundedAvMax;
       Body.setAngularVelocity(c, av);
     } else if (thr) {
-      Body.setAngularVelocity(c, Math.max(-DRIVE.airSpinMax, c.angularVelocity - DRIVE.airSpinAccel));
+      Body.setAngularVelocity(c, Math.max(-DRIVE.airSpinMax, Body.getAngularVelocity(c) - DRIVE.airSpinAccel / SUB));
     } else {
-      let av = c.angularVelocity;
-      if (av < 0) av = Math.min(0, av + DRIVE.airSpinBrakeAccel);
-      Body.setAngularVelocity(c, Math.min(DRIVE.airNoseForwardMax, av + DRIVE.airNoseForwardAccel));
+      let av = Body.getAngularVelocity(c);
+      if (av < 0) av = Math.min(0, av + DRIVE.airSpinBrakeAccel / SUB);
+      Body.setAngularVelocity(c, Math.min(DRIVE.airNoseForwardMax, av + DRIVE.airNoseForwardAccel / SUB));
     }
   };
 
@@ -191,6 +204,12 @@ function simulate(seed: number, bot: BotKind, trace = false): RunResult {
   const vLast = track.vertices[track.vertices.length - 1].x;
   const inRange = (b: Body) => b.position.x > vFirst + 2 && b.position.x < vLast - 2;
 
+  // 卡縫自動脫困 watchdog（逐行對照 GameCanvas.tsx step()）：偵測「按著油門+著地卻
+  // 原地不動」→ 暫停驅動 60 步讓輪子回彈。少了它，任何小卡頓都會累積成永久卡死，
+  // timeout 會被嚴重高估。
+  let assistLeft = 0;
+  const jamHist: number[] = [];
+
   let hasEverGrounded = false;
   let crashTimer = 0;
   let outcome: RunResult["outcome"] = "timeout";
@@ -199,6 +218,7 @@ function simulate(seed: number, bot: BotKind, trace = false): RunResult {
   let prevRear = { ...bike.rearWheel.position };
   let prevFront = { ...bike.frontWheel.position };
   let prevSink = 0;
+  let finishStep: number | undefined;
   const vyLog: number[] = [];
   const traceRows: string[] = [];
 
@@ -206,9 +226,28 @@ function simulate(seed: number, bot: BotKind, trace = false): RunResult {
   for (let step = 0; step < MAX_STEPS; step++) {
     const grounded = rc > 0 || fc > 0;
     if (grounded) hasEverGrounded = true;
-    const thr = decideThrottle(grounded);
-    applyControls(grounded, thr);
-    Engine.update(engine, STEP);
+    const botThr = decideThrottle(grounded);
+
+    // watchdog（同 GameCanvas）：卡住 40 步就強制放開油門 60 步
+    if (assistLeft > 0) {
+      assistLeft--;
+      jamHist.length = 0;
+    } else if (grounded && botThr) {
+      jamHist.push(bike.chassis.position.x);
+      if (jamHist.length > 40) jamHist.shift();
+      if (jamHist.length === 40 && Math.abs(bike.chassis.position.x - jamHist[0]) < 3) {
+        assistLeft = 60;
+        jamHist.length = 0;
+      }
+    } else {
+      jamHist.length = 0;
+    }
+    const thr = botThr && assistLeft <= 0; // 有效油門
+
+    for (let s = 0; s < SUB; s++) {
+      applyControls(rc > 0 || fc > 0, thr);
+      Engine.update(engine, SUB_DELTA);
+    }
 
     const c = bike.chassis;
     const rearMove = Math.hypot(bike.rearWheel.position.x - prevRear.x, bike.rearWheel.position.y - prevRear.y);
@@ -220,7 +259,8 @@ function simulate(seed: number, bot: BotKind, trace = false): RunResult {
     // ── 真實死亡判定（複製 GameCanvas.tsx；waitingToStart 期間略過）──
     if (hasEverGrounded) {
       const bothOff = rc === 0 && fc === 0;
-      const speed = Math.hypot(c.velocity.x, c.velocity.y);
+      const cv = Body.getVelocity(c); // per-baseDelta = 每幀位移，門檻不隨子步數變
+      const speed = Math.hypot(cv.x, cv.y);
       const tipped = Math.cos(c.angle) < RULES.crashTipCos;
       const ca = Math.cos(c.angle), sa = Math.sin(c.angle);
       const topHit = tipped && BIKE.crashZone.some(({ x: lx, y: ly }) => {
@@ -275,7 +315,7 @@ function simulate(seed: number, bot: BotKind, trace = false): RunResult {
       }
     }
 
-    if (c.position.x >= track.finishX) { outcome = "finished"; break; }
+    if (c.position.x >= track.finishX) { outcome = "finished"; finishStep = step; break; }
   }
 
   if (firstDeep) {
@@ -289,7 +329,7 @@ function simulate(seed: number, bot: BotKind, trace = false): RunResult {
     if (center >= 0) rows = traceRows.slice(Math.max(0, center - 12), Math.min(traceRows.length, center + 17));
     else rows = traceRows.slice(-20);
   }
-  return { seed, bot, outcome, maxSinkAlive: Math.round(maxSinkAlive * 10) / 10, firstDeep, traceRows: rows };
+  return { seed, bot, outcome, maxSinkAlive: Math.round(maxSinkAlive * 10) / 10, firstDeep, traceRows: rows, finishStep };
 }
 
 // 單一種子逐步追蹤（診斷用）：node ... trace seed=826 bot=safe
@@ -312,7 +352,16 @@ function main() {
     for (let s = 1; s <= RUNS; s++) all.push(simulate(s, bot));
   }
 
-  console.log(`跑了 ${all.length} 局（${BOTS.join("/")} × ${RUNS} 種子），輪半徑 ${BIKE.wheelRadius}px\n`);
+  console.log(
+    `跑了 ${all.length} 局（${BOTS.join("/")} × ${RUNS} 種子）｜subSteps=${SUB}｜` +
+    `輪半徑=${BIKE.wheelRadius}px｜單步位移=${(DRIVE.cruiseSpeed / SUB).toFixed(2)}px ` +
+    `${DRIVE.cruiseSpeed / SUB >= BIKE.wheelRadius ? "⚠️ ≥輪半徑，具備穿透條件" : "✅ <輪半徑"}\n`,
+  );
+  const finished = all.filter((r) => r.outcome === "finished");
+  if (finished.length) {
+    const avgSteps = finished.reduce((s, r) => s + (r.finishStep ?? 0), 0) / finished.length;
+    console.log(`完賽局平均步數=${avgSteps.toFixed(1)}（子步等比換算正確的話，此值應與 subSteps=1 幾乎相同）\n`);
+  }
   for (const bot of BOTS) {
     const rows = all.filter((r) => r.bot === bot);
     const submerged = rows.filter((r) => r.maxSinkAlive > SINK_SUBMERGED).length;

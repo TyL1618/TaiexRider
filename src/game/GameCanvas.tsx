@@ -1,9 +1,13 @@
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { Engine, Events, Composite, Body, type IEventCollision } from "matter-js";
 import "./GameCanvas.css";
-import { pricesToTrack, buildTerrainBodies, slopeAt, terrainYAt, type Track } from "./terrain";
+
+// [DEV ONLY] 手感調參面板。三元的 false 分支讓 Vite 在正式建置直接消掉這個 import，
+// 面板與 devSinkSim/devTuning 都不會進玩家的 bundle。
+const DevTuner = import.meta.env.DEV ? lazy(() => import("./DevTuner")) : null;
+import { pricesToTrack, buildTerrainBodies, slopeAt, surfaceDistance, terrainYAt, type Track } from "./terrain";
 import { createBike, resetBike, type Bike } from "./bike";
-import { BIKE, CAMERA, COLOR, DRIVE, RULES } from "./constants";
+import { BIKE, CAMERA, COLOR, DRIVE, PHYSICS, RULES } from "./constants";
 import { APP_VERSION } from "../version";
 import { playFlip, playPerfectLanding, playCrash, playFinish, startEngine, updateEngine, stopEngine, getVolume, setVolume } from "./audio";
 import { logEvent } from "../lib/analytics";
@@ -364,8 +368,16 @@ export default function GameCanvas({ prices, label, name, subtitle, onExit, onGa
     const bikeFilter = bikeHueDeg !== 0 ? `hue-rotate(${bikeHueDeg}deg)` : "none";
 
     // ---- 建立世界 ----
+    // subSteps 每幀重讀（沒有任何東西被烘進剛體裡），DEV 面板可即時切換不用重開一局。
+    let subSteps = Math.max(1, Math.round(PHYSICS.subSteps));
+    let SUB_DELTA = (1000 / 60) / subSteps;
+    let easeSub: number = DRIVE.groundLockEase; // 型別要標 number：DRIVE 是 as const（字面量型別）
     const engine = Engine.create();
-    engine.gravity.y = 0.5; // 低重力 → 空中時間更長，翻轉窗口更寬（Ketch Rider 風格）
+    // 重力 ×subSteps：Matter 每次 update 的重力速度增量 ∝ delta²，n 個 (Δ/n) 子步累積起來
+    // 只有原本的 1/n，乘回 n 才能讓每幀的重力加速度與 subSteps=1 相同。
+    engine.gravity.y = PHYSICS.gravityY * subSteps;
+    engine.positionIterations = PHYSICS.positionIterations;
+    engine.velocityIterations = PHYSICS.velocityIterations;
     const world = engine.world;
 
     const track: Track = pricesToTrack(prices);
@@ -399,6 +411,7 @@ export default function GameCanvas({ prices, label, name, subtitle, onExit, onGa
     Body.setStatic(bike.frontWheel, true);
     let waitingToStart = true;
     let hasEverGrounded = false; // 首次落地後才開放空中翻滾
+    let devMaxSink = 0; // [DEV] 本局最大穿透深度（調參面板讀）
 
     // ---- 插值用：記錄上一物理步的位置/角度，渲染時平滑消除步進鋸齒 ----
     let prevChassisPos = { x: bike.chassis.position.x, y: bike.chassis.position.y };
@@ -561,6 +574,7 @@ let crashTimer = 0;
     };
 
     const doReset = () => {
+      devMaxSink = 0; // [DEV] 每局重新統計最大穿透
       Body.setStatic(bike.chassis, false);
       Body.setStatic(bike.rearWheel, false);
       Body.setStatic(bike.frontWheel, false);
@@ -678,6 +692,16 @@ let crashTimer = 0;
     //    任何坡面同速（陡坡不再蝸牛），tx 永遠 > 0 → 不倒退，凸坡頂有向上動量 → 自然飛出去。
     //  著地恆時 → 車身角速度朝前輪坡段平滑修正（貼坡、不翹頭）
     //  離地：按住＝後空翻、放開＝車頭緩緩往前壓（準備落地）
+    // ⚠️ 單位鐵則（Matter 0.20，2026-07-10 實作子步時踩過）：
+    //   · Body.setVelocity/setAngularVelocity 接受的是「每 _baseDelta(16.666ms) 的量」，
+    //     內部自己用 body.deltaTime 換算 → 與子步大小無關，常數不用除以 n。
+    //   · 但直接讀 body.velocity / body.angularVelocity 拿到的是「每次 update 的位移」
+    //     （= 每子步），兩者單位不同！subSteps=1 時剛好相等所以以前不會出錯。
+    //   → 讀取一律走 Body.getVelocity()/getAngularVelocity()（回傳 per-baseDelta），
+    //     寫入一律用原始常數，讀寫單位才一致。
+    //   · 唯一要按 n 換算的是「每個子步都會累加一次」的增量（空中角加速度），因為控制律
+    //     每個子步都跑一次，一幀會被套用 n 次 → 增量除以 n。上限/目標值是絕對量，不用改。
+    //   · ease 類（groundLockEase）一幀會收斂 n 次 → 取 n 次方根維持每幀收斂速度相同。
     const applyControls = (grounded: boolean, _upright: boolean) => {
       if (overRef.current) return;
       const c = bike.chassis;
@@ -696,22 +720,24 @@ let crashTimer = 0;
           //    坡面外法線 = (ty, -tx)（y 向下座標系：flat→(0,-1)=朝上 ✓）
           //    只移除「離坡」分量(vn>0)；「入坡」分量留給物理碰撞處理，不干涉落地
           const nx = ty, ny = -tx;
-          let vn = c.velocity.x * nx + c.velocity.y * ny;
-          if (vn > 0) Body.setVelocity(c, { x: c.velocity.x - vn * nx, y: c.velocity.y - vn * ny });
-          vn = bike.rearWheel.velocity.x * nx + bike.rearWheel.velocity.y * ny;
-          if (vn > 0) Body.setVelocity(bike.rearWheel, { x: bike.rearWheel.velocity.x - vn * nx, y: bike.rearWheel.velocity.y - vn * ny });
-          vn = bike.frontWheel.velocity.x * nx + bike.frontWheel.velocity.y * ny;
-          if (vn > 0) Body.setVelocity(bike.frontWheel, { x: bike.frontWheel.velocity.x - vn * nx, y: bike.frontWheel.velocity.y - vn * ny });
-          // ② 油門：切線鎖速到 cruiseSpeed
+          for (const b of [c, bike.rearWheel, bike.frontWheel]) {
+            const v = Body.getVelocity(b);
+            const vn = v.x * nx + v.y * ny;
+            if (vn > 0) Body.setVelocity(b, { x: v.x - vn * nx, y: v.y - vn * ny });
+          }
+          // ② 油門：切線鎖速到 cruiseSpeed（絕對目標值，與子步數無關）
           if (thr) {
-            const vt = c.velocity.x * tx + c.velocity.y * ty;
-            const delta = (DRIVE.cruiseSpeed - vt) * DRIVE.groundLockEase;
-            Body.setVelocity(c, { x: c.velocity.x + delta * tx, y: c.velocity.y + delta * ty });
-            Body.setVelocity(bike.rearWheel, { x: bike.rearWheel.velocity.x + delta * tx, y: bike.rearWheel.velocity.y + delta * ty });
-            Body.setVelocity(bike.frontWheel, { x: bike.frontWheel.velocity.x + delta * tx, y: bike.frontWheel.velocity.y + delta * ty });
+            const vc = Body.getVelocity(c);
+            const vt = vc.x * tx + vc.y * ty;
+            const delta = (DRIVE.cruiseSpeed - vt) * easeSub;
+            for (const b of [c, bike.rearWheel, bike.frontWheel]) {
+              const v = Body.getVelocity(b);
+              Body.setVelocity(b, { x: v.x + delta * tx, y: v.y + delta * ty });
+            }
           }
         }
         // ③ 對齊前輪坡段：以比例修正車身角速度（gain），並夾在 groundedAvMax 內
+        //    這是「直接設定」不是累加 → 每個子步設同一個目標值，不需除以 n
         const slope = slopeAt(track, bike.frontWheel.position.x);
         const da = angleDelta(c.angle, slope);
         let av = da * DRIVE.groundAlignGain;
@@ -720,13 +746,15 @@ let crashTimer = 0;
       } else if (thr && hasEverGrounded) {
         // 空中按住 → 後空翻（首次落地後才開放，避免懸空落下時誤觸翻滾）
         // 任意角度均可持續旋轉；移除 cos 條件，修「倒置區間停轉」bug
-        const nv = Math.max(-DRIVE.airSpinMax, c.angularVelocity - DRIVE.airSpinAccel);
+        // 角加速度是每子步累加一次 → ÷n；上限 airSpinMax 是絕對值 → 不變
+        const avNow = Body.getAngularVelocity(c);
+        const nv = Math.max(-DRIVE.airSpinMax, avNow - DRIVE.airSpinAccel / subSteps);
         Body.setAngularVelocity(c, nv);
       } else {
         // 空中放開：線性制動（airSpinBrakeAccel/step 朝 0 推，≈4步停），不瞬間歸零保留手感
-        let av = c.angularVelocity;
-        if (av < 0) av = Math.min(0, av + DRIVE.airSpinBrakeAccel);
-        Body.setAngularVelocity(c, Math.min(DRIVE.airNoseForwardMax, av + DRIVE.airNoseForwardAccel));
+        let av = Body.getAngularVelocity(c);
+        if (av < 0) av = Math.min(0, av + DRIVE.airSpinBrakeAccel / subSteps);
+        Body.setAngularVelocity(c, Math.min(DRIVE.airNoseForwardMax, av + DRIVE.airNoseForwardAccel / subSteps));
       }
     };
 
@@ -784,7 +812,6 @@ let crashTimer = 0;
       } else {
         jamHist.length = 0;
       }
-      applyControls(grounded, uprightNow);
       // 存下本步物理狀態，供渲染插值（frame 裡用 alpha=acc/STEP 取中間位置）
       prevChassisPos = { x: bike.chassis.position.x, y: bike.chassis.position.y };
       prevChassisAngle = bike.chassis.angle;
@@ -792,12 +819,44 @@ let crashTimer = 0;
       prevRearAngle = bike.rearWheel.angle;
       prevFrontPos = { x: bike.frontWheel.position.x, y: bike.frontWheel.position.y };
       prevFrontAngle = bike.frontWheel.angle;
-      Engine.update(engine, STEP);
+      // 物理參數每幀重讀 → DEV 調參面板改滑桿即時生效，不用重開一局。
+      // （子步數沒有被烘進任何剛體：frictionAir 由 Matter 自己按 delta 正規化，見 bike.ts）
+      subSteps = Math.max(1, Math.round(PHYSICS.subSteps));
+      SUB_DELTA = STEP / subSteps;
+      // ease 一幀會收斂 subSteps 次 → 取 n 次方根，讓每幀的收斂速度與單步時相同
+      easeSub = subSteps === 1 ? DRIVE.groundLockEase : 1 - Math.pow(1 - DRIVE.groundLockEase, 1 / subSteps);
+      engine.gravity.y = PHYSICS.gravityY * subSteps;
+      engine.positionIterations = PHYSICS.positionIterations;
+      engine.velocityIterations = PHYSICS.velocityIterations;
+      // 子步：把這一幀拆成 subSteps 次較小的 Engine.update，讓碰撞取樣更密
+      // （單步位移 = cruiseSpeed/subSteps，subSteps≥2 時就小於輪半徑，不會一接觸就埋進去）。
+      // 控制律每個子步都要套用，否則驅動只生效 1/n 幀。
+      for (let s = 0; s < subSteps; s++) {
+        applyControls(rearContacts > 0 || frontContacts > 0, uprightNow);
+        Engine.update(engine, SUB_DELTA);
+      }
 
       const c = bike.chassis;
       const groundedNow = rearContacts > 0 || frontContacts > 0;
       const airborneFully = rearContacts === 0 && frontContacts === 0;
       if (groundedNow && !hasEverGrounded) hasEverGrounded = true;
+
+      // [DEV] 即時穿透讀數：sink = 輪半徑 − 輪心到地形折線的最短距離。
+      // 0 = 完美貼地；>0 = 輪心已在地表下；≥ 2×輪半徑 = 整顆輪子沒入（＝玩家看到的破圖）。
+      // 寫到 window 而非 import DEV 模組，正式建置這段會被整個消掉。
+      if (import.meta.env.DEV) {
+        const rs = BIKE.wheelRadius - surfaceDistance(track, bike.rearWheel.position);
+        const fs = BIKE.wheelRadius - surfaceDistance(track, bike.frontWheel.position);
+        const sink = Math.max(rs, fs);
+        if (sink > devMaxSink) devMaxSink = sink;
+        const dv = Body.getVelocity(c);
+        const spd = Math.hypot(dv.x, dv.y);
+        (window as unknown as { __devStats: unknown }).__devStats = {
+          sink, maxSink: devMaxSink, speed: spd,
+          stepMove: spd / subSteps, // 單步位移，必須 < 輪半徑才不會一接觸就埋進去
+          subSteps, grounded: groundedNow, wheelRadius: BIKE.wheelRadius,
+        };
+      }
 
       // 空中累積旋轉 / 滯空時間
       if (!groundedNow) {
@@ -850,7 +909,9 @@ let crashTimer = 0;
       // 死亡判定（懸空等待觸碰期間完全略過：static 車身 velocity=0、雙輪離地，
       // 否則 stuckMidAir 會把「等待中」誤判成卡死 → 開場立刻爆炸）
       const bothWheelsOff = rearContacts === 0 && frontContacts === 0;
-      const speed = Math.hypot(c.velocity.x, c.velocity.y);
+      // 用 getVelocity（per-baseDelta = 每幀位移），子步數不影響這個門檻值(0.5)
+      const cv = Body.getVelocity(c);
+      const speed = Math.hypot(cv.x, cv.y);
       // 車頂碰地：把局部 crashZone 座標轉世界，任一點低於地形 → 死
       // 前提：車身真的「翻過 90°」(cos < crashTipCos)，爬陡坡前傾(<90°)不誤判（discussion 第 1 點）
       const tippedOver = !waitingToStart && Math.cos(c.angle) < RULES.crashTipCos;
@@ -1407,7 +1468,9 @@ let crashTimer = 0;
         acc -= STEP;
       }
       if (!overRef.current && !pausedRef.current) {
-        updateEngine(Math.hypot(bike.chassis.velocity.x, bike.chassis.velocity.y), grounded);
+        // getVelocity = per-baseDelta（每幀位移），引擎聲的速度對應關係不受子步數影響
+        const v = Body.getVelocity(bike.chassis);
+        updateEngine(Math.hypot(v.x, v.y), grounded);
       }
 
       // 鏡頭跟隨 / 終點全覽（dying 時鏡頭凍住，等動畫結束再開始縮放）
@@ -1519,6 +1582,8 @@ let crashTimer = 0;
   return (
     <div className="game-root">
       <canvas ref={canvasRef} className="game-canvas" />
+
+      {DevTuner && <Suspense fallback={null}><DevTuner /></Suspense>}
 
       {/* 分數：螢幕正中央偏上（結算/死亡動畫時隱藏）*/}
       {!crashed && !finished && !dying && (

@@ -4,6 +4,10 @@ import { VitePWA } from "vite-plugin-pwa";
 
 // https://vite.dev/config/
 export default defineConfig({
+  // host:true → dev server 綁到區網 IP，手機連同一個 wifi 就能開 http://<電腦IP>:5173
+  // 直接用真的觸控螢幕調手感（DEV 調參面板在手機上也能操作）。
+  // ⚠️ 第一次跑可能要在 Windows 防火牆放行 Node.js 的私人網路存取。
+  server: { host: true },
   plugins: [
     react(),
     VitePWA({

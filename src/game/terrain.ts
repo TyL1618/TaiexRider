@@ -149,6 +149,30 @@ export function terrainYAt(track: Track, x: number): number {
   return a.y + (b.y - a.y) * t;
 }
 
+// 點到地形折線的最短距離：正 = 在地表上方，負 = 已經在地表下方（穿進去了）。
+//
+// ⚠️ 不可以用「p.y − terrainYAt(track, p.x)」代替：那是「垂直距離」，只在平地等價。
+// 斜坡上輪子靜止時輪心是沿**法線**離地表 r，垂直距離是 r/cosθ——75° 坡完美貼地用垂直
+// 公式會算出 17px 的假下沉。診斷「車子陷進地形」時被這個坑騙過一次，見 simSinkScan.ts。
+//
+// 用途：DEV 調參面板的即時 sink 讀數、headless 模擬的穿透量測。
+// 判定車輪是否穿透：sink = wheelRadius − surfaceDistance(輪心)；sink>0 即已陷入。
+export function surfaceDistance(track: Track, p: Vec2): number {
+  const v = track.vertices;
+  const i = segIdx(v, p.x);
+  let best = Infinity;
+  // 只掃鄰近幾段就夠（每段寬 segmentWidth），避免整條折線 O(n)
+  for (let k = Math.max(0, i - 2); k <= Math.min(v.length - 2, i + 2); k++) {
+    const a = v[k], b = v[k + 1];
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const len2 = dx * dx + dy * dy;
+    const t = len2 > 0 ? Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / len2)) : 0;
+    const d = Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
+    if (d < best) best = d;
+  }
+  return p.y < terrainYAt(track, p.x) ? best : -best;
+}
+
 // 賽道頂點 → 靜態碰撞體：每段一個「實心梯形」（凸四邊形）
 // 上緣 = 折線本身、兩側垂直、下緣拉到 baseY（賽道下方全部填滿）。
 // 相鄰梯形共用一條垂直邊 → 零縫、零凸角、頂面 = 折線本身 → 結構性根治

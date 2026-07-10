@@ -20,6 +20,13 @@ if (Capacitor.isNativePlatform()) {
 initAds();
 initButtonHaptics();
 
+// [DEV ONLY] 把上次在調參面板拖出來的手感值套回 constants 物件。動態 import 讓正式
+// 建置完全不會包含這支檔案。GameCanvas 要等玩家從首頁點進遊戲才掛載，這個 promise
+// 早就 resolve 了，不會有「世界已建好才套用參數」的時序問題。
+if (import.meta.env.DEV) {
+  void import("./game/devTuning").then((m) => m.loadSavedTuning());
+}
+
 // 原生體驗：擋掉長按跳出的瀏覽器右鍵/內容選單（user-select:none 不保證擋得住，
 // 部分 Android WebView 長按圖片/canvas 仍會跳選單，是最容易穿幫像網頁的地方之一）。
 document.addEventListener("contextmenu", (e) => e.preventDefault());

@@ -1,6 +1,11 @@
 import { Bodies, Body, Constraint, Composite, type World } from "matter-js";
 import { BIKE } from "./constants";
 
+// ⚠️ frictionAir 不需要為子步做任何換算：Matter 0.20 的 Body.update() 內部已經是
+//    `frictionAir = 1 - fa * (deltaTime / _baseDelta)`，delta 變小就自動按比例縮小
+//    衰減量，n 個子步累積起來 (1 - fa/n)^n ≈ (1 - fa)，與單步一致。自己再開 n 次方根
+//    會變成重複校正。（2026-07-10 實作子步時踩過，見 constants.ts PHYSICS 說明）
+
 export interface Bike {
   chassis: Body;
   rearWheel: Body; // 後輪（左）＝驅動輪
