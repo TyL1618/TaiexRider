@@ -6,6 +6,22 @@
 
 ---
 
+## 🔁 2026-07-11 第三輪複查（Fable 5，全面體檢）
+
+> 範圍擴大到週任務/帳號刪除合規/隱私權政策與 Play Console Data Safety 表單一致性。
+
+| 等級 | 項目 | 狀態 |
+|------|------|------|
+| 🔴✅ 已修 | `claim_weekly_quest()` 只驗證「quest_id 合法＋本週沒領過」，**從不驗證進度是否達標**——grant to authenticated，任何登入者打 API 帶任意合法 quest_id 即可無條件領走該週金幣（一週可刷 ≈380 金幣不用玩） | `supabase/migration_20260711.sql` 加 `%rowtype` 進度閘門，target/欄位對照前端 `weeklyQuests.ts` POOL，42702-safe。使用者已跑 migration。 |
+| 🟢 已修 | CSP `connect-src` 殘留 TWA 時代 `http://127.0.0.1:47591`（AdMob loopback 橋接），Capacitor 版走同進程 plugin bridge 已不使用 | 已從 `public/_headers` 移除，收緊攻擊面。 |
+| 🟢 已修 | 遊戲內「更新日誌」洩漏開發者內部字眼（「SQL 欄位參照不明確」「migration_xxx.sql」） | 已從 `version.ts`/`Home.tsx` 移除，改為「設定→遊玩教學」純玩家向靜態說明。 |
+| 🟢 已補 | Google Play 帳號刪除合規：舊版只有 email 申請（30 天處理），**沒有 App 內自助管道** | 新增 `supabase/functions/delete-account`（只信 JWT 只能刪自己，逐表刪除，`iap_purchases` 刻意保留金流稽核）+ `Home.tsx` 設定頁雙重確認按鈕。已部署 ACTIVE。 |
+| 🟡✅ 已修 | 隱私權政策（`public/privacy.html`）與實際蒐集行為不符：宣稱「不含任何廣告或第三方追蹤器」但 AdMob 早已上線；帳號刪除段落沒提到新的 App 內自助管道 | 已補 Google AdMob／Google Play 帳務服務揭露段落＋App 內刪除路徑說明。Play Console Data Safety 表單「開放使用者要求刪除自己的資料」題目原本停在「否」，使用者已改回「是」並補上刪除資料網址。 |
+
+**殘餘已知風險（維持既有結論，非本輪新增）**：`wallet_earn` 系列在有伺服器每日上限封頂前提下仍可被「不玩只呼叫 RPC」薅到上限（ANTICHEAT Phase B 待正式上架後處理）；退款不自動收回鑽石（Voided Purchases API，同上）。
+
+---
+
 ## 🔁 2026-07-04 第二輪複查（Fable 5）
 
 > 比照首輪規格重掃一遍，**新增涵蓋**：車庫/金幣（garage.ts、Garage.tsx）、每日任務（quests.ts）、
