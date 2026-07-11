@@ -163,6 +163,33 @@ export async function signOut(): Promise<void> {
   resetWalletCache(); // 內含金幣/鑽石/擁有清單/裝備車皮 + 成就/streak 快取歸零
 }
 
+// 帳號刪除（Google Play 合規：使用者必須能在 App 內自行刪除帳號）：
+// 呼叫 delete-account Edge Function（伺服器端刪光該玩家所有資料表列 + Auth 使用者本體，
+// 只信 JWT 不收參數、只能刪自己），成功後走同一套 signOut 清本地快取回到訪客狀態。
+// 回傳 null=成功；字串=錯誤訊息（給 UI 顯示，可重試——Edge Function 逐表刪除是冪等的）。
+export async function deleteAccount(): Promise<string | null> {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) return "尚未登入";
+  const { data, error } = await supabase.functions.invoke("delete-account");
+  if (error) {
+    // Edge Function 回非 2xx 時，真正的 {ok:false,error:"..."} 在 error.context 裡（同 billing.ts 慣例）
+    let detail = (error as { message?: string })?.message ?? String(error);
+    try {
+      const ctx = (error as { context?: { json?: () => Promise<{ error?: string }> } }).context;
+      if (ctx?.json) {
+        const body = await ctx.json();
+        if (body?.error) detail = body.error;
+      }
+    } catch { /* 讀不到就用 message */ }
+    return `刪除失敗：${detail}`;
+  }
+  if (!(data as { ok?: boolean })?.ok) return `刪除失敗：${(data as { error?: string })?.error ?? "未知"}`;
+  // 伺服器端 auth 使用者已刪除，本地 signOut 可能回錯誤（session 已無效），靜默吞掉——
+  // 重點是 resetPlayerName/resetWalletCache 把本地快取清乾淨。
+  try { await signOut(); } catch { /* 靜默 */ }
+  return null;
+}
+
 // 將暱稱同步到 user_profiles，讓舊成績排行榜也顯示新名稱
 // 長度硬上限 32：DB 端另有 CHECK constraint（migration_hardening），
 // 這裡先擋一層避免正常路徑就被 DB 拒絕。

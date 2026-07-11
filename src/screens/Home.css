@@ -24,14 +24,9 @@
   letter-spacing: 0.05em;
   color: var(--neon-cyan);
   text-shadow: 0 0 8px var(--neon-cyan), 0 0 28px rgba(45, 226, 230, 0.5);
-}
-
-.home-sub {
-  margin-top: 0.4rem;
+  /* 2026-07-11 移除 .home-sub 副標語（slogan 只留 boot splash）——原本標題與下方
+     內容的間距由副標語的 margin 撐出，改由標題自己補上，版面節奏不變。 */
   margin-bottom: 1.1rem;
-  font-size: 0.85rem;
-  letter-spacing: 0.18em;
-  color: var(--text-dim);
 }
 
 .home-entry-row {
@@ -334,6 +329,51 @@
   transition: all 0.15s;
 }
 .settings-cancel-btn:hover { border-color: var(--neon-cyan); color: var(--neon-cyan); }
+
+/* 帳號刪除（Play 合規）：入口做成低調文字連結（不跟登出搶視覺），確認畫面才變紅 */
+.settings-delete-link {
+  background: none;
+  border: none;
+  color: rgba(255, 120, 120, 0.55);
+  font-size: 0.72rem;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 0.1rem 0.4rem;
+}
+.settings-delete-link:hover { color: rgba(255, 120, 120, 0.9); }
+.settings-delete-confirm {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.55rem;
+  width: 100%;
+  padding: 0.55rem 0.4rem 0.2rem;
+  border: 1px solid rgba(255, 80, 80, 0.35);
+  border-radius: 8px;
+  background: rgba(255, 60, 60, 0.06);
+  box-sizing: border-box;
+}
+.settings-delete-warn {
+  font-size: 0.76rem;
+  line-height: 1.5;
+  color: rgba(255, 150, 150, 0.9);
+}
+.settings-delete-warn strong { color: rgba(255, 110, 110, 1); }
+.settings-delete-error {
+  font-size: 0.74rem;
+  color: #ff6b6b;
+}
+.settings-delete-btn {
+  background: rgba(255, 60, 60, 0.15);
+  border: 1px solid rgba(255, 100, 100, 0.7);
+  border-radius: 6px;
+  color: #ff8484;
+  font-size: 0.82rem;
+  padding: 0.32rem 1.1rem;
+  cursor: pointer;
+  letter-spacing: 0.04em;
+}
+.settings-delete-btn:disabled { opacity: 0.5; cursor: default; }
 
 /* 關閉鈕：與登出拉開距離 */
 .settings-close-btn { margin-top: 0.3rem; }

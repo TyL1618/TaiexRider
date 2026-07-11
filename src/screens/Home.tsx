@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { APP_VERSION } from "../version";
-import { signInWithGoogle, signOut, updateProfileName, type User } from "../lib/auth";
+import { signInWithGoogle, signOut, updateProfileName, deleteAccount, type User } from "../lib/auth";
 import { getPlayerName, setPlayerName, clampNameWidth } from "../lib/playerId";
 import { setVolume, getVolume } from "../game/audio";
 import { detectEnv } from "../lib/ads";
@@ -33,6 +33,9 @@ export default function Home({
   const [nickname, setNickname]         = useState(() => getPlayerName());
   const [savedName, setSavedName]       = useState(() => getPlayerName());
   const [logoutConfirm, setLogoutConfirm] = useState(false);
+  // 帳號刪除（Play 合規）：idle → confirm（警告+確認鈕）→ deleting（呼叫中）；錯誤留在面板顯示
+  const [deleteState, setDeleteState] = useState<"idle" | "confirm" | "deleting">("idle");
+  const [deleteError, setDeleteError] = useState("");
   const [volume, setVolumeState]        = useState(() => Math.round(getVolume() * 100));
   const [showStats, setShowStats]       = useState(false);
   const [showEncyclopedia, setShowEncyclopedia] = useState(false);
@@ -79,9 +82,26 @@ export default function Home({
   };
 
   const handleCloseSettings = () => {
+    if (deleteState === "deleting") return; // 刪除進行中不給關面板（避免以為沒刪成）
     setShowSettings(false);
     setLogoutConfirm(false);
+    setDeleteState("idle");
+    setDeleteError("");
     if (isDirty) setNickname(savedName);
+  };
+
+  const handleDeleteAccount = async () => {
+    setDeleteState("deleting");
+    setDeleteError("");
+    const err = await deleteAccount();
+    if (err) {
+      setDeleteState("confirm"); // 留在確認畫面顯示錯誤，可重試（Edge Function 冪等）
+      setDeleteError(err);
+      return;
+    }
+    // 成功：帳號已刪、本地快取已清（deleteAccount 內部走 signOut），關面板回訪客首頁
+    setDeleteState("idle");
+    setShowSettings(false);
   };
 
   return (
@@ -91,7 +111,6 @@ export default function Home({
       </button>
 
       <h1 className="home-title">TAIEX&shy;RIDER</h1>
-      <p className="home-sub">把台股走勢騎成霓虹賽道</p>
 
       <div className="home-entry-row">
         <button className="garage-entry-btn" onClick={() => onNav("garage")}>
@@ -227,6 +246,41 @@ export default function Home({
                   <button className="settings-signout-btn" onClick={() => setLogoutConfirm(true)}>
                     登出
                   </button>
+                )}
+
+                {/* 帳號刪除（Play 合規要求 App 內可自行刪除）：與登出視覺分離，雙重確認 */}
+                {deleteState === "idle" ? (
+                  <button
+                    className="settings-delete-link"
+                    onClick={() => { setDeleteState("confirm"); setLogoutConfirm(false); }}
+                  >
+                    刪除帳號
+                  </button>
+                ) : (
+                  <div className="settings-delete-confirm">
+                    <span className="settings-delete-warn">
+                      將永久刪除帳號與所有遊戲資料：<br />
+                      金幣、鑽石、車款、成績、成就、連續參賽紀錄。<br />
+                      <strong>此操作無法復原，已購買項目不會退款。</strong>
+                    </span>
+                    {deleteError && <span className="settings-delete-error">{deleteError}</span>}
+                    <div className="settings-logout-btns">
+                      <button
+                        className="settings-delete-btn"
+                        disabled={deleteState === "deleting"}
+                        onClick={handleDeleteAccount}
+                      >
+                        {deleteState === "deleting" ? "刪除中…" : "確定永久刪除"}
+                      </button>
+                      <button
+                        className="settings-cancel-btn"
+                        disabled={deleteState === "deleting"}
+                        onClick={() => { setDeleteState("idle"); setDeleteError(""); }}
+                      >
+                        取消
+                      </button>
+                    </div>
+                  </div>
                 )}
               </div>
             )}

@@ -29,6 +29,7 @@ import { recordFinish } from "./lib/achievements";
 import { grantPlayReward, computePlayReward } from "./lib/playRewards";
 import { Capacitor } from "@capacitor/core";
 import { App as CapApp } from "@capacitor/app";
+import { ensureDailyReminder, maybeAskDailyReminder } from "./lib/notifications";
 
 export default function App() {
   const [screen, setScreen]         = useState<Screen>("home");
@@ -105,6 +106,10 @@ export default function App() {
     const t = setTimeout(() => { void import("./game/GameCanvas"); }, 2500);
     return () => clearTimeout(t);
   }, []);
+
+  // 每日提醒（原生殼限定）：啟動時只在「已授權」的前提下重排程，不跳權限框
+  //（權限請求在第一局玩完才問，見 handleGameOver 的 maybeAskDailyReminder()）。
+  useEffect(() => { ensureDailyReminder(); }, []);
 
   // App 啟動時預熱每日資料，進 DailyChallenge 時直接從快取拿，不需等待
   useEffect(() => {
@@ -206,6 +211,8 @@ export default function App() {
   }, []);
 
   const handleGameOver = useCallback((stats: GameOverStats) => {
+    // 每日提醒權限：第一局玩完（已投入）這個時點才問，只問一次；已授權/已拒絕都 no-op。
+    maybeAskDailyReminder();
     if (isDailyRun && user) {
       submitDailyScore(getPlayerName(), {
         score:   stats.score,

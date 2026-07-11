@@ -39,10 +39,14 @@ export interface DiamondPack {
   label: string;
 }
 
+// 2026-07-11 定價定案（使用者拍板）：售價走 Play 標準階梯 NT$30/90/290（使用者在
+// Play Console 手動改售價），鑽石數 100/350/1300——越大包每元鑽石越多（3.3/3.9/4.5
+// 顆/元），誘導往上買。大包 1200→1300：SKU id 不能改（Play Console 商品 id 固定），
+// 只改內容物數量；DB 端白名單同步見 migration_20260711b.sql，兩邊要一致。
 export const DIAMOND_PACKS: DiamondPack[] = [
   { sku: "diamonds_100",  diamonds: 100,  label: "小包" },
   { sku: "diamonds_350",  diamonds: 350,  label: "中包" },
-  { sku: "diamonds_1200", diamonds: 1200, label: "大包" },
+  { sku: "diamonds_1200", diamonds: 1300, label: "大包" },
 ];
 
 // 永久去除廣告（非消耗型，買一次終身有效）：復活廣告、每日拿金幣廣告、每日排名賽
