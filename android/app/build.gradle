@@ -10,8 +10,8 @@ android {
         // Play Console 只認 applicationId+versionCode 單調遞增，不因為底層原生架構
         // 換成 Capacitor 而重置。18 上傳時被 Play Console 拒絕（該號碼已用過，見
         // CAPACITOR_EXPERIMENT.md），改成 19（Capacitor 首次真正送審的版本）。
-        versionCode 24
-        versionName "1.24"
+        versionCode 25
+        versionName "1.25"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
