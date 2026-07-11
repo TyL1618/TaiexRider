@@ -192,17 +192,6 @@ export default function GameCanvas({ prices, label, name, subtitle, onExit, onGa
   // 永久去廣告（IAP）：已購買者跳過所有「看廣告」標籤/流程，見 garage.ts getAdsRemoved()
   const [adsRemoved] = useState(() => getAdsRemoved());
   const [newPb, setNewPb] = useState(false); // 本局打破個人最佳（結算徽章）
-  // 首玩教學（一生只出現一次）：hold=教「按住＝前進」→ air=等首次騰空教「持續按住＝後空翻」
-  // → null=完成。核心操作只有一個手勢，兩句浮層就足夠，不做分步打斷式教學。
-  // 沒學完就摔車/完賽：hold 階段會在下一局重教（重掛 GameCanvas 時 localStorage 仍空）；
-  // air 階段學到一半則直接視為看過（別每局都煩玩家）。
-  const [tutStage, setTutStage] = useState<"hold" | "air" | null>(() => {
-    try { return localStorage.getItem("tr_tutorial_seen") ? null : "hold"; } catch { return null; }
-  });
-  const markTutorialSeen = () => {
-    setTutStage(null);
-    try { localStorage.setItem("tr_tutorial_seen", "1"); } catch { /* 靜默 */ }
-  };
   // 結算畫面「看廣告雙倍本局金幣」，每局限一次（排行榜/經典模式沒有金幣可以雙倍，不顯示）。
   // 摔車當下走到賽道的比例（0~1），長征模式摔車金幣按比例、雙倍時也照這個比例算。
   const deathProgressRef = useRef(0);
@@ -299,26 +288,6 @@ export default function GameCanvas({ prices, label, name, subtitle, onExit, onGa
   useEffect(() => {
     if ((crashed || finished) && newPb) maybeRequestReview();
   }, [crashed, finished, newPb]);
-
-  // 首玩教學狀態機：hold 提示在玩家「持續按住 1.2 秒」後晉級（中途放開會重新計時，
-  // 確保真的體驗過加速）；air 提示只在騰空時顯示，任何一次騰空撐滿 2.2 秒＝學會。
-  // hud 每 5 幀節流同步，這裡拿它當訊號剛剛好，不用碰物理迴圈。
-  useEffect(() => {
-    if (tutStage !== "hold" || showStartPrompt || !hud.throttle) return;
-    const t = setTimeout(() => setTutStage("air"), 1200);
-    return () => clearTimeout(t);
-  }, [tutStage, showStartPrompt, hud.throttle]);
-  useEffect(() => {
-    if (tutStage !== "air" || !hud.airborne) return;
-    const t = setTimeout(markTutorialSeen, 2200);
-    return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tutStage, hud.airborne]);
-  // 局結束時 air 階段還沒學完：直接標記看過（hold 都學會了，別每局重複打擾）
-  useEffect(() => {
-    if ((crashed || finished) && tutStage === "air") markTutorialSeen();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [crashed, finished, tutStage]);
 
   // 結算分數滾動動畫：0 → 真正最終分，ease-out 約 550ms（原生感 juice）
   // 終點讀 finalScoreRef（每步同步、不節流），不能讀 hud.points——那是每 5 幀才
@@ -1714,14 +1683,6 @@ let crashTimer = 0;
           <div className="start-prompt-text">觸碰螢幕開始</div>
           <div className="start-prompt-sub">TAP TO RIDE</div>
         </div>
-      )}
-
-      {/* 首玩教學浮層（一生一次，見 tutStage 註解）：置中偏下、pointer-events:none 不擋操作 */}
-      {tutStage === "hold" && !showStartPrompt && !crashed && !finished && !dying && (
-        <div className="tut-hint">👆 按住螢幕＝加速前進</div>
-      )}
-      {tutStage === "air" && hud.airborne && !crashed && !finished && !dying && (
-        <div className="tut-hint tut-air">🔄 空中持續按住＝後空翻</div>
       )}
 
       {!crashed && !finished && !showStartPrompt && <div className={`throttle-dot ${hud.throttle ? "on" : ""}`} />}

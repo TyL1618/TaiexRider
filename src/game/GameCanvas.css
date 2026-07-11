@@ -34,28 +34,6 @@
   50%       { opacity: 1; }
 }
 
-/* 首玩教學浮層（一生一次，GameCanvas tutStage）：置中偏下不擋車，脈動吸睛 */
-.tut-hint {
-  position: absolute;
-  top: 63%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  text-align: center;
-  font-size: 1.05rem;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  color: #ffd447;
-  text-shadow: 0 0 14px rgba(255, 212, 71, 0.85), 0 0 4px #fff;
-  pointer-events: none;
-  user-select: none;
-  white-space: nowrap;
-  animation: startPulse 1.2s ease-in-out infinite;
-}
-.tut-hint.tut-air {
-  color: #2de2e6;
-  text-shadow: 0 0 14px rgba(45, 226, 230, 0.9), 0 0 4px #fff;
-}
-
 .game-canvas {
   display: block;
   width: 100%;

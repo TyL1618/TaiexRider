@@ -227,7 +227,7 @@ export default function Home({
                 className="settings-changelog-btn"
                 onClick={() => { setShowSettings(false); setShowHelp(true); }}
               >
-                遊戲說明
+                遊玩教學
               </button>
             </div>
 
@@ -293,7 +293,7 @@ export default function Home({
       {showHelp && (
         <div className="modal-overlay" onClick={() => setShowHelp(false)}>
           <div className="modal-panel log" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-title">遊戲說明</div>
+            <div className="modal-title">遊玩教學</div>
             <div className="log-scroll">
               <div className="log-entry">
                 <div className="log-date">操作方式</div>
@@ -327,6 +327,26 @@ export default function Home({
                   <li>隨機賽道：拉霸隨機抽一支股票</li>
                   <li>自選賽道・前次盤勢：從全市場約 1000 支自選</li>
                   <li>自選賽道・每日長征：5 支股票串接的超長路線</li>
+                </ul>
+              </div>
+              <div className="log-entry">
+                <div className="log-date">💰 金幣怎麼賺</div>
+                <ul className="log-notes">
+                  <li>自選/隨機賽道：完賽 +5、摔車 +2（每日賽/經典模式不計入）</li>
+                  <li>每日長征（5 支股票串接）：完賽 +30、摔車依跑到的距離比例發放</li>
+                  <li>以上每日合計上限 100 枚，達上限後改玩每日／週任務累積</li>
+                  <li>每日任務、每週任務：完成即可到車庫領取，各自獨立額度</li>
+                  <li>車庫「看廣告拿金幣」：每日最多 2 次</li>
+                  <li>結算畫面「看廣告 獎勵 ×2」：每局限用一次，把本局金幣翻倍</li>
+                  <li>⚡ 狂暴盤日（大盤漲跌幅 ≥2.5%）：任務金幣加倍</li>
+                </ul>
+              </div>
+              <div className="log-entry">
+                <div className="log-date">💎 鑽石怎麼賺</div>
+                <ul className="log-notes">
+                  <li>每日排名賽：只要參賽即有小額鑽石，名次越前面越多</li>
+                  <li>經典模式：每週各關卡前三名額外發放鑽石</li>
+                  <li>車庫可直接付費購買鑽石包，用來解鎖鑽石車款</li>
                 </ul>
               </div>
             </div>
