@@ -233,3 +233,62 @@ export function stopEngine() {
   engOsc = null; engFilt = null; engGain = null;
   osc.stop(c.currentTime + 1.0);
 }
+
+// ---- 背景音樂（BGM，2026-07-12 使用者提供素材，CC-BY／incompetech.com）----
+// 兩軌切換：非遊玩畫面（首頁/車庫/選單/每日排名賽列表等）放 galactic-rap，
+// 實際跑賽道（GameCanvas 掛載中）切 hiding-your-reality。走
+// MediaElementAudioSourceNode 接進 masterGain()，跟音效共用同一顆音量滑桿；
+// 不用 AudioBufferSourceNode 整首解碼進記憶體（檔案數 MB 起跳，串流播放對
+// 行動裝置記憶體友善很多，且原生支援 .loop）。
+//
+// ⚠️ 行動瀏覽器/WebView 的 autoplay 政策：沒有使用者手勢前 .play() 會被拒絕
+// （回傳的 Promise reject NotAllowedError）。冷啟動首頁那次很可能踩到——
+// 失敗時靜默吞掉，掛一次性 pointerdown 監聽，使用者第一次點擊任何地方時重試。
+let bgmMenu: HTMLAudioElement | null = null;
+let bgmGame: HTMLAudioElement | null = null;
+let currentBgm: HTMLAudioElement | null = null;
+let bgmRetryQueued = false;
+
+function ensureBgm(): void {
+  if (bgmMenu && bgmGame) return;
+  const c = ctx();
+  const base = import.meta.env.BASE_URL;
+  bgmMenu = new Audio(`${base}audio/galactic-rap.mp3`);
+  bgmGame = new Audio(`${base}audio/hiding-your-reality.mp3`);
+  bgmMenu.loop = true;
+  bgmGame.loop = true;
+  c.createMediaElementSource(bgmMenu).connect(masterGain());
+  c.createMediaElementSource(bgmGame).connect(masterGain());
+}
+
+function tryPlay(el: HTMLAudioElement): void {
+  el.play().catch(() => {
+    if (bgmRetryQueued) return;
+    bgmRetryQueued = true;
+    const retry = () => {
+      bgmRetryQueued = false;
+      if (currentBgm === el) el.play().catch(() => { /* 仍失敗就放棄，不再重試轟炸 */ });
+    };
+    document.addEventListener("pointerdown", retry, { once: true });
+  });
+}
+
+function switchBgm(target: HTMLAudioElement): void {
+  ensureBgm();
+  if (currentBgm === target) return;
+  currentBgm?.pause();
+  currentBgm = target;
+  tryPlay(target);
+}
+
+// 進入非遊玩畫面（首頁/車庫/選單等）時呼叫。
+export function playMenuMusic(): void {
+  ensureBgm();
+  switchBgm(bgmMenu!);
+}
+
+// 進入賽道（GameCanvas 掛載）時呼叫。
+export function playGameMusic(): void {
+  ensureBgm();
+  switchBgm(bgmGame!);
+}

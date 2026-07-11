@@ -54,6 +54,19 @@ export async function ensureDailyReminder(): Promise<void> {
   }
 }
 
+// 通知點擊 deep link：使用者點開每日提醒通知時呼叫 callback（App.tsx 用來導向
+// 每日排名賽畫面，不自動開局）。只過濾我們自己排的那則提醒（REMINDER_ID），
+// 避免以後加了其他種類通知會誤觸發不相關的導航。回傳取消訂閱函式。
+export function onDailyReminderTapped(callback: () => void): () => void {
+  if (!Capacitor.isNativePlatform()) return () => {};
+  let handle: { remove: () => void } | undefined;
+  let cancelled = false;
+  LocalNotifications.addListener("localNotificationActionPerformed", (action) => {
+    if (action.notification.id === REMINDER_ID) callback();
+  }).then((h) => { if (cancelled) h.remove(); else handle = h; });
+  return () => { cancelled = true; handle?.remove(); };
+}
+
 // 第一局玩完時呼叫：還沒問過權限就問一次（系統框），同意就排程；拒絕記下來不再問。
 export async function maybeAskDailyReminder(): Promise<void> {
   if (!Capacitor.isNativePlatform()) return;

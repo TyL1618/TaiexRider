@@ -41,6 +41,8 @@ interface GameCanvasProps {
   analyticsMode?: string;   // 打點用模式標籤（daily/slot/custom/long/classic）
   pbKey?: string;           // 個人最佳紀錄的 localStorage key 尾碼（模式+標的）
   uid?: string | null;      // 已登入玩家 id，看廣告雙倍金幣要用來隔離每日上限快取（見 playRewards.ts）
+  dailyRank?: number | null; // 每日排名賽即時名次（App.tsx 提交成功後非同步算出才會有值，結算畫面顯示用）
+  completedQuests?: { title: string; reward: number }[]; // 本局新完成的每日/週任務（App.tsx 算好傳入，結算畫面顯示用）
 }
 
 interface Hud {
@@ -159,7 +161,7 @@ function getBikeImageEntry(src: string): BikeImgEntry {
 }
 getBikeImageEntry(`${import.meta.env.BASE_URL}bike.png`); // 預熱預設車皮
 
-export default function GameCanvas({ prices, label, name, subtitle, onExit, onGameOver, hideMinimap = false, revivalEnabled = false, analyticsMode, pbKey, uid = null }: GameCanvasProps) {
+export default function GameCanvas({ prices, label, name, subtitle, onExit, onGameOver, hideMinimap = false, revivalEnabled = false, analyticsMode, pbKey, uid = null, dailyRank = null, completedQuests = [] }: GameCanvasProps) {
   const stars = difficultyStars(calcDifficulty(prices));
   const cityBuildings = generateCity(prices.length * 31 + Math.round((prices[0] || 0) * 100));
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -1724,10 +1726,19 @@ let crashTimer = 0;
             {subtitle && <div className="overlay-track-sub">{subtitle}</div>}
             <div className="overlay-score">{displayScore} 分</div>
             {newPb && <div className="overlay-pb">🎉 新個人紀錄！</div>}
+            {/* 每日排名賽即時名次：App.tsx 提交成功後非同步算出才會有值，晚個半秒才彈出屬正常 */}
+            {dailyRank != null && <div className="overlay-rank">🏆 目前排名第 {dailyRank} 名</div>}
             <div className="overlay-time">{hud.timer}</div>
             <div className="overlay-stats">
               翻轉 {hud.totalFlips} 圈 ・ 完美落地 {hud.perfectLandings} 次
             </div>
+            {completedQuests.length > 0 && (
+              <div className="overlay-quests">
+                {completedQuests.map((q, i) => (
+                  <div key={i} className="overlay-quest-item">✅ {q.title} +{q.reward}💰</div>
+                ))}
+              </div>
+            )}
             {coinRewardEligible && (() => {
               const baseReward = computePlayReward(isLongMarch, finished, finished ? 1 : deathProgressRef.current);
               const shownReward = adDoubleState === "claimed" ? baseReward * 2 : baseReward;

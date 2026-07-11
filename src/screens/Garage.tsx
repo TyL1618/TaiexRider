@@ -231,6 +231,9 @@ export default function Garage({ user, onBack }: { user: User | null; onBack: ()
       <p className="garage-coins"><CoinIcon size={22} /> 金幣 {coins}</p>
       <p className="garage-coins garage-diamonds">💎 鑽石 {diamonds}</p>
       <p className="garage-intro">完賽/摔車與每日任務都能賺金幣，解鎖車皮換上場</p>
+      {!user && (
+        <p className="garage-guest-notice">⚠️ 訪客進度僅存於本機，清除資料或換裝置會遺失。登入 Google 可雲端保存</p>
+      )}
       <button
         className="garage-ad-btn"
         disabled={watchingAd || adClaims >= MAX_AD_COIN_CLAIMS_PER_DAY}

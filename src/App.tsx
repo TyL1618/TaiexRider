@@ -29,7 +29,8 @@ import { recordFinish } from "./lib/achievements";
 import { grantPlayReward, computePlayReward } from "./lib/playRewards";
 import { Capacitor } from "@capacitor/core";
 import { App as CapApp } from "@capacitor/app";
-import { ensureDailyReminder, maybeAskDailyReminder } from "./lib/notifications";
+import { ensureDailyReminder, maybeAskDailyReminder, onDailyReminderTapped } from "./lib/notifications";
+import { playMenuMusic, playGameMusic } from "./game/audio";
 
 export default function App() {
   const [screen, setScreen]         = useState<Screen>("home");
@@ -38,6 +39,8 @@ export default function App() {
   const [user, setUser]             = useState<User | null>(null);
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [marketMood, setMarketMood] = useState<MarketMood | null>(null);
+  const [dailyRank, setDailyRank] = useState<number | null>(null); // 每日排名賽即時名次（提交成功後非同步算出）
+  const [completedQuests, setCompletedQuests] = useState<{ title: string; reward: number }[]>([]); // 本局新完成任務（結算畫面慶祝用）
   const gameKeyRef = useRef(0); // 每次 handleStartTrack +1，確保新局 GameCanvas 重建（revivalUsed 重置）
 
   // refs 讓 popstate 閉包隨時拿到最新值，不靠 useEffect 依賴陣列
@@ -110,6 +113,15 @@ export default function App() {
   // 每日提醒（原生殼限定）：啟動時只在「已授權」的前提下重排程，不跳權限框
   //（權限請求在第一局玩完才問，見 handleGameOver 的 maybeAskDailyReminder()）。
   useEffect(() => { ensureDailyReminder(); }, []);
+
+  // 背景音樂：track 有值＝實際在跑賽道（GameCanvas 掛載中）放 hiding-your-reality，
+  // 否則（首頁/車庫/選單/每日排名賽列表等所有非遊玩畫面）放 galactic-rap。
+  // 冷啟動首頁那次很可能被行動瀏覽器 autoplay 政策擋下，audio.ts 內部會掛一次性
+  // pointerdown 監聽自動重試，這裡不用特別處理。
+  useEffect(() => {
+    if (track) playGameMusic();
+    else playMenuMusic();
+  }, [track]);
 
   // App 啟動時預熱每日資料，進 DailyChallenge 時直接從快取拿，不需等待
   useEffect(() => {
@@ -210,6 +222,17 @@ export default function App() {
     }
   }, []);
 
+  // 每日提醒通知點擊 deep link（原生殼限定）：落在每日排名賽畫面，不自動開局
+  //（玩家自己按開始，行為跟 App 捷徑一致）。若當下正在賽道中，只更新 screen 狀態，
+  // 等玩家離開賽道後自然落在這個畫面，不打斷正在進行的一局。
+  useEffect(() => {
+    return onDailyReminderTapped(() => {
+      window.history.pushState({ taiex: true }, "");
+      screenRef.current = "daily";
+      setScreen("daily");
+    });
+  }, []);
+
   const handleGameOver = useCallback((stats: GameOverStats) => {
     // 每日提醒權限：第一局玩完（已投入）這個時點才問，只問一次；已授權/已拒絕都 no-op。
     maybeAskDailyReminder();
@@ -219,6 +242,17 @@ export default function App() {
         timeMs:  stats.timeMs,
         flips:   stats.flips,
         perfect: stats.perfect,
+      }).then(async () => {
+        // 排名賽結算即時名次回饋：提交成功後重抓（快取已被 submitDailyScore 內部清掉）
+        // 排行榜，用「精確比對剛提交的分數+時間」找自己那一列——ScoreRow 沒有 player_id
+        // （anon key 讀不到），分數+時間精確相同機率極低，可視為唯一辨識。伺服器端若
+        // 靜默拒絕了這筆（冷卻/物理驗證未過），這裡就找不到自己，不顯示名次，不臆測。
+        const key = await resolveSessionDate(dailyKey());
+        const rows = await fetchDailyTop(key);
+        const myScore = Math.round(stats.score);
+        const myTimeMs = Math.round(stats.timeMs);
+        const idx = rows.findIndex((r) => r.score === myScore && r.time_ms === myTimeMs);
+        if (idx >= 0) setDailyRank(idx + 1);
       });
     }
     // 經典模式：提交紀錄保持者（需登入）。level id 隨 TrackData 帶入。
@@ -254,6 +288,10 @@ export default function App() {
       finished: stats.finished, mode, marketMood: marketMood?.mood ?? null,
     }, user?.id ?? null);
     for (const q of newlyDone) { addCoins(q.reward * rageMultiplier); earnCoins("quest"); }
+    // 結算畫面任務完成慶祝：每日任務同步算好，直接加進清單（週任務見下方 async 區塊）
+    if (newlyDone.length > 0) {
+      setCompletedQuests((prev) => [...prev, ...newlyDone.map((q) => ({ title: q.title, reward: q.reward * rageMultiplier }))]);
+    }
     // 週任務：仿每日任務，但用 ISO 週別累計，需登入才有伺服器權威進度（詳見 weeklyQuests.ts）
     const week = weekKey();
     recordWeeklyRun(week, {
@@ -264,6 +302,9 @@ export default function App() {
         const result = await claimWeeklyQuest(week, q.id);
         if (result.coins !== null) writeCoinsCache(result.coins);
         else addCoins(q.reward * rageMultiplier);
+      }
+      if (newlyDoneWeekly.length > 0) {
+        setCompletedQuests((prev) => [...prev, ...newlyDoneWeekly.map((q) => ({ title: q.title, reward: q.reward * rageMultiplier }))]);
       }
     });
     // 股票圖鑑：自選/長征模式騎過的個股才算（kind==='stock'，daily/classic 排除在外）；
@@ -297,6 +338,8 @@ export default function App() {
     analyticsModeRef.current = deriveAnalyticsMode(t);
     logEvent("run_start", analyticsModeRef.current, { label: t.label });
     setTrack(t);
+    setDailyRank(null);       // 新的一局：清掉上一局的名次回饋
+    setCompletedQuests([]);   // 新的一局：清掉上一局的任務慶祝清單
     setPlaying(true); // 遊玩中：暫緩 SW 自動更新 reload
   };
   const handleExitTrack = useCallback(() => {
@@ -322,6 +365,8 @@ export default function App() {
           analyticsMode={analyticsModeRef.current}
           pbKey={track.classicId ? `classic_${track.classicId}` : `${analyticsModeRef.current}_${track.label}`}
           uid={user?.id ?? null}
+          dailyRank={dailyRank}
+          completedQuests={completedQuests}
         />
       </Suspense>
     );

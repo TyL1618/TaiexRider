@@ -29,6 +29,14 @@
   margin-bottom: 0.7rem;
 }
 
+.garage-guest-notice {
+  font-size: 0.74rem;
+  color: rgba(255, 190, 80, 0.85);
+  letter-spacing: 0.02em;
+  margin: -0.3rem 0 0.9rem;
+  max-width: 320px;
+}
+
 .garage-ad-btn {
   margin-bottom: 1.2rem;
   padding: 0.45rem 1rem;

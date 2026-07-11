@@ -300,6 +300,33 @@
   50% { opacity: 0.55; }
 }
 
+/* 每日排名賽即時名次（結算畫面，非同步算出才出現，輕輕淡入不用搶眼動畫） */
+.overlay-rank {
+  margin-top: 0.15rem;
+  font-size: 0.88rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--neon-cyan);
+  text-shadow: 0 0 8px rgba(45, 226, 230, 0.5);
+  animation: overlayPop 260ms ease-out backwards;
+}
+
+/* 本局新完成任務清單（結算畫面，緊接統計列之後、不擋按鈕、隨整個結算畫面一起消失） */
+.overlay-quests {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  margin-top: 0.1rem;
+  animation: overlayPop 300ms 220ms ease-out backwards;
+}
+.overlay-quest-item {
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  color: var(--neon-amber);
+  opacity: 0.9;
+}
+
 /* 分享成績（品紅鏤空，比 ghost 顯眼、不搶主行動鈕） */
 .overlay-btn.share-btn {
   background: transparent;
