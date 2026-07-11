@@ -63,8 +63,10 @@
       <li><strong>遊戲成績</strong>：若您已登入並完成每日排名賽，本遊戲會將您的分數、完成時間、後空翻次數及完美落地次數上傳至排行榜資料庫。</li>
       <li><strong>本機儲存</strong>：玩家暱稱、音量設定及每日賽道快取資料儲存於您的裝置本地（localStorage / IndexedDB），不會上傳至任何伺服器。</li>
       <li><strong>匿名遊玩統計</strong>：為改善遊戲品質，本遊戲會記錄匿名的遊玩事件（開始遊戲的模式、死亡原因與賽道位置、完賽成績、復活使用），並附帶一組隨機產生的匿名裝置識別碼。這些資料不含姓名、電子郵件或任何可直接識別個人的資訊，僅用於統計分析（例如各模式受歡迎程度、關卡難度調整），原始事件保留 90 天後自動刪除。</li>
+      <li><strong>廣告顯示（僅 Android App 版）</strong>：App 內建由 Google AdMob 提供的獎勵廣告（觀看廣告可獲得遊戲內金幣等獎勵，為玩家自願觀看，非強制）。AdMob 可能收集廣告識別碼（Advertising ID）等裝置資訊，用於顯示廣告及避免重複投放。</li>
+      <li><strong>App 內購買（僅 Android App 版）</strong>：若您透過 Google Play 購買遊戲內鑽石或永久去除廣告，交易款項與付款資訊（信用卡號等）皆由 Google Play 帳務系統直接處理，本遊戲僅會收到購買結果（購買品項、是否成功），不會取得您的付款卡號等金流資訊。</li>
     </ul>
-    <p>本遊戲<strong>不</strong>收集精確位置、通訊錄、相機或麥克風等敏感裝置資料。</p>
+    <p>本遊戲<strong>不</strong>收集精確位置、通訊錄、相機或麥克風等敏感裝置資料。App 內的每日提醒通知為裝置本地排程，不涉及任何伺服器或第三方推播服務。</p>
 
     <h2>二、資料的使用方式</h2>
     <ul>
@@ -72,6 +74,8 @@
       <li>遊戲成績：公開顯示於排行榜，供全體玩家查閱。</li>
       <li>本機資料：僅在您的裝置上使用，用於改善遊戲體驗（記住設定、加速載入）。</li>
       <li>匿名遊玩統計：僅用於彙總分析與遊戲平衡調整，不與您的 Google 帳號資料合併分析、不用於廣告或行銷。</li>
+      <li>廣告識別碼：僅供 Google AdMob 用於投放與計次獎勵廣告，本遊戲不會另外保存或用於自身的行銷分析。</li>
+      <li>購買紀錄：用於發放對應的鑽石或去除廣告權益，並作為金流爭議與退款處理的稽核依據。</li>
     </ul>
 
     <h2>三、第三方服務</h2>
@@ -79,6 +83,14 @@
     <ul>
       <li>
         <strong>Google Sign-In（Google LLC）</strong>：用於帳號登入驗證。<br />
+        隱私政策：<a href="https://policies.google.com/privacy" target="_blank" rel="noopener">policies.google.com/privacy</a>
+      </li>
+      <li>
+        <strong>Google AdMob（僅 Android App 版）</strong>：用於顯示遊戲內獎勵廣告。<br />
+        隱私政策：<a href="https://policies.google.com/privacy" target="_blank" rel="noopener">policies.google.com/privacy</a>
+      </li>
+      <li>
+        <strong>Google Play 帳務服務 / Play Billing（僅 Android App 版）</strong>：用於處理鑽石與去除廣告的付費交易。<br />
         隱私政策：<a href="https://policies.google.com/privacy" target="_blank" rel="noopener">policies.google.com/privacy</a>
       </li>
       <li>
@@ -90,11 +102,11 @@
         隱私政策：<a href="https://www.cloudflare.com/privacypolicy/" target="_blank" rel="noopener">cloudflare.com/privacypolicy</a>
       </li>
     </ul>
-    <p>本遊戲目前不含任何廣告或第三方追蹤器。</p>
 
     <h2>四、資料保留與刪除</h2>
     <p>排行榜成績資料會無限期保留，以維護完整的歷史排行榜記錄。</p>
-    <p><strong>帳號刪除申請</strong>：若您希望刪除帳號及所有相關個人資料（包含 Google 帳號 ID、暱稱、遊戲成績），請以電子郵件聯絡 <a href="mailto:tyl161803@gmail.com">tyl161803@gmail.com</a>，主旨填寫「刪除帳號申請」，本開發者將於 30 天內完成刪除並回覆確認。刪除後資料無法復原。</p>
+    <p><strong>帳號刪除</strong>：您可在 App 內「設定」→「刪除帳號」自行提出申請，系統會立即刪除您的 Google 帳號 ID、暱稱、遊戲成績、金幣鑽石餘額、車款、成就與連續參賽紀錄等所有個人遊戲資料，此操作無法復原。若您使用網頁版或無法透過 App 內功能刪除，也可以電子郵件聯絡 <a href="mailto:tyl161803@gmail.com">tyl161803@gmail.com</a>，主旨填寫「刪除帳號申請」，本開發者將於 30 天內完成刪除並回覆確認。</p>
+    <p>基於金流稽核及防詐需求，已完成的付費交易紀錄（購買品項、時間、交易編號）不在前述刪除範圍內，將依法令要求之期間留存，其餘個人資料仍會依上述方式刪除。</p>
 
     <h2>五、兒童隱私</h2>
     <p>本遊戲適合所有年齡層使用，不針對 13 歲以下兒童收集個人資料。若您發現未成年子女在未經同意的情況下提供了個人資料，請聯絡我們。</p>
@@ -106,7 +118,7 @@
     <p>如有任何關於隱私權的疑問或請求，請透過電子郵件聯絡：<br />
     <a href="mailto:tyl161803@gmail.com">tyl161803@gmail.com</a></p>
 
-    <p class="updated">最後更新：2026 年 7 月 2 日</p>
+    <p class="updated">最後更新：2026 年 7 月 11 日</p>
   </div>
 </body>
 </html>
