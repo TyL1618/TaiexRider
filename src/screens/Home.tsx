@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { APP_VERSION, CHANGELOG } from "../version";
+import { APP_VERSION } from "../version";
 import { signInWithGoogle, signOut, updateProfileName, type User } from "../lib/auth";
 import { getPlayerName, setPlayerName, clampNameWidth } from "../lib/playerId";
 import { setVolume, getVolume } from "../game/audio";
@@ -29,7 +29,6 @@ export default function Home({
   marketMood?: MarketMood | null;
 }) {
   const [showSettings, setShowSettings] = useState(false);
-  const [showLog, setShowLog]           = useState(false);
   const [showHelp, setShowHelp]         = useState(false);
   const [nickname, setNickname]         = useState(() => getPlayerName());
   const [savedName, setSavedName]       = useState(() => getPlayerName());
@@ -211,12 +210,6 @@ export default function Home({
               >
                 遊戲說明
               </button>
-              <button
-                className="settings-changelog-btn"
-                onClick={() => { setShowSettings(false); setShowLog(true); }}
-              >
-                更新日誌
-              </button>
             </div>
 
             {/* 登出區 - 置底，與關閉按鈕有間距 */}
@@ -239,25 +232,6 @@ export default function Home({
             )}
 
             <button className="modal-btn settings-close-btn" onClick={handleCloseSettings}>關閉</button>
-          </div>
-        </div>
-      )}
-
-      {showLog && (
-        <div className="modal-overlay" onClick={() => setShowLog(false)}>
-          <div className="modal-panel log" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-title">更新日誌</div>
-            <div className="log-scroll">
-              {CHANGELOG.map((entry) => (
-                <div key={entry.date} className="log-entry">
-                  <div className="log-date">{entry.date}</div>
-                  <ul className="log-notes">
-                    {entry.notes.map((n, i) => <li key={i}>{n}</li>)}
-                  </ul>
-                </div>
-              ))}
-            </div>
-            <button className="modal-btn" onClick={() => setShowLog(false)}>關閉</button>
           </div>
         </div>
       )}
