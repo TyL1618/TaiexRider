@@ -19,6 +19,7 @@ import { requestRewardedAd, preloadRewardedAd } from "../lib/ads";
 import { grantPlayReward, computePlayReward } from "../lib/playRewards";
 import { maybeRequestReview } from "../lib/review";
 import { dailyKey } from "../data/pick";
+import { Capacitor } from "@capacitor/core";
 
 export interface GameOverStats {
   score: number;
@@ -311,8 +312,10 @@ export default function GameCanvas({ prices, label, name, subtitle, onExit, onGa
     return () => cancelAnimationFrame(raf);
   }, [crashed, finished]);
 
-  // 分享成績：優先產生「成績圖卡」走 navigator.share files（手機原生面板，圖+文轉發效果最好）；
-  // 不支援 files → 純文字 share；再不支援 → 複製到剪貼簿。文案連動股票/當日走勢（本遊戲的天然哏）。
+  // 分享成績：文案連動股票/當日走勢（本遊戲的天然哏），圖卡+檔案分享優先（圖+文轉發效果最好）。
+  // 2026-07-12：原生殼改走 @capacitor/share（見 lib/nativeShare.ts 檔頭說明——WebView 的
+  // navigator.share() 帶檔案分享常直接失敗，這是 TWA→Capacitor 換殼後的體驗退化，改用官方
+  // 原生分享 Intent 修復，恢復系統分享面板＋LINE/FB/IG 捷徑圖示）。網頁/PWA 版邏輯不變。
   const shareScore = async () => {
     const trackDesc = subtitle ? `${name}（${subtitle}）` : `${label} ${name}`;
     const text = finished
@@ -321,10 +324,11 @@ export default function GameCanvas({ prices, label, name, subtitle, onExit, onGa
     const url = "https://taiexrider.pages.dev";
     logEvent("share", analyticsMode, { label, finished });
 
-    // ① 圖卡 + 檔案分享
+    // 圖卡兩條路徑都要用，先產生（renderShareCard 失敗回 null，兩條路徑各自處理 fallback）
+    let blob: Blob | null = null;
     try {
       const { renderShareCard } = await import("../lib/shareCard");
-      const blob = await renderShareCard({
+      blob = await renderShareCard({
         label, name, subtitle,
         prices,
         score: hud.points,
@@ -333,6 +337,16 @@ export default function GameCanvas({ prices, label, name, subtitle, onExit, onGa
         perfect: hud.perfectLandings,
         finished,
       });
+    } catch { /* 圖卡產生失敗，blob 維持 null，走純文字分享 */ }
+
+    if (Capacitor.isNativePlatform()) {
+      const { shareNative } = await import("../lib/nativeShare");
+      await shareNative(blob, "TAIEX RIDER", text, url);
+      return;
+    }
+
+    // ① 圖卡 + 檔案分享（web／PWA）
+    try {
       if (blob) {
         const file = new File([blob], "taiexrider-score.png", { type: "image/png" });
         if (navigator.canShare?.({ files: [file] })) {
