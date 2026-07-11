@@ -39,10 +39,15 @@ export interface DiamondPack {
   label: string;
 }
 
-// 2026-07-11 定價定案（使用者拍板）：售價走 Play 標準階梯 NT$30/90/290（使用者在
-// Play Console 手動改售價），鑽石數 100/350/1300——越大包每元鑽石越多（3.3/3.9/4.5
-// 顆/元），誘導往上買。大包 1200→1300：SKU id 不能改（Play Console 商品 id 固定），
-// 只改內容物數量；DB 端白名單同步見 migration_20260711b.sql，兩邊要一致。
+// 2026-07-11 定價定案（使用者拍板）：玩家實際看到的顯示價 NT$30/90/290，鑽石數
+// 100/350/1300——越大包每元鑽石越多（3.3/3.9/4.5 顆/元），誘導往上買。大包
+// 1200→1300：SKU id 不能改（Play Console 商品 id 固定），只改內容物數量；DB 端
+// 白名單同步見 migration_20260711b.sql，兩邊要一致。
+// ⚠️ Play Console「售價」輸入欄位 ≠ 玩家實際看到的顯示價（含稅，顯示價會比輸入值
+// 高一截）——2026-07-11 實測輸入 30 元、玩家看到 31 元。要讓顯示價精準落在整數，
+// Console 輸入值要回推微調：diamonds_100 輸入 29／diamonds_350 輸入 86／
+// diamonds_1200 輸入 279（此檔案不寫死售價，UI 一律用 fetchPackPrices() 向 Google
+// 動態查詢顯示，這裡純粹記錄 Console 端要填的正確輸入值，供之後調整定價時參考）。
 export const DIAMOND_PACKS: DiamondPack[] = [
   { sku: "diamonds_100",  diamonds: 100,  label: "小包" },
   { sku: "diamonds_350",  diamonds: 350,  label: "中包" },
