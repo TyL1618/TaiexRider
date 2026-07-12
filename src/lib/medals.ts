@@ -1,5 +1,6 @@
 // 經典模式獎牌制（Trackmania 式）：每關依「個人最佳分數」授銅/銀/金牌。
-// 不需新儲存——直接讀 PB 的 localStorage（tr_pb_classic_{id}，GameCanvas checkPb 寫入）。
+// 不需新儲存——直接讀 PB 的 localStorage（tr_pb_classic_{id}_{uid|guest}，GameCanvas
+// checkPb 寫入，key 帶 uid 隔離避免同裝置切換帳號沿用前一個使用者的 PB）。
 // 門檻 v1 為全關卡統一值（銅=完賽底分、銀=完賽+基本特技、金=高手線），
 // 之後可依 events 完賽分數分佈改成每關獨立門檻。
 
@@ -17,9 +18,9 @@ export const MEDAL_ICON: Record<Medal, string> = {
   bronze: "🥉",
 };
 
-export function classicPb(classicId: string): number {
+export function classicPb(classicId: string, uid: string | null = null): number {
   try {
-    return parseInt(localStorage.getItem(`tr_pb_classic_${classicId}`) ?? "0", 10) || 0;
+    return parseInt(localStorage.getItem(`tr_pb_classic_${classicId}_${uid ?? "guest"}`) ?? "0", 10) || 0;
   } catch {
     return 0;
   }

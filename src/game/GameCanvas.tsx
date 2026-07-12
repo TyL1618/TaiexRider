@@ -553,10 +553,12 @@ let crashTimer = 0;
 
     // 個人最佳（PB）：分數 > 既有紀錄即更新 localStorage；
     // 只有「打破舊紀錄」（舊值 > 0，非首次遊玩）才亮結算徽章
+    // key 帶 uid 隔離（訪客固定 "guest"）——同裝置切換帳號才不會沿用前一個使用者的
+    // PB，跟 quests.ts/adRewards.ts 2026-07-08 修過的同一種跨帳號快取污染問題。
     const checkPb = (score: number) => {
       if (!pbKey) return;
       try {
-        const k = `tr_pb_${pbKey}`;
+        const k = `tr_pb_${pbKey}_${uid ?? "guest"}`;
         const old = parseInt(localStorage.getItem(k) ?? "0", 10);
         if (score > old) {
           localStorage.setItem(k, String(score));

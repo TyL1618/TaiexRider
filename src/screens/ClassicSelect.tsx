@@ -50,7 +50,7 @@ export default function ClassicSelect({
       <div className="track-list">
         {CLASSICS.map((c) => {
           const recs = records.get(c.id) ?? [];
-          const pb = classicPb(c.id);
+          const pb = classicPb(c.id, user?.id ?? null);
           const medal = medalFor(pb);
           const next = nextMedalTarget(pb);
           return (
