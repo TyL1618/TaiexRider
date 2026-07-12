@@ -107,10 +107,17 @@ press/release 完整合法性狀態機**（成本/風險不成比例，事件數
 - **反作弊用**：`submit_daily_score` 新增 `p_replay` 參數（預設 null，向下相容尚未
   更新的客戶端），有帶時驗證：events 的 n 加總 vs p_flips、"p" 事件筆數 vs
   p_perfect、path 長度 vs p_time/500，各自容忍一定誤差，離譜偏差靜默拒絕。
+  **2026-07-13 補強**（`migration_20260713.sql`）：加 [C2] 硬上限——整包 jsonb
+  >64KB／events >150 筆／path 含非數字元素 → 拒絕（防 DB 膨脹＋防鬼影資料污染）；
+  整個驗證包進 exception 區塊，格式惡意/損壞一律靜默拒絕不回 SQL 400。
 - **Ghost 用**：新 RPC `get_daily_ghost_path(p_date)` 回傳當日目前第一名（非
   suspect）的 `replay->path`，`GameCanvas.tsx drawGhost()` 依 `raceTimeMs` 線性插值
   出鬼影 x 座標，套用既有地形函式（`terrainYAt`/`slopeAt`）算貼地高度/傾角，純視覺
   疊圖、不跑物理，半透明+去色跟玩家自己的車一眼區分。
+  **2026-07-13 補強**：① RPC 改嚴格「真第一名」語意——第一名那列沒 replay 就回
+  null，不退而求其次回第二名的（原版回「有 replay 的最高分」，空窗期會把第二名
+  當成「第一名鬼影」顯示，語意不符）；② 去色改離屏預渲染一次（每幀 `ctx.filter`
+  在 Android WebView 昂貴）；③ 前端抓鬼影加 1.5s 逾時不擋開局。
 - **產品範圍**（使用者 2026-07-12 拍板）：只做「跟當日目前第一名賽跑」，`DailyChallenge.tsx`
   進場前一個開關（開啟/關閉第一名鬼影，`tr_ghost_toggle`，純顯示偏好不用帳號隔離），
   不做成獨立模式。鬼影來源是即時查詢（誰是第一名鬼影就換誰），不是固定存檔。

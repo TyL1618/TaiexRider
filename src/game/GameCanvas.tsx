@@ -18,6 +18,7 @@ import { getActiveBikeSkin, addCoins, earnCoins, getAdsRemoved } from "../lib/ga
 import { requestRewardedAd, preloadRewardedAd } from "../lib/ads";
 import { grantPlayReward, computePlayReward } from "../lib/playRewards";
 import { maybeRequestReview } from "../lib/review";
+import { readPb } from "../lib/medals";
 import { dailyKey } from "../data/pick";
 import { Capacitor } from "@capacitor/core";
 
@@ -565,13 +566,14 @@ let crashTimer = 0;
     // 只有「打破舊紀錄」（舊值 > 0，非首次遊玩）才亮結算徽章
     // key 帶 uid 隔離（訪客固定 "guest"）——同裝置切換帳號才不會沿用前一個使用者的
     // PB，跟 quests.ts/adRewards.ts 2026-07-08 修過的同一種跨帳號快取污染問題。
+    // 讀取走 readPb()（medals.ts）：內含 vc28 前舊 key 的一次性沿用，避免更新後
+    // 所有玩家 PB 顯示歸零。
     const checkPb = (score: number) => {
       if (!pbKey) return;
       try {
-        const k = `tr_pb_${pbKey}_${uid ?? "guest"}`;
-        const old = parseInt(localStorage.getItem(k) ?? "0", 10);
+        const old = readPb(pbKey, uid);
         if (score > old) {
-          localStorage.setItem(k, String(score));
+          localStorage.setItem(`tr_pb_${pbKey}_${uid ?? "guest"}`, String(score));
           if (old > 0) setNewPb(true);
         }
       } catch { /* localStorage 不可用時略過 */ }
@@ -1325,6 +1327,24 @@ let crashTimer = 0;
       );
     };
 
+    // 鬼影去色車圖（離屏預渲染一次）：每幀設 ctx.filter 在 Android WebView 的
+    // Canvas2D 是已知昂貴操作（會強制走軟體路徑），改為首次要畫時烘一張灰階版，
+    // 之後每幀純 drawImage，成本跟畫自己的車一樣。
+    let ghostSpriteCanvas: HTMLCanvasElement | null = null;
+    const ghostSprite = (): HTMLCanvasElement | null => {
+      if (ghostSpriteCanvas) return ghostSpriteCanvas;
+      if (!bikeEntry.ready) return null;
+      const c = document.createElement("canvas");
+      c.width = bikeEntry.img.naturalWidth;
+      c.height = bikeEntry.img.naturalHeight;
+      const g = c.getContext("2d");
+      if (!g) return null;
+      g.filter = "grayscale(1) brightness(1.6)";
+      g.drawImage(bikeEntry.img, 0, 0);
+      ghostSpriteCanvas = c;
+      return c;
+    };
+
     // 第一名鬼影（純視覺、無物理）：依 raceTimeMs 從 ghostPath（每 500ms 一個 x 座標）
     // 線性插值出鬼影目前的 x，貼地高度/傾角用既有地形函式簡化重現（不需要完整物理
     // replay，見 ANTICHEAT_DESIGN.md 第四層）。半透明+去色，跟玩家自己的車一眼區分。
@@ -1335,27 +1355,27 @@ let crashTimer = 0;
       const i1 = Math.min(i0 + 1, ghostPath.length - 1);
       const frac = idx - i0;
       const gx = ghostPath[i0] + (ghostPath[i1] - ghostPath[i0]) * frac;
+      if (!Number.isFinite(gx)) return; // 資料異常（理論上伺服器端已擋，防禦性再擋一層）
       if (gx > track.finishX) return; // 鬼影已抵達終點，不繼續畫在終點閃爍
       const sx = wx(gx);
       if (sx < -60 || sx > W + 60) return; // 畫面外不畫，省效能
+      const sprite = ghostSprite();
+      if (!sprite) return;
       const gy = terrainYAt(track, gx);
       const gAngle = slopeAt(track, gx);
       ctx.save();
       ctx.globalAlpha = 0.32;
-      ctx.filter = "grayscale(1) brightness(1.6)";
       ctx.translate(sx, wy(gy - BIKE.wheelRadius));
       ctx.rotate(gAngle);
-      if (bikeEntry.ready) {
-        const w = bikeSpriteW;
-        const h = w * (bikeEntry.img.naturalHeight / bikeEntry.img.naturalWidth);
-        ctx.drawImage(
-          bikeEntry.img,
-          (-w / 2 + bikeOffsetX) * scale,
-          (-h / 2 + bikeOffsetY) * scale,
-          w * scale,
-          h * scale,
-        );
-      }
+      const w = bikeSpriteW;
+      const h = w * (sprite.height / sprite.width);
+      ctx.drawImage(
+        sprite,
+        (-w / 2 + bikeOffsetX) * scale,
+        (-h / 2 + bikeOffsetY) * scale,
+        w * scale,
+        h * scale,
+      );
       ctx.restore();
     };
 

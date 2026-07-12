@@ -303,8 +303,15 @@ export default function DailyChallenge({
             }
             setStreakLive(true);
             // 開關開著才抓鬼影路徑（沒開/抓不到都回 null，GameCanvas 收到 null 就不畫）；
-            // 上線初期沒有人交出帶 replay 的第一名成績時本來就會是 null，正常現象。
-            const ghostPath = ghostOn ? await fetchDailyGhostPath(sessionKeyRef.current) : null;
+            // 上線初期第一名還沒有帶 replay 的成績時本來就會是 null，正常現象。
+            // 1.5s 逾時：網路卡住時不擋「開始挑戰」，逾時就不帶鬼影直接進場（鬼影是
+            // 純加分體驗，不值得讓玩家枯等）。
+            const ghostPath = ghostOn
+              ? await Promise.race([
+                  fetchDailyGhostPath(sessionKeyRef.current),
+                  new Promise<number[] | null>((resolve) => { setTimeout(() => resolve(null), 1500); }),
+                ])
+              : null;
             onPlay(track, ghostPath);
           };
           return (

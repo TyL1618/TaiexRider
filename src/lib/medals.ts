@@ -18,12 +18,29 @@ export const MEDAL_ICON: Record<Medal, string> = {
   bronze: "🥉",
 };
 
-export function classicPb(classicId: string, uid: string | null = null): number {
+// PB 讀取（含一次性舊 key 沿用）：vc28 起 key 帶 {uid|guest} 隔離，vc28 前的舊 key
+// （tr_pb_ 開頭、不帶帳號尾碼）在第一次讀取時複製進目前帳號的新 key——沒有這步，
+// 更新後所有玩家的 PB/獎牌顯示會歸零（舊紀錄變孤兒資料），體感像進度被清掉。
+// 用「複製」不用「搬移」：同裝置多帳號時每個帳號第一次讀都各自沿用一次舊值
+// （舊 key 本來就是所有帳號共用的，這只是把舊行為凍結下來，之後各自獨立成長）。
+export function readPb(pbKey: string, uid: string | null): number {
   try {
-    return parseInt(localStorage.getItem(`tr_pb_classic_${classicId}_${uid ?? "guest"}`) ?? "0", 10) || 0;
+    const scoped = `tr_pb_${pbKey}_${uid ?? "guest"}`;
+    const v = localStorage.getItem(scoped);
+    if (v !== null) return parseInt(v, 10) || 0;
+    const legacy = localStorage.getItem(`tr_pb_${pbKey}`);
+    if (legacy !== null) {
+      localStorage.setItem(scoped, legacy);
+      return parseInt(legacy, 10) || 0;
+    }
+    return 0;
   } catch {
     return 0;
   }
+}
+
+export function classicPb(classicId: string, uid: string | null = null): number {
+  return readPb(`classic_${classicId}`, uid);
 }
 
 export function medalFor(score: number): Medal | null {
