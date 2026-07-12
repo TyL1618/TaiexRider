@@ -209,6 +209,8 @@
   cursor: pointer;
 }
 .ghost-toggle input { accent-color: var(--neon-amber); cursor: pointer; }
+.ghost-toggle.unavailable { opacity: 0.45; cursor: default; }
+.ghost-toggle.unavailable input { cursor: default; }
 
 .daily-challenge-btn {
   margin-top: 1rem;

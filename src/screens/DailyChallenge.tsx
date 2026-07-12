@@ -78,6 +78,12 @@ export default function DailyChallenge({
   const [weeklyQuests, setWeeklyQuests] = useState<WeeklyQuestView[]>([]); // 本週任務（ISO 週別，已登入才有伺服器權威進度）
   const [pendingSettlement, setPendingSettlement] = useState<PendingSettlement | null>(null); // 前一期排行榜鑽石結算彈窗
   const [ghostOn, setGhostOn] = useState(getGhostToggle()); // 第一名鬼影開關（純顯示偏好）
+  // 鬼影可用性：進頁面就查一次「今日第一名有沒有留下路徑」，查不到就把開關反灰＋
+  // 顯示原因——否則玩家打了勾進場卻沒鬼影，分不清是壞掉還是本來就沒有（2026-07-13
+  // 體檢後補的方案 A）。null＝查詢中（樂觀維持可勾），查到的路徑順便快取起來，
+  // handleStart 直接用、不用再抓第二次。
+  const [ghostAvail, setGhostAvail] = useState<boolean | null>(null);
+  const ghostPathRef = useRef<number[] | null>(null);
 
   // 2026-07-07：同裝置切換帳號時，本地次數快取重新從「這個 uid」自己的 key 讀取
   // （見 challengeAttempts.ts 頂部說明），避免沿用前一個使用者當天用掉的次數；
@@ -147,6 +153,13 @@ export default function DailyChallenge({
         if (!alive || !usage) return;
         writeAttemptsCache(key, user?.id ?? null, usage.attemptsUsed);
         setAttempts(getAttempts(key, user?.id ?? null));
+      });
+      // 鬼影可用性檢查（順便快取路徑給 handleStart 直接用）：null＝今日第一名還沒有
+      // 留下路徑（空窗期/沒人玩過/第一名是舊版客戶端交的）→ 開關反灰顯示原因。
+      fetchDailyGhostPath(key).then((p) => {
+        if (!alive) return;
+        ghostPathRef.current = p;
+        setGhostAvail(p !== null);
       });
       return fetchDailyTop(key);
     }).then((r) => {
@@ -302,27 +315,29 @@ export default function DailyChallenge({
               setStreak(recordStreak(sessionKeyRef.current));
             }
             setStreakLive(true);
-            // 開關開著才抓鬼影路徑（沒開/抓不到都回 null，GameCanvas 收到 null 就不畫）；
-            // 上線初期第一名還沒有帶 replay 的成績時本來就會是 null，正常現象。
-            // 1.5s 逾時：網路卡住時不擋「開始挑戰」，逾時就不帶鬼影直接進場（鬼影是
-            // 純加分體驗，不值得讓玩家枯等）。
-            const ghostPath = ghostOn
-              ? await Promise.race([
+            // 鬼影路徑：優先用進頁面時已快取好的（零延遲）；還在查詢中（ghostAvail
+            // === null 且快取空）才現場抓，帶 1.5s 逾時——網路卡住不擋「開始挑戰」，
+            // 逾時就不帶鬼影直接進場（鬼影是純加分體驗，不值得讓玩家枯等）。
+            const ghostPath = ghostOn && ghostAvail !== false
+              ? (ghostPathRef.current ?? await Promise.race([
                   fetchDailyGhostPath(sessionKeyRef.current),
                   new Promise<number[] | null>((resolve) => { setTimeout(() => resolve(null), 1500); }),
-                ])
+                ]))
               : null;
             onPlay(track, ghostPath);
           };
           return (
             <>
-              <label className="ghost-toggle">
+              <label className={`ghost-toggle${ghostAvail === false ? " unavailable" : ""}`}>
                 <input
                   type="checkbox"
-                  checked={ghostOn}
+                  checked={ghostOn && ghostAvail !== false}
+                  disabled={ghostAvail === false}
                   onChange={(e) => { setGhostOn(e.target.checked); setGhostToggle(e.target.checked); }}
                 />
-                🏆 開啟第一名鬼影（跟目前第一名同場競速，看看差多少）
+                {ghostAvail === false
+                  ? "🏆 第一名鬼影暫不可用（今日第一名尚未留下鬼影紀錄）"
+                  : "🏆 開啟第一名鬼影（跟目前第一名同場競速，看看差多少）"}
               </label>
               <button
                 className={`daily-challenge-btn${showAd && canPlay ? " ad" : ""}${!canPlay ? " maxed" : ""}`}
