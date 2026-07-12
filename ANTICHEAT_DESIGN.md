@@ -101,9 +101,12 @@ press/release 完整合法性狀態機**（成本/風險不成比例，事件數
 取樣點數對得上時間，已足夠拉高偽造成本；press/release 粒度之後真的觀察到繞過案例
 再加，避免過度設計）：
 
-- **格式**：`{ "events": [[t,"f"|"p",n], ...], "path": [x0,x1,...] }`，t=相對開始 ms、
-  n=該次落地貢獻的翻轉圈數（`GameCanvas.tsx settleFlip()` 記錄）、path 每 500ms 一個
-  車身 x 座標（主迴圈 `raceTimeMs` 累加處記錄）。
+- **格式**：`{ "events": [[t,"f"|"p",n], ...], "path": [...] }`，t=相對開始 ms、
+  n=該次落地貢獻的翻轉圈數（`GameCanvas.tsx settleFlip()` 記錄）。path 兩版：
+  **v1**（vc28）＝純數字陣列（車身 x 每 500ms，鬼影貼地重建）；**v2**（vc29 起，
+  `migration_20260713b.sql`）＝`[x, y, 累計旋轉角]` 三元組每 250ms、2400 筆封頂
+  （10 分鐘，防掛機灌大），鬼影完整復刻空中軌跡/翻轉轉速。伺服器端雙格式驗證，
+  等 vc28 客戶端絕跡後可收斂只收 v2。
 - **反作弊用**：`submit_daily_score` 新增 `p_replay` 參數（預設 null，向下相容尚未
   更新的客戶端），有帶時驗證：events 的 n 加總 vs p_flips、"p" 事件筆數 vs
   p_perfect、path 長度 vs p_time/500，各自容忍一定誤差，離譜偏差靜默拒絕。

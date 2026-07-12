@@ -22,6 +22,13 @@ import { readPb } from "../lib/medals";
 import { dailyKey } from "../data/pick";
 import { Capacitor } from "@capacitor/core";
 
+// Ghost/replay 取樣參數（v2 格式，2026-07-13）：每 250ms 記一組 [x, y, 累計旋轉角]，
+// 鬼影可完整復刻空中軌跡與翻轉（v1 只記 x、貼地重建，見 drawGhost 的雙格式處理）。
+// 錄滿 2400 筆（10 分鐘）封頂——正常一局 < 1 分鐘，封頂只防「站著不動掛機」把
+// replay 灌大；伺服器端 migration_20260713b.sql 用同一組常數驗證，改這裡要一起改。
+const REPLAY_SAMPLE_MS = 250;
+const REPLAY_MAX_SAMPLES = 2400;
+
 export interface GameOverStats {
   score: number;
   timeMs: number;
@@ -29,9 +36,11 @@ export interface GameOverStats {
   perfect: number;
   finished: boolean;
   progressPct: number; // 0~1，完賽固定 1，摔車＝死亡當下跑到賽道的比例（長征金幣按比例用）
-  // 反作弊 Phase C + Ghost 用的輕量錄製（見 migration_20260712b.sql）。只有每日排名賽
-  // 才會被 App.tsx 帶進 submitDailyScore，其餘模式產生了也不會用到。
-  replay?: { events: [number, string, number][]; path: number[] };
+  // 反作弊 Phase C + Ghost 用的輕量錄製（見 migration_20260712b/20260713b.sql）。
+  // path＝[x, y, 累計旋轉角] 每 REPLAY_SAMPLE_MS 一組（Matter 的 body.angle 本來就
+  // 不正規化、翻轉會累計，線性插值可直接重現轉速）。只有每日排名賽才會被 App.tsx
+  // 帶進 submitDailyScore，其餘模式產生了也不會用到。
+  replay?: { events: [number, string, number][]; path: [number, number, number][] };
 }
 
 interface GameCanvasProps {
@@ -48,7 +57,9 @@ interface GameCanvasProps {
   uid?: string | null;      // 已登入玩家 id，看廣告雙倍金幣要用來隔離每日上限快取（見 playRewards.ts）
   dailyRank?: number | null; // 每日排名賽即時名次（App.tsx 提交成功後非同步算出才會有值，結算畫面顯示用）
   completedQuests?: { title: string; reward: number }[]; // 本局新完成的每日/週任務（App.tsx 算好傳入，結算畫面顯示用）
-  ghostPath?: number[] | null; // 第一名鬼影路徑（每 500ms 一個 x 座標），只有每日排名賽開啟開關時才有值
+  // 第一名鬼影路徑（只有每日排名賽開啟開關時才有值）。兩種格式：
+  // v1（vc28 錄的）＝純數字陣列（x 每 500ms，貼地重建）；v2＝[x,y,角度] 每 250ms。
+  ghostPath?: (number | [number, number, number])[] | null;
 }
 
 interface Hud {
@@ -534,11 +545,11 @@ let crashTimer = 0;
     let maxDistScore = 0; // 歷史最大行進分 → 分數只增不減（discussion 第 5 點）
     let totalFlips = 0; // 全程累計後空翻圈數（結算顯示，discussion 第 9 點）
     let perfectLandings = 0; // 全程完美落地次數
-    // 反作弊 Phase C + Ghost 用的輕量錄製（見 migration_20260712b.sql）：
-    // events＝翻轉/完美落地事件時間戳（settleFlip 內 push），path＝車身 x 座標每
-    // 500ms 取樣一次（下方主迴圈）。只在每日排名賽提交時使用，其餘模式錄了也不會用到。
+    // 反作弊 Phase C + Ghost 用的輕量錄製（見 migration_20260712b/20260713b.sql）：
+    // events＝翻轉/完美落地事件時間戳（settleFlip 內 push），path＝[x, y, 累計旋轉角]
+    // 每 REPLAY_SAMPLE_MS 取樣一組（下方主迴圈）。只在每日排名賽提交時使用。
     let replayEvents: [number, string, number][] = [];
-    let replayPath: number[] = [];
+    let replayPath: [number, number, number][] = [];
     let nextSampleAt = 0;
     let wasGrounded = false;
     // 落地延遲結算（v0.12.1）：首次觸地只快照，連續 landingSettleSteps 步著地才結算。
@@ -1345,27 +1356,43 @@ let crashTimer = 0;
       return c;
     };
 
-    // 第一名鬼影（純視覺、無物理）：依 raceTimeMs 從 ghostPath（每 500ms 一個 x 座標）
-    // 線性插值出鬼影目前的 x，貼地高度/傾角用既有地形函式簡化重現（不需要完整物理
-    // replay，見 ANTICHEAT_DESIGN.md 第四層）。半透明+去色，跟玩家自己的車一眼區分。
+    // 第一名鬼影（純視覺、無物理）：依 raceTimeMs 對 ghostPath 線性插值。
+    // v2 格式（[x,y,累計旋轉角] 每 250ms）＝完整復刻原局軌跡：空中拋物線、後空翻
+    // 轉速、落地姿態全都是當時的真實數據（角度是累計值不繞圈，插值天然正確）；
+    // v1 舊格式（純 x 每 500ms，vc28 錄的）＝退回貼地重建（地形函式算高度/傾角）。
+    // 半透明+去色，跟玩家自己的車一眼區分。
     const drawGhost = () => {
       if (!ghostPath || ghostPath.length < 2) return;
-      const idx = raceTimeMs / 500;
+      const isV2 = Array.isArray(ghostPath[0]);
+      const stepMs = isV2 ? REPLAY_SAMPLE_MS : 500;
+      const idx = raceTimeMs / stepMs;
       const i0 = Math.max(0, Math.min(Math.floor(idx), ghostPath.length - 1));
       const i1 = Math.min(i0 + 1, ghostPath.length - 1);
       const frac = idx - i0;
-      const gx = ghostPath[i0] + (ghostPath[i1] - ghostPath[i0]) * frac;
-      if (!Number.isFinite(gx)) return; // 資料異常（理論上伺服器端已擋，防禦性再擋一層）
+      let gx: number, gy: number, gAngle: number;
+      if (isV2) {
+        const p0 = ghostPath[i0] as [number, number, number];
+        const p1 = ghostPath[i1] as [number, number, number];
+        gx = p0[0] + (p1[0] - p0[0]) * frac;
+        gy = p0[1] + (p1[1] - p0[1]) * frac;           // 車身中心世界座標（含空中）
+        gAngle = p0[2] + (p1[2] - p0[2]) * frac;        // 累計旋轉角（翻轉如實重現）
+      } else {
+        const x0 = ghostPath[i0] as number;
+        const x1 = ghostPath[i1] as number;
+        gx = x0 + (x1 - x0) * frac;
+        gy = terrainYAt(track, gx) - BIKE.wheelRadius;  // 舊資料沒有 y：貼地重建
+        gAngle = slopeAt(track, gx);
+      }
+      // 資料異常（理論上伺服器端已擋，防禦性再擋一層）
+      if (!Number.isFinite(gx) || !Number.isFinite(gy) || !Number.isFinite(gAngle)) return;
       if (gx > track.finishX) return; // 鬼影已抵達終點，不繼續畫在終點閃爍
       const sx = wx(gx);
       if (sx < -60 || sx > W + 60) return; // 畫面外不畫，省效能
       const sprite = ghostSprite();
       if (!sprite) return;
-      const gy = terrainYAt(track, gx);
-      const gAngle = slopeAt(track, gx);
       ctx.save();
       ctx.globalAlpha = 0.32;
-      ctx.translate(sx, wy(gy - BIKE.wheelRadius));
+      ctx.translate(sx, wy(gy));
       ctx.rotate(gAngle);
       const w = bikeSpriteW;
       const h = w * (sprite.height / sprite.width);
@@ -1573,12 +1600,17 @@ let crashTimer = 0;
       last = now;
       if (dt > 60) dt = 60; // 防止分頁切回時爆衝
       if (!overRef.current && !waitingToStart) raceTimeMs += dt;
-      // Ghost 用車身 x 座標取樣：每 500ms 一筆，追趕式 while 避免掉幀時漏採樣
-      // （dt 上限已鉗制在 60ms，不會一次補太多筆）。
+      // Ghost 取樣：每 REPLAY_SAMPLE_MS 記一組 [x, y, 累計旋轉角]，追趕式 while 避免
+      // 掉幀時漏採樣（dt 上限已鉗制在 60ms，不會一次補太多筆）。角度取 2 位小數
+      //（0.01 rad ≈ 0.57°，肉眼無感、JSON 體積省一半）。錄滿上限就停（防掛機灌大）。
       if (!overRef.current && !waitingToStart) {
-        while (raceTimeMs >= nextSampleAt) {
-          replayPath.push(Math.round(bike.chassis.position.x));
-          nextSampleAt += 500;
+        while (raceTimeMs >= nextSampleAt && replayPath.length < REPLAY_MAX_SAMPLES) {
+          replayPath.push([
+            Math.round(bike.chassis.position.x),
+            Math.round(bike.chassis.position.y),
+            Math.round(bike.chassis.angle * 100) / 100,
+          ]);
+          nextSampleAt += REPLAY_SAMPLE_MS;
         }
       }
       acc += dt;

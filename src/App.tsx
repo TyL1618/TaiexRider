@@ -12,7 +12,7 @@ import DailyChallenge from "./screens/DailyChallenge";
 import ClassicSelect from "./screens/ClassicSelect";
 import Garage from "./screens/Garage";
 import type { TrackData } from "./data/tracks";
-import { submitDailyScore, fetchDailyTop } from "./lib/leaderboard";
+import { submitDailyScore, fetchDailyTop, type GhostPathData } from "./lib/leaderboard";
 import { submitClassicRecord } from "./lib/classicRecords";
 import { fetchHardestDailyMap, fetchDailyMapList, resolveSessionDate } from "./lib/dailyMap";
 import { onAuthStateChange, getUser, type User } from "./lib/auth";
@@ -41,7 +41,7 @@ export default function App() {
   const [marketMood, setMarketMood] = useState<MarketMood | null>(null);
   const [dailyRank, setDailyRank] = useState<number | null>(null); // 每日排名賽即時名次（提交成功後非同步算出）
   const [completedQuests, setCompletedQuests] = useState<{ title: string; reward: number }[]>([]); // 本局新完成任務（結算畫面慶祝用）
-  const [ghostPath, setGhostPath] = useState<number[] | null>(null); // 第一名鬼影路徑（DailyChallenge 開關+抓取後傳入）
+  const [ghostPath, setGhostPath] = useState<GhostPathData | null>(null); // 第一名鬼影路徑（DailyChallenge 開關+抓取後傳入）
   const gameKeyRef = useRef(0); // 每次 handleStartTrack +1，確保新局 GameCanvas 重建（revivalUsed 重置）
 
   // refs 讓 popstate 閉包隨時拿到最新值，不靠 useEffect 依賴陣列
