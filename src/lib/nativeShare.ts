@@ -53,8 +53,10 @@ export async function shareNative(
       await Share.share({ title, text: `${text}\n${url}`, files: [written.uri] });
       return true;
     } catch (e) {
-      console.warn("[share] 原生圖卡分享失敗，退回純文字分享", e);
-      /* 往下走純文字分享 */
+      // 面板已經跳出來過（無論使用者真的分享出去還是關掉/取消），不再退回純文字
+      // 分享——否則會變成連續跳兩個分享面板。真正失敗（例如寫檔失敗）也視同結束。
+      console.warn("[share] 原生圖卡分享結束或失敗", e);
+      return false;
     }
   }
   try {
