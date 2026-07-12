@@ -198,6 +198,18 @@
 }
 .google-signin-btn:active { transform: scale(0.97); }
 
+.ghost-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.9rem;
+  font-size: 0.74rem;
+  letter-spacing: 0.02em;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.ghost-toggle input { accent-color: var(--neon-amber); cursor: pointer; }
+
 .daily-challenge-btn {
   margin-top: 1rem;
   padding: 0.85rem 2.4rem;

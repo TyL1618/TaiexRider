@@ -4,8 +4,9 @@
 > 原則：**伺服器端能驗的都在 RPC 驗**；接受「無法 100% 防」的現實（客戶端永遠可被逆向），
 > 重點是擋掉 99% 的低成本作弊（改 JS 變數、直接打 API、重放請求）。
 > 狀態：**Phase A 已實作**（2026-07-04，`supabase/migration_20260704.sql`，已跑生效）；
-> **Phase B 已實作**（2026-07-12，`supabase/migration_20260712.sql`，待使用者手動跑）——
-> 範圍見本文件第二/三層段落最新註記；Phase C 未動，排入 vc28。
+> **Phase B 已實作**（2026-07-12，`supabase/migration_20260712.sql`，待使用者手動跑）；
+> **Phase C 已實作**（2026-07-12，`supabase/migration_20260712b.sql`，待使用者手動跑，
+> 跟 Ghost 鬼影賽跑一起做）——範圍見本文件第二/三/四層段落最新註記。
 > ⚠️ Phase A 實作與本文第一層原公式有三處刻意偏差（照抄會誤殺 16/27 筆真實成績），
 > 依據 2026-07-04 線上資料回測定案，細節見 migration 檔頭註解：
 > ① 分數上限加 slack +500（容忍 v0.12.14 前舊計分制的未更新客戶端，普及後可收緊）；
@@ -92,12 +93,31 @@
 
 ## 第四層：操作事件序列（Phase C，與 Ghost 回放共用一份工）
 
-錄一份輕量「關鍵事件時間軸」隨成績提交，一魚兩吃：
+✅ **2026-07-12 實作**（`migration_20260712b.sql`，vc28 批次）：
 
-- **格式**（設計目標 < 4KB/局）：`[[t, type], ...]`，type ∈ press/release/land/flip/perfect/finish，t = 相對開始 ms。壓縮：delta encoding + 整數陣列。
-- **反作弊用**：RPC 做粗一致性（事件數 vs flips/perfect 對得上、press/release 交錯合法、最後 finish 時間 ≈ p_time）。偽造者要生成自洽事件流，成本大幅上升。
-- **Ghost 用**（留存規劃的「跟保持者鬼影賽跑」）：同一份資料 + 車輛位置取樣（每 0.5s 一個 x），回放端用簡化插值重現，不需完整物理 replay。
-- 存放：`daily_scores` 加 `replay jsonb`（或獨立表，僅榜上前 100 保留完整 replay，其餘丟棄省空間）。
+錄一份輕量「關鍵事件時間軸」隨成績提交，一魚兩吃。**實作範圍比設計稍微收斂**：
+只錄「翻轉/完美落地事件（含時間戳+圈數）」+「車輛 x 座標每 0.5s 取樣」，**沒有做
+press/release 完整合法性狀態機**（成本/風險不成比例，事件數對得上 flips/perfect、
+取樣點數對得上時間，已足夠拉高偽造成本；press/release 粒度之後真的觀察到繞過案例
+再加，避免過度設計）：
+
+- **格式**：`{ "events": [[t,"f"|"p",n], ...], "path": [x0,x1,...] }`，t=相對開始 ms、
+  n=該次落地貢獻的翻轉圈數（`GameCanvas.tsx settleFlip()` 記錄）、path 每 500ms 一個
+  車身 x 座標（主迴圈 `raceTimeMs` 累加處記錄）。
+- **反作弊用**：`submit_daily_score` 新增 `p_replay` 參數（預設 null，向下相容尚未
+  更新的客戶端），有帶時驗證：events 的 n 加總 vs p_flips、"p" 事件筆數 vs
+  p_perfect、path 長度 vs p_time/500，各自容忍一定誤差，離譜偏差靜默拒絕。
+- **Ghost 用**：新 RPC `get_daily_ghost_path(p_date)` 回傳當日目前第一名（非
+  suspect）的 `replay->path`，`GameCanvas.tsx drawGhost()` 依 `raceTimeMs` 線性插值
+  出鬼影 x 座標，套用既有地形函式（`terrainYAt`/`slopeAt`）算貼地高度/傾角，純視覺
+  疊圖、不跑物理，半透明+去色跟玩家自己的車一眼區分。
+- **產品範圍**（使用者 2026-07-12 拍板）：只做「跟當日目前第一名賽跑」，`DailyChallenge.tsx`
+  進場前一個開關（開啟/關閉第一名鬼影，`tr_ghost_toggle`，純顯示偏好不用帳號隔離），
+  不做成獨立模式。鬼影來源是即時查詢（誰是第一名鬼影就換誰），不是固定存檔。
+- **上線空窗期**：只有這份 migration 生效後、且當天有人用新版客戶端交出帶 replay
+  的第一名成績，開關才會真的看到鬼影；舊成績沒有 replay 欄位，是預期中的正常現象。
+- 存放：`daily_scores` 加 `replay jsonb`（沒有另建獨立表——目前規模單日筆數不多，
+  加欄位已經夠用，之後量大再評估是否要限制只留前 100 名的 replay）。
 
 ## 刻意不做
 
@@ -111,7 +131,7 @@
 |------|------|--------|------|
 | A | 物理一致性驗證 + 冷卻 | 純 SQL（一份 migration，手動跑） | ✅ 已上（2026-07-04，10s 冷卻） |
 | B | DB 端每日次數 + 高頻標記 + suspect 欄位/VIEW + 夜間掃描 | SQL + 前端開局 RPC + CI | ✅ 已實作（2026-07-12，`migration_20260712.sql`，待手動跑），vc27 |
-| C | 操作事件序列 + Ghost 資料 | 前端錄製 + schema + RPC | 未動，排入 vc28（見 RETENTION_PLAN.md） |
+| C | 操作事件序列 + Ghost 資料 | 前端錄製 + schema + RPC | ✅ 已實作（2026-07-12，`migration_20260712b.sql`，待手動跑），vc28 |
 
 > ⚠️ 所有 RPC 修改都要在 Supabase SQL Editor 手動跑，push 不生效（老規矩）。
 > ⚠️ Phase A 上線前先拿近期真實成績跑一遍驗證公式（避免把正常玩家的極限成績誤殺）——

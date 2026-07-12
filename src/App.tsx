@@ -41,6 +41,7 @@ export default function App() {
   const [marketMood, setMarketMood] = useState<MarketMood | null>(null);
   const [dailyRank, setDailyRank] = useState<number | null>(null); // 每日排名賽即時名次（提交成功後非同步算出）
   const [completedQuests, setCompletedQuests] = useState<{ title: string; reward: number }[]>([]); // 本局新完成任務（結算畫面慶祝用）
+  const [ghostPath, setGhostPath] = useState<number[] | null>(null); // 第一名鬼影路徑（DailyChallenge 開關+抓取後傳入）
   const gameKeyRef = useRef(0); // 每次 handleStartTrack +1，確保新局 GameCanvas 重建（revivalUsed 重置）
 
   // refs 讓 popstate 閉包隨時拿到最新值，不靠 useEffect 依賴陣列
@@ -242,6 +243,7 @@ export default function App() {
         timeMs:  stats.timeMs,
         flips:   stats.flips,
         perfect: stats.perfect,
+        replay:  stats.replay,
       }).then(async () => {
         // 排名賽結算即時名次回饋：提交成功後重抓（快取已被 submitDailyScore 內部清掉）
         // 排行榜，用「精確比對剛提交的分數+時間」找自己那一列——ScoreRow 沒有 player_id
@@ -346,6 +348,7 @@ export default function App() {
     trackRef.current = null;
     setTrack(null);
     setIsDailyRun(false);
+    setGhostPath(null); // 離開賽道：清掉這局的鬼影路徑，避免殘留到下一個非排名賽模式
     setPlaying(false); // 離開賽道：若有待套用的新版立即 reload
   }, []);
 
@@ -367,6 +370,7 @@ export default function App() {
           uid={user?.id ?? null}
           dailyRank={dailyRank}
           completedQuests={completedQuests}
+          ghostPath={isDailyRun ? ghostPath : null}
         />
       </Suspense>
     );
@@ -387,7 +391,7 @@ export default function App() {
   if (screen === "daily")  return (
     <DailyChallenge
       user={user}
-      onPlay={(t) => { setIsDailyRun(true); handleStartTrack(t); }}
+      onPlay={(t, ghost) => { setIsDailyRun(true); setGhostPath(ghost); handleStartTrack(t); }}
       onBack={goHome}
     />
   );

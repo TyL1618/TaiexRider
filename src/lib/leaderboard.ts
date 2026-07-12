@@ -22,6 +22,9 @@ export interface SubmitStats {
   timeMs: number;
   flips: number;
   perfect: number;
+  // 反作弊 Phase C + Ghost 用的輕量錄製（見 migration_20260712b.sql）。舊版客戶端
+  // 沒有這欄位時 RPC 用 p_replay 預設值 null，完全向下相容。
+  replay?: { events: [number, string, number][]; path: number[] };
 }
 
 function anonHeaders(): Record<string, string> {
@@ -82,6 +85,7 @@ export async function submitDailyScore(
         p_time:    Math.round(s.timeMs),
         p_flips:   s.flips,
         p_perfect: s.perfect,
+        p_replay:  s.replay ?? null,
       }),
     });
     if (r.ok) {
@@ -93,5 +97,24 @@ export async function submitDailyScore(
     return r.ok;
   } catch {
     return false;
+  }
+}
+
+// Ghost 鬼影賽跑：抓「當日目前第一名（非可疑）」的鬼影路徑（每 500ms 一個 x 座標）。
+// 純公開讀取，anon key 即可（不需登入）。上線初期沒有人交出帶 replay 的第一名成績時
+// 會回 null（正常現象，不是錯誤），呼叫端應靜默不顯示鬼影。
+export async function fetchDailyGhostPath(challengeDate: string): Promise<number[] | null> {
+  if (!isLeaderboardConfigured) return null;
+  try {
+    const r = await fetch(`${URL}/rest/v1/rpc/get_daily_ghost_path`, {
+      method: "POST",
+      headers: { ...anonHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({ p_date: challengeDate }),
+    });
+    if (!r.ok) return null;
+    const data = (await r.json()) as number[] | null;
+    return Array.isArray(data) && data.length > 0 ? data : null;
+  } catch {
+    return null;
   }
 }

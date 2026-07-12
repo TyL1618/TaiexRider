@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import Sparkline from "../components/Sparkline";
 import { dailyTrack, dailyKey } from "../data/pick";
-import { fetchDailyTop, invalidateDailyTop, isLeaderboardConfigured, type ScoreRow } from "../lib/leaderboard";
+import { fetchDailyTop, fetchDailyGhostPath, invalidateDailyTop, isLeaderboardConfigured, type ScoreRow } from "../lib/leaderboard";
 import { fetchHardestDailyMap, resolveSessionDate, resolveSessionDisplayDate } from "../lib/dailyMap";
 import { signInWithGoogle, type User } from "../lib/auth";
 import { getPlayerName } from "../lib/playerId";
@@ -34,13 +34,22 @@ const fmtMs = (ms: number) => {
   return `${Math.floor(s / 60)}:${(s % 60).toFixed(3).padStart(6, "0")}`;
 };
 
+// 第一名鬼影開關：純顯示偏好（不涉競技/經濟資料），不用帳號隔離，全裝置共用一個值。
+const GHOST_TOGGLE_KEY = "tr_ghost_toggle";
+function getGhostToggle(): boolean {
+  try { return localStorage.getItem(GHOST_TOGGLE_KEY) !== "0"; } catch { return true; }
+}
+function setGhostToggle(v: boolean): void {
+  try { localStorage.setItem(GHOST_TOGGLE_KEY, v ? "1" : "0"); } catch { /* 靜默 */ }
+}
+
 export default function DailyChallenge({
   user,
   onPlay,
   onBack,
 }: {
   user: User | null;
-  onPlay: (t: TrackData) => void;
+  onPlay: (t: TrackData, ghostPath: number[] | null) => void;
   onBack: () => void;
 }) {
   const fallbackTrack = dailyTrack();
@@ -68,6 +77,7 @@ export default function DailyChallenge({
   const [adsRemoved] = useState(() => getAdsRemoved()); // 永久去廣告：第 3~5 次挑戰不再顯示「看廣告」標籤
   const [weeklyQuests, setWeeklyQuests] = useState<WeeklyQuestView[]>([]); // 本週任務（ISO 週別，已登入才有伺服器權威進度）
   const [pendingSettlement, setPendingSettlement] = useState<PendingSettlement | null>(null); // 前一期排行榜鑽石結算彈窗
+  const [ghostOn, setGhostOn] = useState(getGhostToggle()); // 第一名鬼影開關（純顯示偏好）
 
   // 2026-07-07：同裝置切換帳號時，本地次數快取重新從「這個 uid」自己的 key 讀取
   // （見 challengeAttempts.ts 頂部說明），避免沿用前一個使用者當天用掉的次數；
@@ -292,26 +302,39 @@ export default function DailyChallenge({
               setStreak(recordStreak(sessionKeyRef.current));
             }
             setStreakLive(true);
-            onPlay(track);
+            // 開關開著才抓鬼影路徑（沒開/抓不到都回 null，GameCanvas 收到 null 就不畫）；
+            // 上線初期沒有人交出帶 replay 的第一名成績時本來就會是 null，正常現象。
+            const ghostPath = ghostOn ? await fetchDailyGhostPath(sessionKeyRef.current) : null;
+            onPlay(track, ghostPath);
           };
           return (
-            <button
-              className={`daily-challenge-btn${showAd && canPlay ? " ad" : ""}${!canPlay ? " maxed" : ""}`}
-              disabled={!canPlay || checkingStart || watchingAd}
-              onClick={canPlay ? handleStart : undefined}
-            >
-              {!user
-                ? "登入才能挑戰"
-                : !canPlay
-                  ? "今日已達上限"
-                  : watchingAd
-                    ? "廣告播放中…"
-                    : checkingStart
-                      ? "確認中…"
-                      : showAd
-                        ? `看廣告開始 (${num}/5)`
-                        : `開始挑戰 (${num}/5)`}
-            </button>
+            <>
+              <label className="ghost-toggle">
+                <input
+                  type="checkbox"
+                  checked={ghostOn}
+                  onChange={(e) => { setGhostOn(e.target.checked); setGhostToggle(e.target.checked); }}
+                />
+                🏆 開啟第一名鬼影（跟目前第一名同場競速，看看差多少）
+              </label>
+              <button
+                className={`daily-challenge-btn${showAd && canPlay ? " ad" : ""}${!canPlay ? " maxed" : ""}`}
+                disabled={!canPlay || checkingStart || watchingAd}
+                onClick={canPlay ? handleStart : undefined}
+              >
+                {!user
+                  ? "登入才能挑戰"
+                  : !canPlay
+                    ? "今日已達上限"
+                    : watchingAd
+                      ? "廣告播放中…"
+                      : checkingStart
+                        ? "確認中…"
+                        : showAd
+                          ? `看廣告開始 (${num}/5)`
+                          : `開始挑戰 (${num}/5)`}
+              </button>
+            </>
           );
         })()}
       </div>

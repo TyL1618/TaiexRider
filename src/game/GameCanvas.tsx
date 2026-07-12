@@ -28,6 +28,9 @@ export interface GameOverStats {
   perfect: number;
   finished: boolean;
   progressPct: number; // 0~1，完賽固定 1，摔車＝死亡當下跑到賽道的比例（長征金幣按比例用）
+  // 反作弊 Phase C + Ghost 用的輕量錄製（見 migration_20260712b.sql）。只有每日排名賽
+  // 才會被 App.tsx 帶進 submitDailyScore，其餘模式產生了也不會用到。
+  replay?: { events: [number, string, number][]; path: number[] };
 }
 
 interface GameCanvasProps {
@@ -44,6 +47,7 @@ interface GameCanvasProps {
   uid?: string | null;      // 已登入玩家 id，看廣告雙倍金幣要用來隔離每日上限快取（見 playRewards.ts）
   dailyRank?: number | null; // 每日排名賽即時名次（App.tsx 提交成功後非同步算出才會有值，結算畫面顯示用）
   completedQuests?: { title: string; reward: number }[]; // 本局新完成的每日/週任務（App.tsx 算好傳入，結算畫面顯示用）
+  ghostPath?: number[] | null; // 第一名鬼影路徑（每 500ms 一個 x 座標），只有每日排名賽開啟開關時才有值
 }
 
 interface Hud {
@@ -162,7 +166,7 @@ function getBikeImageEntry(src: string): BikeImgEntry {
 }
 getBikeImageEntry(`${import.meta.env.BASE_URL}bike.png`); // 預熱預設車皮
 
-export default function GameCanvas({ prices, label, name, subtitle, onExit, onGameOver, hideMinimap = false, revivalEnabled = false, analyticsMode, pbKey, uid = null, dailyRank = null, completedQuests = [] }: GameCanvasProps) {
+export default function GameCanvas({ prices, label, name, subtitle, onExit, onGameOver, hideMinimap = false, revivalEnabled = false, analyticsMode, pbKey, uid = null, dailyRank = null, completedQuests = [], ghostPath = null }: GameCanvasProps) {
   const stars = difficultyStars(calcDifficulty(prices));
   const cityBuildings = generateCity(prices.length * 31 + Math.round((prices[0] || 0) * 100));
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -529,6 +533,12 @@ let crashTimer = 0;
     let maxDistScore = 0; // 歷史最大行進分 → 分數只增不減（discussion 第 5 點）
     let totalFlips = 0; // 全程累計後空翻圈數（結算顯示，discussion 第 9 點）
     let perfectLandings = 0; // 全程完美落地次數
+    // 反作弊 Phase C + Ghost 用的輕量錄製（見 migration_20260712b.sql）：
+    // events＝翻轉/完美落地事件時間戳（settleFlip 內 push），path＝車身 x 座標每
+    // 500ms 取樣一次（下方主迴圈）。只在每日排名賽提交時使用，其餘模式錄了也不會用到。
+    let replayEvents: [number, string, number][] = [];
+    let replayPath: number[] = [];
+    let nextSampleAt = 0;
     let wasGrounded = false;
     // 落地延遲結算（v0.12.1）：首次觸地只快照，連續 landingSettleSteps 步著地才結算。
     // 微彈跳/擦地（< N 步又離地）不清 airRotation、不煞停翻轉。
@@ -628,6 +638,9 @@ let crashTimer = 0;
       maxDistScore = 0;
       totalFlips = 0;
       perfectLandings = 0;
+      replayEvents = [];
+      replayPath = [];
+      nextSampleAt = 0;
       raceTimeMs = 0;
       wasGrounded = false;
       groundedRun = 0;
@@ -817,6 +830,7 @@ let crashTimer = 0;
         bonusPoints += gained;
         totalFlips += perfectFlips;
         perfectLandings++;
+        replayEvents.push([Math.round(raceTimeMs), "p", perfectFlips]);
         showToast(`完美落地 ${perfectFlips} 圈 +${gained}`);
         playPerfectLanding();
         haptics.perfect();
@@ -829,6 +843,7 @@ let crashTimer = 0;
         const gained = flipScore(flips);
         bonusPoints += gained;
         totalFlips += flips;
+        replayEvents.push([Math.round(raceTimeMs), "f", flips]);
         showToast(`${flips} 圈 +${gained}`);
         playFlip();
       }
@@ -1024,7 +1039,7 @@ let crashTimer = 0;
           label, score: points, timeMs: Math.round(raceTimeMs), flips: totalFlips, perfect: perfectLandings,
         });
         checkPb(points);
-        onGameOverRef.current?.({ score: points, timeMs: raceTimeMs, flips: totalFlips, perfect: perfectLandings, finished: true, progressPct: 1 });
+        onGameOverRef.current?.({ score: points, timeMs: raceTimeMs, flips: totalFlips, perfect: perfectLandings, finished: true, progressPct: 1, replay: { events: replayEvents, path: replayPath } });
       }
       return { grounded: groundedNow, upright };
     };
@@ -1310,6 +1325,40 @@ let crashTimer = 0;
       );
     };
 
+    // 第一名鬼影（純視覺、無物理）：依 raceTimeMs 從 ghostPath（每 500ms 一個 x 座標）
+    // 線性插值出鬼影目前的 x，貼地高度/傾角用既有地形函式簡化重現（不需要完整物理
+    // replay，見 ANTICHEAT_DESIGN.md 第四層）。半透明+去色，跟玩家自己的車一眼區分。
+    const drawGhost = () => {
+      if (!ghostPath || ghostPath.length < 2) return;
+      const idx = raceTimeMs / 500;
+      const i0 = Math.max(0, Math.min(Math.floor(idx), ghostPath.length - 1));
+      const i1 = Math.min(i0 + 1, ghostPath.length - 1);
+      const frac = idx - i0;
+      const gx = ghostPath[i0] + (ghostPath[i1] - ghostPath[i0]) * frac;
+      if (gx > track.finishX) return; // 鬼影已抵達終點，不繼續畫在終點閃爍
+      const sx = wx(gx);
+      if (sx < -60 || sx > W + 60) return; // 畫面外不畫，省效能
+      const gy = terrainYAt(track, gx);
+      const gAngle = slopeAt(track, gx);
+      ctx.save();
+      ctx.globalAlpha = 0.32;
+      ctx.filter = "grayscale(1) brightness(1.6)";
+      ctx.translate(sx, wy(gy - BIKE.wheelRadius));
+      ctx.rotate(gAngle);
+      if (bikeEntry.ready) {
+        const w = bikeSpriteW;
+        const h = w * (bikeEntry.img.naturalHeight / bikeEntry.img.naturalWidth);
+        ctx.drawImage(
+          bikeEntry.img,
+          (-w / 2 + bikeOffsetX) * scale,
+          (-h / 2 + bikeOffsetY) * scale,
+          w * scale,
+          h * scale,
+        );
+      }
+      ctx.restore();
+    };
+
     // 完美落地雙輪特效：兩輪各冒一圈擴散光環 + 放射火花
     const drawPerfectFx = () => {
       if (perfectFxFrames <= 0) return;
@@ -1447,6 +1496,7 @@ let crashTimer = 0;
         }
         drawFlag(track.vertices[0].x, track.vertices[0].y, COLOR.start, "START");
         drawFlag(track.finishX, track.vertices[track.vertices.length - 1].y, COLOR.finish, "FIN");
+        drawGhost();
         drawBike(alpha);
         drawPerfectFx();
         // 死亡特效：粒子爆炸（A）+ 白色閃光（B）
@@ -1503,6 +1553,14 @@ let crashTimer = 0;
       last = now;
       if (dt > 60) dt = 60; // 防止分頁切回時爆衝
       if (!overRef.current && !waitingToStart) raceTimeMs += dt;
+      // Ghost 用車身 x 座標取樣：每 500ms 一筆，追趕式 while 避免掉幀時漏採樣
+      // （dt 上限已鉗制在 60ms，不會一次補太多筆）。
+      if (!overRef.current && !waitingToStart) {
+        while (raceTimeMs >= nextSampleAt) {
+          replayPath.push(Math.round(bike.chassis.position.x));
+          nextSampleAt += 500;
+        }
+      }
       acc += dt;
 
       let grounded = false;
@@ -1557,7 +1615,7 @@ let crashTimer = 0;
           setDying(false);
           setCrashed(true);
           checkPb(points);
-          onGameOverRef.current?.({ score: points, timeMs: raceTimeMs, flips: totalFlips, perfect: perfectLandings, finished: false, progressPct: deathProgressRef.current });
+          onGameOverRef.current?.({ score: points, timeMs: raceTimeMs, flips: totalFlips, perfect: perfectLandings, finished: false, progressPct: deathProgressRef.current, replay: { events: replayEvents, path: replayPath } });
         }
       }
       // 鏡頭震動（暫時偏移，渲染後還原，不汙染 camX/camY 平滑狀態）
