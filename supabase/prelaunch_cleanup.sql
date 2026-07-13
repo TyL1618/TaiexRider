@@ -16,16 +16,26 @@
 --            清掉可能讓已購買商品的驗證邏輯出錯，絕對不能動
 --
 -- 下面這些表「沒有」放進清除清單，是刻意的，不是漏掉：
---   wallet_earn_log / wallet_daily_attempts / player_weekly_quest /
---   daily_diamond_settlement / classic_diamond_settlement
---   → 這幾張表本來就有 cleanup_old_wallet_logs() 排程在滾動清理（14 天/60 天/
---     8 週不等，見 migration_20260708c.sql/20260708d.sql），不是永久累積的
---     測試污染，開服後這些「今天/本週」尺度的資料自然會被新資料覆蓋，
---     不需要特地手動清空。
+--   wallet_earn_log / player_weekly_quest
+--   → 這兩張表本來就有 cleanup_old_wallet_logs() 排程在滾動清理（14 天/8 週，
+--     見 migration_20260708c.sql/20260708d.sql），不是永久累積的測試污染，
+--     開服後這些「今天/本週」尺度的資料自然會被新資料覆蓋，不需要特地手動清空。
 --   player_achievements / player_streak / player_collection（Q 系列成就進度、
 --     連續天數、股票圖鑑收集）→ 使用者這次沒有點名要清，這些偏向「玩家帳號的
 --     持續進度」而非「單場遊玩紀錄/排行榜」，先保留不動。如果之後想連這些也
 --     一起歸零（例如連封測期間解鎖的成就都要清掉重來），告訴 Claude 再加開一段。
+--
+-- 🔒 2026-07-13 修正：wallet_daily_attempts 改為「一併清空」（原本刻意不清，
+-- 靠自己的 14 天滾動清理）。根因：daily_diamond_settlement 是
+-- settle_daily_diamonds() 用 `on conflict (player_id, challenge_date) do
+-- nothing` 防重複發獎的擋板，這支腳本把它 truncate 掉後，若同一天的結算被
+-- 重新觸發一次（GitHub Actions settle-daily-rewards.yml 開了
+-- workflow_dispatch 允許手動重跑），wallet_daily_attempts 裡最近 1~13 天
+-- 「誰玩過」的紀錄還在（沒被清、要等 14 天滾動清理才會消失），會被誤判成
+-- 「這期還沒發過」，對這些人再發一次 +3 參與獎鑽石。既然這支腳本本來就是
+-- 把 daily_scores/daily_diamond_settlement 等整段封測歷史清空歸零，
+-- wallet_daily_attempts 的封測期出席紀錄一併清掉才是一致的，清完後
+-- settle_daily_diamonds() 對任何舊日期重跑都會查到零參與者，不會誤發。
 -- ============================================================================
 
 begin;
@@ -49,6 +59,11 @@ truncate table public.classic_diamond_settlement;
 -- 測試流量資料，開服後才是真正有意義的正式數據。
 truncate table public.events;
 
+-- 每日排名賽出席/次數紀錄。一併清空避免 daily_diamond_settlement 的防重複
+-- 發獎擋板被清空後，settle_daily_diamonds() 若重跑舊日期會靠這張表殘留的
+-- 出席紀錄誤發參與獎（見上方 2026-07-14 修正說明）。
+truncate table public.wallet_daily_attempts;
+
 commit;
 
 -- ── 執行後可用這幾行快速確認清空成功（皆應回傳 0）───────────────────────────
@@ -57,3 +72,4 @@ commit;
 -- select count(*) from public.events;
 -- select count(*) from public.daily_diamond_settlement;
 -- select count(*) from public.classic_diamond_settlement;
+-- select count(*) from public.wallet_daily_attempts;

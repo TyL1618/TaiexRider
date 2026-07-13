@@ -51,12 +51,14 @@
 ## 三、正式上架前必做（非封測阻塞項，但送審正式版前必須完成）
 
 - [ ] **AdMob 廣告單元 ID 換真實值**——現在仍用 Google 官方測試單元（`src/lib/ads.ts`
-      `NATIVE_AD_UNIT_IDS`），同時記得拿掉 `isTesting: true`；AdMob 帳戶要先完成
-      「連結 Play 商店 listing + 放送資格審核」，這兩件事使用者已決定等公開上線前
-      才一起處理（現在換也不保證能穩定放送，換了白工）
+      `NATIVE_AD_UNIT_IDS`），同時記得拿掉 `isTesting: true`；**技術上必須等公開
+      上架後才能換**（不是使用者選擇要等）：AdMob「連結 Play 商店 listing」要查詢
+      公開商店頁面，封測軌道不公開查不到；「放送資格審核」同樣要等公開上線才能
+      申請——現在換也不保證能穩定放送，只能等公開上線當下一起處理
 - [ ] **跑 `supabase/prelaunch_cleanup.sql`** 清空玩家遊戲數據（daily_scores/
-      classic_records/events 等，**絕對不能清已註冊 Google 帳號/user_profiles**）——
-      使用者會自己找時機手動跑，動手前逐表再確認一次，不用 Claude 主動催促
+      classic_records/events/wallet_daily_attempts 等，**絕對不能清已註冊 Google
+      帳號/user_profiles**）——使用者會自己找時機手動跑，動手前逐表再確認一次，
+      不用 Claude 主動催促。2026-07-13 已修復 +3 鑽石重複發放漏洞，跑最新版即可
 - [ ] 反作弊 Phase B（DB 端離群偵測/提交頻率）——非阻塞，建議正式上架後盡快補上，
       見 [ANTICHEAT_DESIGN.md](ANTICHEAT_DESIGN.md)
 
