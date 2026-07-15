@@ -82,6 +82,15 @@
   border-left: 1px solid rgba(255, 179, 0, 0.35);
 }
 
+/* 目前登入帳號狀態：讓玩家一眼確認登入/登出是否成功，不用點開設定面板才看得到 */
+.account-status {
+  margin: -0.5rem 0 1.1rem;
+  font-size: 0.68rem;
+  letter-spacing: 0.03em;
+  color: var(--text-dim);
+  opacity: 0.8;
+}
+
 /* 全站盤勢主題氛圍說明文字：讓玩家知道今天用哪天的資料、背景色調為何改變 */
 .market-mood-caption {
   margin-bottom: 1.6rem;

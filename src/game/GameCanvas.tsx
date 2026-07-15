@@ -399,7 +399,7 @@ export default function GameCanvas({ prices, label, name, subtitle, onExit, onGa
     // ---- 車體貼圖（決定①：整張含輪去背 PNG，輪子不轉）----
     // 車庫選用車皮：開局讀一次即可，中途不變。有 src 用獨立圖檔（各自校正過
     // spriteW/offsetX/Y 讓兩個輪子對齊物理輪位）；無 src 套預設圖 + hue-rotate 濾鏡。
-    const activeSkin = getActiveBikeSkin();
+    const activeSkin = getActiveBikeSkin(uid);
     const bikeImgSrc = activeSkin.src
       ? `${import.meta.env.BASE_URL}${activeSkin.src}`
       : `${import.meta.env.BASE_URL}bike.png`;

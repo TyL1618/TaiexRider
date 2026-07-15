@@ -25,12 +25,18 @@ export default function Home({
   onNav,
   marketMood,
   shellUpdate,
+  walletVersion, // 純重繪訊號（不直接使用值）：App.tsx 伺服器錢包同步完成後 +1，
+  // 讓首頁跟著重讀 getCoins()/getActiveBikeSkin() 之類直接讀 localStorage 的呼叫，
+  // 否則登入後首頁全程不卸載，會停在登入當下、同步完成前讀到的舊值，玩家得手動
+  // 切去別的分頁再切回來才看得到正確金幣/車皮（2026-07-16 使用者回報）。
 }: {
   user: User | null;
   onNav: (s: Screen) => void;
   marketMood?: MarketMood | null;
   shellUpdate?: ShellUpdateInfo | null;
+  walletVersion?: number;
 }) {
+  void walletVersion;
   const [showSettings, setShowSettings] = useState(false);
   const [showHelp, setShowHelp]         = useState(false);
   const [nickname, setNickname]         = useState(() => getPlayerName());
@@ -66,7 +72,7 @@ export default function Home({
   // 首頁車庫展示：目前裝備車皮的高解析度大圖（遊戲內貼圖只有 64~90px 寬，細節看不出來）。
   // 高解析版存在 bikes/hires/ 下（同檔名，1:1 對應遊戲版 src），未生成 hires 版的車皮
   // （目前只有 default）直接退回原圖，因為 public/bike.png 本身解析度已經夠用。
-  const activeSkin = getActiveBikeSkin();
+  const activeSkin = getActiveBikeSkin(user?.id ?? null);
   const showcaseSrc = activeSkin.src ? activeSkin.src.replace(/^bikes\//, "bikes/hires/") : "bike.png";
 
   const handleSaveName = () => {
@@ -140,6 +146,11 @@ export default function Home({
           📖 <span className="ency-entry-label">圖鑑</span>
         </button>
       </div>
+      <p className="account-status">
+        當前帳號：{user
+          ? (user.email === "tyl161803@gmail.com" ? `開發者帳號（${user.email}）` : user.email)
+          : "尚未登入"}
+      </p>
       {showEncyclopedia && <Encyclopedia onClose={() => setShowEncyclopedia(false)} />}
       {marketMood && (
         <p className="market-mood-caption">

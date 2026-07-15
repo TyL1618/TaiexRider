@@ -44,6 +44,7 @@ export default function App() {
   const [completedQuests, setCompletedQuests] = useState<{ title: string; reward: number }[]>([]); // 本局新完成任務（結算畫面慶祝用）
   const [ghost, setGhost] = useState<GhostRecord | null>(null); // 第一名鬼影路徑+車皮（DailyChallenge 開關+抓取後傳入）
   const [shellUpdate, setShellUpdate] = useState<ShellUpdateInfo | null>(null); // 原生殼版本落後提示（首頁顯示）
+  const [walletVersion, setWalletVersion] = useState(0); // 純重繪訊號：伺服器錢包同步完成後 +1，讓首頁跟著重讀 localStorage 快取
   const gameKeyRef = useRef(0); // 每次 handleStartTrack +1，確保新局 GameCanvas 重建（revivalUsed 重置）
 
   // refs 讓 popstate 閉包隨時拿到最新值，不靠 useEffect 依賴陣列
@@ -75,8 +76,16 @@ export default function App() {
   // streak，這支背景重觸發的 wallet_get() 若比較晚回來，會把剛寫入的新值蓋回舊值——
   // 這是「回車庫/回首頁金幣歸零」與「連續參賽要玩 2、3 場才顯示」的根因。改依 user?.id
   // （穩定字串）比較，只有真的登入/登出/換帳號才重新觸發。
+  //
+  // 2026-07-16 補：同步完成後 bump walletVersion 讓首頁跟著重繪。車庫頁自己有掛載時
+  // 同步+重讀 state 的 effect（見 Garage.tsx）所以沒這問題，但首頁在登入後全程不會
+  // 卸載重掛載——getCoins()/getActiveBikeSkin() 這類直接讀 localStorage 的呼叫寫在
+  // render 裡，sync 完成後 localStorage 值變了，可是沒有任何 React state 變動去
+  // 觸發首頁重繪，玩家得手動切去別的分頁再切回來才會看到新值。walletVersion 純粹
+  // 當「重繪訊號」用，Home 不需要真的讀它的值。
   useEffect(() => {
-    if (user) syncWalletFromServer();
+    if (!user) return;
+    syncWalletFromServer().then(() => setWalletVersion((v) => v + 1));
   }, [user?.id]);
 
   // 開發者測試帳號：登入即補滿金幣+鑽石+Q 系列成就進度+streak（wallet_dev_grant RPC，
@@ -269,7 +278,7 @@ export default function App() {
         timeMs:  stats.timeMs,
         flips:   stats.flips,
         perfect: stats.perfect,
-        skinId:  getActiveSkinId(),
+        skinId:  getActiveSkinId(user?.id ?? null),
         replay:  stats.replay,
       }).then(async () => {
         // 排名賽結算即時名次回饋：提交成功後重抓（快取已被 submitDailyScore 內部清掉）
@@ -426,7 +435,7 @@ export default function App() {
 
   return (
     <>
-      <Home user={user} onNav={handleNav} marketMood={marketMood} shellUpdate={shellUpdate} />
+      <Home user={user} onNav={handleNav} marketMood={marketMood} shellUpdate={shellUpdate} walletVersion={walletVersion} />
       {confirmLeave && (
         <div className="modal-overlay" onClick={() => setConfirmLeave(false)}>
           <div className="modal-panel" onClick={(e) => e.stopPropagation()}>

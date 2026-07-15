@@ -115,6 +115,15 @@ const OWNED_KEY = "tr_garage_owned";
 const ACTIVE_KEY = "tr_garage_active";
 const ADS_REMOVED_KEY = "tr_ads_removed";
 
+// 目前裝備車皮（ACTIVE_KEY）帳號隔離：跟 coins/diamonds/owned 不同，這個偏好從來
+// 沒有存在伺服器上（純本地選擇），舊版是單一全域 key，登出時 resetWalletCache() 會
+// 重設成 "default" 防止跨帳號污染，副作用是同一帳號登出再登入也會被一起洗掉
+// （2026-07-16 使用者回報）。改成比照 wallet_daily_att_{uid|guest} 的慣例帳號隔離，
+// 各帳號各自的 key 天生不會互相污染，登出不再需要重設，同帳號重登入記得原本的車。
+function activeSkinKey(uid: string | null): string {
+  return `${ACTIVE_KEY}_${uid ?? "guest"}`;
+}
+
 async function getUid(): Promise<string | null> {
   const { data: { session } } = await supabase.auth.getSession();
   return session?.user.id ?? null;
@@ -172,12 +181,13 @@ export function markAdsRemoved(): void {
 }
 
 // 登出時呼叫：把錢包/成就/streak/圖鑑快取全部歸零成訪客預設值，避免下一個登入的帳號
-// （或登出後的訪客畫面）看到上一個帳號的金幣/鑽石/車皮/成就/收集殘影。
+// （或登出後的訪客畫面）看到上一個帳號的金幣/鑽石/擁有清單/成就/收集殘影。
+// 裝備車皮（ACTIVE_KEY）不在這裡處理——已改帳號隔離（見 activeSkinKey()），各帳號
+// 各自的 key 天生不會互相污染，不需要也不應該在登出時重設。
 export function resetWalletCache(): void {
   writeCoinsCache(0);
   writeDiamondsCache(0);
   writeOwnedCache(["default"]);
-  try { localStorage.setItem(ACTIVE_KEY, "default"); } catch { /* 靜默 */ }
   resetAchievementsCache();
   resetStreakCache();
   resetCollectionCache();
@@ -369,9 +379,9 @@ export async function grantDevWallet(): Promise<void> {
   writeStreakCache(row.last_session_key, row.streak_count);
 }
 
-export function getActiveSkinId(): string {
+export function getActiveSkinId(uid: string | null = null): string {
   try {
-    const id = localStorage.getItem(ACTIVE_KEY);
+    const id = localStorage.getItem(activeSkinKey(uid));
     return id && isOwned(id) ? id : "default";
   } catch {
     return "default";
@@ -379,15 +389,15 @@ export function getActiveSkinId(): string {
 }
 
 // 選用：只有已擁有的車皮能選
-export function setActiveSkin(id: string): boolean {
+export function setActiveSkin(id: string, uid: string | null = null): boolean {
   if (!isOwned(id)) return false;
   try {
-    localStorage.setItem(ACTIVE_KEY, id);
+    localStorage.setItem(activeSkinKey(uid), id);
   } catch { /* 靜默 */ }
   return true;
 }
 
 // GameCanvas 繪車時讀取目前選用的完整車皮設定
-export function getActiveBikeSkin(): BikeSkin {
-  return BIKE_SKINS.find((s) => s.id === getActiveSkinId()) ?? BIKE_SKINS[0];
+export function getActiveBikeSkin(uid: string | null = null): BikeSkin {
+  return BIKE_SKINS.find((s) => s.id === getActiveSkinId(uid)) ?? BIKE_SKINS[0];
 }

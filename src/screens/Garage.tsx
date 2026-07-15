@@ -18,7 +18,7 @@ import "./Garage.css";
 export default function Garage({ user, onBack }: { user: User | null; onBack: () => void }) {
   const [coins, setCoins] = useState(() => getCoins());
   const [diamonds, setDiamonds] = useState(() => getDiamonds());
-  const [active, setActive] = useState(() => getActiveSkinId());
+  const [active, setActive] = useState(() => getActiveSkinId(user?.id ?? null));
   const [watchingAd, setWatchingAd] = useState(false);
   const [adClaims, setAdClaims] = useState(() => getAdCoinClaims(dailyKey(), user?.id ?? null));
   const [achvBikes, setAchvBikes] = useState<AchvBikeView[]>(() => getAchievementBikes(0));
@@ -106,6 +106,7 @@ export default function Garage({ user, onBack }: { user: User | null; onBack: ()
       setCoins(getCoins());
       setDiamonds(getDiamonds());
       setAdsRemoved(getAdsRemoved());
+      setActive(getActiveSkinId(user?.id ?? null)); // 帳號隔離：換帳號要重讀這個帳號自己的裝備車
       await refreshAchvBikes(() => alive);
       if (alive) forceRender((n) => n + 1);
     });
@@ -181,7 +182,7 @@ export default function Garage({ user, onBack }: { user: User | null; onBack: ()
   };
 
   const handleEquip = (id: string) => {
-    if (setActiveSkin(id)) setActive(id);
+    if (setActiveSkin(id, user?.id ?? null)) setActive(id);
   };
 
   const renderSkinCard = (s: BikeSkin) => {
