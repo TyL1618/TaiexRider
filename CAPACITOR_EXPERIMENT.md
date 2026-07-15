@@ -4,10 +4,12 @@
 > 上傳坑→vc19 送審」全流程**。`TaiexRider-cap` 沙盒的成果已併回主專案
 > `TaiexRider`，`applicationId` 轉回正式的 `com.tylapp.taiexrider`，`versionCode 19`
 > （Capacitor 首版）已打包簽署版 AAB 上傳 Play Console 封閉測試軌道、**使用者已送出
-> 審查**。**舊 TWA 版完整備份在
-> `C:\Users\tyl16\Documents\Private\TaiexRider-TWA-backup\`**（含完整 git 歷史，未來
-> 要回退隨時可用）。完整經過見下方「🔀 正式合併進主專案」與「✅ vc19（Capacitor
-> 首版）已送審」兩節。**下一步：等審查結果，非阻塞。**
+> 審查**。**舊 TWA 版完整備份曾在
+> `C:\Users\tyl16\Documents\Private\TaiexRider-TWA-backup\`**（含完整 git 歷史，
+> 下方第 1 步的 robocopy 記錄）——**2026-07-15 已刪除**：Capacitor 版從 vc19 穩定
+> 跑到 vc30，多次過審+真機驗證，回退需求已過期，414MB 純佔空間；TWA 關鍵踩雷教訓
+> 仍留在 CLAUDE.md「踩雷筆記」與 History.md 舊交接紀錄，不受影響。完整經過見下方
+> 「🔀 正式合併進主專案」與「✅ vc19（Capacitor 首版）已送審」兩節。
 
 ## 🔀 2026-07-10 晚：正式合併進主專案
 
