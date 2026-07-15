@@ -163,7 +163,7 @@ log 一起回滾，前端又慣例把 RPC 失敗靜默吞掉 → 玩家只是「
 
 **防重放**：`iap_purchases(purchase_token pk, player_id, sku_id, diamonds, created_at)` 記錄每筆已兌換的 purchase_token，同一筆不能重複發鑽石。`grant_iap_diamonds()` 內有 SKU 白名單（`diamonds_100`/`diamonds_350`/`diamonds_1200`，暫定鑽石數，實際定價在 Play Console 設定），**只給 service_role 呼叫**（`revoke ... from public, anon, authenticated`）——前端絕對不能直接呼叫這支，否則偽造 purchase_token 就能騙鑽石。
 
-**✅ 部署前置作業皆已完成**（2026-07-06）：① migration 已跑；② Play Console 單次產品已建立（介面路徑：透過 Google Play 營利 → 產品 → 單次產品，實測發現這一步本身要求 APK 先有 BILLING 權限才給建，順序比預期更早卡關）；③ Google Cloud 服務帳號 + Play Console 授權已完成；④ `verify-iap-purchase` Edge Function 已部署（secrets：`GOOGLE_SERVICE_ACCOUNT_EMAIL`/`GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY`）；⑤ Android 原生專案已加 androidbrowserhelper 的 Play Billing 橋接（vc11 已上傳審核通過上線）。詳細清單見 [NEXT_BATCH_PLAN.md](NEXT_BATCH_PLAN.md) 批次 4。
+**✅ 部署前置作業皆已完成**（2026-07-06）：① migration 已跑；② Play Console 單次產品已建立（介面路徑：透過 Google Play 營利 → 產品 → 單次產品，實測發現這一步本身要求 APK 先有 BILLING 權限才給建，順序比預期更早卡關）；③ Google Cloud 服務帳號 + Play Console 授權已完成；④ `verify-iap-purchase` Edge Function 已部署（secrets：`GOOGLE_SERVICE_ACCOUNT_EMAIL`/`GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY`）；⑤ Android 原生專案已加 androidbrowserhelper 的 Play Billing 橋接（vc11 已上傳審核通過上線）。詳細清單見 History.md「📦 已封存文件：NEXT_BATCH_PLAN.md」批次 4。
 
 **永久去除廣告（非消耗型，`migration_20260706d.sql`）**：跟鑽石（消耗型，可重複買）不同，去廣告是「買一次終身有效」，Google 端驗證完要呼叫 `:acknowledge` 而不是 `:consume`（`consume` 會讓非消耗型商品變成可重複購買，語意錯誤）。`verify-iap-purchase` 依 SKU 是否在 `DIAMOND_SKUS` 集合裡分流兩種呼叫方式。購買後 `player_wallet.ads_removed` 設為 true，四個「看廣告」點依此欄位調整（**2026-07-09 定案：一律改「免看廣告直接領取」，不是隱藏按鈕**——曾把拿金幣/雙倍按鈕整段藏起來，等於花錢買去廣告反而失去獎勵，已修正）：`GameCanvas.tsx` 復活按鈕直接復活、結算「觀看廣告 獎勵 ×2」→「🎁 領取 獎勵 ×2」、`Garage.tsx`「看廣告 +40 金幣」→「🎁 領取 +40 金幣」（每日上限不變）；`DailyChallenge.tsx` 第 3~5 次挑戰標籤一律顯示「開始挑戰」。SKU id：`remove_ads_forever`。
 
@@ -181,7 +181,7 @@ log 一起回滾，前端又慣例把 RPC 失敗靜默吞掉 → 玩家只是「
 ⑤ 又變「暫無法購買」＝查價與對帳並發各自建 billing 連線互相干擾＋冷啟動連線未就緒 → `getService()` 快取 Promise 共用連線＋查價自動重試 4 次；
 ⑥ 付款成功不發鑽石（Edge Function 全 500）＝服務帳號**多行 PEM 私鑰用 `supabase secrets set --env-file` 被折行吃掉只剩第一行** → 用 `JSON.stringify(private_key)` 保持單行+`\n` 轉義寫入（詳見 CLAUDE.md 踩雷筆記）；
 ⑦ 鑽石入帳被 42702 擋（見 §2.5 的 PL/pgSQL 踩雷）。
-**二次稽核（2026-07-09，見 [FABLE5_HANDOFF_20260709.md](FABLE5_HANDOFF_20260709.md) 報告）發現的缺口**：
+**二次稽核（2026-07-09，見 [History.md](History.md)「📦 已封存文件：FABLE5_HANDOFF_20260709.md」報告）發現的缺口**：
 - 🔴✅ **2026-07-10 已修＋已部署上線**：Edge Function 原本未比對 Google 回應
   `productId` 與聲稱 `sku_id`（便宜包冒充貴包的真錢漏洞）。`verifyPurchase()` 現在讀
   `GooglePurchase.productId`，主流程在 `purchaseState` 通過後多一關：

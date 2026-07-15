@@ -14,7 +14,7 @@
 > 也補上暱稱/錢包/成就/streak 全部歸零。同時跑了一次性資料清零 SQL（不進 migration 檔案），
 > 把除了 tyl161803@gmail.com 以外所有玩家的金幣/鑽石/車庫/成就歸零，防漏網測試者受汙染影響。
 > 使用者已跑完兩份 SQL 並真機用兩個帳號交叉驗證通過。詳見 CLAUDE.md 待辦 1b、
-> NEXT_BATCH_PLAN.md 批次 1。
+> History.md「📦 已封存文件：NEXT_BATCH_PLAN.md」批次 1。
 >
 > ✅ **2026-07-04 當晚已提前實作完成**（使用者：「不用等 7/5，現在就處理」）。
 > `supabase/migration_20260705.sql` 已寫好且**✅ 已跑生效**，客戶端（garage.ts/App.tsx/

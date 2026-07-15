@@ -333,7 +333,7 @@ other bikes. Silent. Deadly. Almost invisible.
 
 - **B（基本款）＝金幣購買**：`b2-cafe-racer` 200 金幣／`b1-street-white` 150 金幣（2026-07-03 曾一度改免費，2026-07-04 使用者拍板收回改回金幣購買）。
 - **Q（任務解鎖款）＝成就條件解鎖**，明確**不是**金幣/鑽石購買——大漲/大跌完賽次數與連續參賽天數達標即可解鎖。2026-07-06 起，這些進度已改為伺服器端權威（`player_achievements`/`player_streak` 表，`achievements.ts`/`streak.ts` 的 localStorage 只當顯示快取），`wallet_unlock_achievement` RPC 也改成伺服器自行驗證門檻是否真的達標，不再信任客戶端宣稱——舊版（v1）信任客戶端曾導致同裝置切換 Google 帳號互相污染，見 [WALLET_PLAN.md](WALLET_PLAN.md) 2026-07-06 段落。
-- **P（鑽石車款）＝走真錢 IAP**（Google Play Billing，**2026-07-06 已正式上線**）：P1 300 鑽石／P2 380 鑽石（車款本身鑽石售價未變）。**鑽石購買頁已上線**（`diamonds_100/350/1200` 三個 SKU id，消耗型 IAP），玩家不再只能靠開發者測試帳號補滿；同時上線「永久去除廣告」（`remove_ads_forever`，非消耗型，見 [NEXT_BATCH_PLAN.md](NEXT_BATCH_PLAN.md) 批次 4）。
+- **P（鑽石車款）＝走真錢 IAP**（Google Play Billing，**2026-07-06 已正式上線**）：P1 300 鑽石／P2 380 鑽石（車款本身鑽石售價未變）。**鑽石購買頁已上線**（`diamonds_100/350/1200` 三個 SKU id，消耗型 IAP），玩家不再只能靠開發者測試帳號補滿；同時上線「永久去除廣告」（`remove_ads_forever`，非消耗型，見 History.md「📦 已封存文件：NEXT_BATCH_PLAN.md」批次 4）。
 > **2026-07-11 定價定案（取代上面 07-06 的暫定佔位價）**：內容物 100/350/**1300**
 > （大包 1200→1300，SKU id 不變，`migration_20260711b.sql`）。使用者已在 Play
 > Console 手動改好三包售價、vc25 已審核上架。

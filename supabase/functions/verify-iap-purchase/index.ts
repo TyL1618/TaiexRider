@@ -14,7 +14,7 @@
 // 不能讓前端直接呼叫 grant_iap_diamonds()/grant_remove_ads()：那樣任何人偽造一個假
 // purchase_token 就能騙鑽石/騙去廣告權，驗證這一步是整個安全設計的核心，不可省略。
 //
-// ── 部署前需要設定的 Supabase secrets（supabase secrets set 指令，見 NEXT_BATCH_PLAN.md）──
+// ── 部署前需要設定的 Supabase secrets（supabase secrets set 指令，見 History.md「📦 已封存文件：NEXT_BATCH_PLAN.md」）──
 //   GOOGLE_SERVICE_ACCOUNT_EMAIL      服務帳號 email（Google Cloud 建立）
 //   GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY 服務帳號私鑰（PEM 格式，換行符號用 \n 轉義）
 // SUPABASE_URL / SUPABASE_ANON_KEY / SUPABASE_SERVICE_ROLE_KEY 由 Supabase Edge Functions

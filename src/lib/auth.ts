@@ -147,7 +147,7 @@ export async function signInWithGoogle(): Promise<void> {
 // 登出：清掉所有帳號相關的本地快取（暱稱/金幣/鑽石/擁有清單/裝備車皮/成就/streak），
 // 回到訪客預設值。背景：2026-07-05 發現這些 key 全是裝置共用、不分帳號，登出後
 // 完全沒清過，導致同裝置換登另一個 Google 帳號時會讀到上一個帳號的殘留資料
-// （見 NEXT_BATCH_PLAN.md 批次 1、CLAUDE.md 待辦 1b）。
+// （見 History.md「📦 已封存文件：NEXT_BATCH_PLAN.md」批次 1、CLAUDE.md 待辦 1b）。
 export async function signOut(): Promise<void> {
   if (Capacitor.isNativePlatform()) {
     // 不 await：這是 Credential Manager 端「忘記這個帳號」的清除動作，只影響下次登入
