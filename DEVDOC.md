@@ -662,17 +662,37 @@ TWA 沒有官方 postMessage 套件可用（androidbrowserhelper 的 `LauncherAc
 3. Build → Generate Signed Bundle/APK → Android App Bundle → 選 keystore → 產 AAB
 4. Play Console → 測試及發布 → 內部測試 → 建立新版本 → 上傳 AAB → 發布
 
-### 9.5b 殼版本更新提示（2026-07-03 設計，暫緩實作——理由見下）
+### 9.5b 殼版本更新提示（✅ 2026-07-15 已實作，Capacitor 版）
 
-**問題**：`android/` 原生殼改動（splash/捷徑/返回手勢等）重包 AAB 上傳後，玩家不會自動被提示更新（PWA 內容端有 Service Worker 自動偵測，但殼本身沒有）。使用者曾因此手動跑去 Play Console 確認有沒有更新按鈕。
+**問題**：原生殼改動重包上傳後，玩家不會自動被提示更新（PWA 內容端有 Service Worker
+自動偵測，但殼本身沒有）。使用者曾因此手動跑去 Play Console 確認有沒有更新按鈕。
 
-**方案 A（採用，但暫緩到公開上架後才做）**：`android/app/src/main/AndroidManifest.xml` 的 `DEFAULT_URL` 加查詢參數標示殼版本，如 `?shell=11`。前端讀這個參數，跟 Supabase 一張 `app_config(key, value)` 表裡的 `latest_shell` 比對，版本落後就彈窗提示更新，按鈕深連結 `market://details?id=com.tylapp.taiexrider` 直接開 Play 商店頁；`app_config.latest_shell` 手動更新一個數字即可控制全服提示，不用重新部署前端。可設「建議更新」（可關閉）或「強制更新」（擋住遊戲）兩種等級。
+**⚠️ 2026-07-03 舊設計已作廢**：當初方案 A 是靠 `AndroidManifest.xml` 的 `DEFAULT_URL`
+加查詢參數（`?shell=11`）傳殼版本給網頁——這是 TWA（androidbrowserhelper）「殼只是
+開一個網址」架構才成立的機制。2026-07-10 換成 Capacitor（網頁內容打包進 APK，不是
+即時開網站）後這個機制直接失效，下面是重新設計、已實作的 Capacitor 版本。
 
-**方案 B（正式做法，長期）**：接 Google Play In-App Updates API（Play Core），原生對話框，甚至可原地下載不用離開 app。要動 `android/` 原生 code，工程量較大，適合日後有大改殼版本時再做。
+**已實作（方案 A′，非強制）**：
+- `src/lib/shellUpdate.ts` `checkShellUpdate()`：原生殼限定（`Capacitor.isNativePlatform()`），
+  用 `@capacitor/app` 的 `App.getInfo().build` 直接讀本機 `versionCode`（不用查詢參數），
+  跟 Supabase `app_config` 表（`supabase/migration_20260715b.sql`）的
+  `latest_android_versioncode` 比對。
+- 落後就在首頁（`Home.tsx`）顯示可關閉的提示條（`.shell-update-banner`），**不擋遊戲**，
+  按鈕 `window.open('https://play.google.com/store/apps/details?id=com.tylapp.taiexrider', '_system')`
+  開 Play 商店頁（Capacitor 內建支援 `_system` target，不需要額外裝 `@capacitor/browser`）。
+- 關閉提示會記住這個版號（`tr_update_dismissed_v`），下次有更新的版號才會再跳。
+- **維運方式**：打包新版上傳 Play Console **審核通過、正式對玩家生效那天**才去
+  Supabase SQL Editor 把 `app_config.latest_android_versioncode` 改成新版號，一個
+  數字控制全服提示，不用重新部署前端（跟舊設計的優點一致，只是不再靠查詢參數傳遞）。
 
-**為何現在不做**：封測期間 app 的 `DEFAULT_URL` 只有封測名單看得到（未公開宣傳），殼版本更新頻率低、影響範圍小，優先度排在其他項目後面。**正式上架後**若殼版本更新頻率提高，優先做方案 A（成本低、Supabase 一個表就搞定）。
+**方案 B（正式做法，長期，仍未做）**：接 Google Play In-App Updates API（Play Core），
+需要額外的 Capacitor 社群外掛（例如 `@capawesome/capacitor-app-update`），原生對話框
+（Flexible/Immediate 兩種），甚至可原地下載不用離開 app；「最新版本」由 Google 自己
+判斷（不用手動維護 Supabase 數字），但要多裝原生依賴、多一輪測試成本，適合玩家量大、
+更新頻率高之後再評估升級。
 
-**2026-07-07 決策更新**：不再等「正式上架後」這個時間點觸發，改成**「下次不管什麼原因需要重包 AAB 時，順便一起做」**——因為方案 A 需要改 `AndroidManifest.xml` 的 `DEFAULT_URL`，本身就要走一次完整重包流程（versionCode+1、Generate Signed Bundle、上傳 Play Console），單獨為此重包一次不划算；但下次如果有別的原生層改動（例如 AdMob SDK 串接通常需要動 `android/`）要重包，就把這個一起包進去，成本趨近於零。
+**強制更新（選配，未做）**：可以再加一個 `min_supported_versioncode` 欄位，低於門檻
+直接擋住遊戲畫面只顯示更新按鈕，留給日後有破壞性更新（例如反作弊資料格式不相容）時用。
 
 ### 9.6 Google Play 帳號
 

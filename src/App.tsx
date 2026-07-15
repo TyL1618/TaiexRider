@@ -30,6 +30,7 @@ import { grantPlayReward, computePlayReward } from "./lib/playRewards";
 import { Capacitor } from "@capacitor/core";
 import { App as CapApp } from "@capacitor/app";
 import { ensureDailyReminder, maybeAskDailyReminder, onDailyReminderTapped } from "./lib/notifications";
+import { checkShellUpdate, type ShellUpdateInfo } from "./lib/shellUpdate";
 import { playMenuMusic, playGameMusic, pauseBgm, resumeBgm } from "./game/audio";
 
 export default function App() {
@@ -42,6 +43,7 @@ export default function App() {
   const [dailyRank, setDailyRank] = useState<number | null>(null); // 每日排名賽即時名次（提交成功後非同步算出）
   const [completedQuests, setCompletedQuests] = useState<{ title: string; reward: number }[]>([]); // 本局新完成任務（結算畫面慶祝用）
   const [ghost, setGhost] = useState<GhostRecord | null>(null); // 第一名鬼影路徑+車皮（DailyChallenge 開關+抓取後傳入）
+  const [shellUpdate, setShellUpdate] = useState<ShellUpdateInfo | null>(null); // 原生殼版本落後提示（首頁顯示）
   const gameKeyRef = useRef(0); // 每次 handleStartTrack +1，確保新局 GameCanvas 重建（revivalUsed 重置）
 
   // refs 讓 popstate 閉包隨時拿到最新值，不靠 useEffect 依賴陣列
@@ -114,6 +116,10 @@ export default function App() {
   // 每日提醒（原生殼限定）：啟動時只在「已授權」的前提下重排程，不跳權限框
   //（權限請求在第一局玩完才問，見 handleGameOver 的 maybeAskDailyReminder()）。
   useEffect(() => { ensureDailyReminder(); }, []);
+
+  // 殼版本更新提示（原生殼限定，網頁版靠 pwa.ts 的 Service Worker 自動更新不需要
+  // 這層）：啟動時查一次，本機版號落後就在首頁顯示可關閉的提示條。
+  useEffect(() => { checkShellUpdate().then(setShellUpdate); }, []);
 
   // 背景音樂：track 有值＝實際在跑賽道（GameCanvas 掛載中）放 hiding-your-reality，
   // 否則（首頁/車庫/選單/每日排名賽列表等所有非遊玩畫面）放 galactic-rap。
@@ -420,7 +426,7 @@ export default function App() {
 
   return (
     <>
-      <Home user={user} onNav={handleNav} marketMood={marketMood} />
+      <Home user={user} onNav={handleNav} marketMood={marketMood} shellUpdate={shellUpdate} />
       {confirmLeave && (
         <div className="modal-overlay" onClick={() => setConfirmLeave(false)}>
           <div className="modal-panel" onClick={(e) => e.stopPropagation()}>

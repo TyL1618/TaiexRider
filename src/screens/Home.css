@@ -111,6 +111,53 @@
   50%      { opacity: 1; }
 }
 
+/* 殼版本更新提示（原生殼限定，非強制）：本機 versionCode 落後 Supabase 記錄的最新
+   版號才會出現，玩家可以直接關掉，不影響任何功能。 */
+.shell-update-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  max-width: 420px;
+  margin-bottom: 1.2rem;
+  padding: 0.5rem 0.6rem 0.5rem 0.8rem;
+  border: 1px solid rgba(255, 179, 0, 0.4);
+  border-radius: 10px;
+  background: rgba(255, 179, 0, 0.08);
+}
+
+.shell-update-text {
+  flex: 1;
+  font-size: 0.74rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--neon-amber);
+}
+
+.shell-update-btn {
+  flex-shrink: 0;
+  padding: 0.35rem 0.7rem;
+  border: 1px solid var(--neon-amber);
+  border-radius: 6px;
+  background: rgba(255, 179, 0, 0.15);
+  color: var(--neon-amber);
+  font-size: 0.7rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.shell-update-dismiss {
+  flex-shrink: 0;
+  width: 1.4rem;
+  height: 1.4rem;
+  border: none;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
 /* 首頁車皮展示框：目前裝備車款的高解析大圖，點擊直接進車庫換車 */
 .bike-showcase {
   width: 100%;

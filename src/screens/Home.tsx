@@ -7,6 +7,7 @@ import { detectEnv } from "../lib/ads";
 import { getCoins, getActiveBikeSkin } from "../lib/garage";
 import CoinIcon from "../components/CoinIcon";
 import type { MarketMood } from "../lib/marketMood";
+import { dismissShellUpdate, openPlayStore, type ShellUpdateInfo } from "../lib/shellUpdate";
 import StatsScreen from "./StatsScreen";
 import Encyclopedia from "../components/Encyclopedia";
 import "./Home.css";
@@ -23,10 +24,12 @@ export default function Home({
   user,
   onNav,
   marketMood,
+  shellUpdate,
 }: {
   user: User | null;
   onNav: (s: Screen) => void;
   marketMood?: MarketMood | null;
+  shellUpdate?: ShellUpdateInfo | null;
 }) {
   const [showSettings, setShowSettings] = useState(false);
   const [showHelp, setShowHelp]         = useState(false);
@@ -39,6 +42,7 @@ export default function Home({
   const [volume, setVolumeState]        = useState(() => Math.round(getVolume() * 100));
   const [showStats, setShowStats]       = useState(false);
   const [showEncyclopedia, setShowEncyclopedia] = useState(false);
+  const [updateDismissed, setUpdateDismissed] = useState(false); // 本局是否已關掉更新提示
   // 隱藏統計頁入口：3 秒內連點版本號 5 下（權限門鎖在後端 admin RPC，這只是入口）。
   // 用 ref 同步計數（state 在快速連點時會讀到舊值）。
   const tapRef = useRef({ n: 0, t: 0 });
@@ -111,6 +115,20 @@ export default function Home({
       </button>
 
       <h1 className="home-title">TAIEX&shy;RIDER</h1>
+
+      {shellUpdate && !updateDismissed && (
+        <div className="shell-update-banner">
+          <span className="shell-update-text">🔄 有新版本可以更新</span>
+          <button className="shell-update-btn" onClick={openPlayStore}>前往商店</button>
+          <button
+            className="shell-update-dismiss"
+            aria-label="關閉更新提示"
+            onClick={() => { dismissShellUpdate(shellUpdate.latest); setUpdateDismissed(true); }}
+          >
+            ×
+          </button>
+        </div>
+      )}
 
       <div className="home-entry-row">
         <button className="garage-entry-btn" onClick={() => onNav("garage")}>
