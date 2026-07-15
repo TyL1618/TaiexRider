@@ -292,3 +292,14 @@ export function playGameMusic(): void {
   ensureBgm();
   switchBgm(bgmGame!);
 }
+
+// App 切到背景（分頁隱藏/切去其他 App）時呼叫：暫停目前播放的 BGM，
+// 避免使用者切走後音樂仍在背景持續播放。
+export function pauseBgm(): void {
+  currentBgm?.pause();
+}
+
+// App 回到前景時呼叫：恢復剛才暫停的那軌（走既有 tryPlay 的 autoplay 重試邏輯）。
+export function resumeBgm(): void {
+  if (currentBgm) tryPlay(currentBgm);
+}

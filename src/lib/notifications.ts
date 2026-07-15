@@ -21,9 +21,9 @@ import { LocalNotifications } from "@capacitor/local-notifications";
 const ASKED_KEY = "tr_notif_asked"; // 已經跳過一次系統權限框（不分帳號：權限是裝置級的）
 const REMINDER_ID = 9001;           // 固定 id：重複 schedule 會覆蓋同 id 的舊排程
 
-// 每天 20:00：晚間休閒時段，且當日賽道（前一交易日盤勢）整天都有效，
-// 不用等午夜換圖，任何時間點進來都玩得到。
-const REMINDER_HOUR = 20;
+// 每天 8:00：台灣午夜已換圖，早上發送讓玩家一整天都還有機會上榜，
+// 避免傍晚才提醒導致只剩幾小時可玩（2026-07-15 由 20:00 改到早上）。
+const REMINDER_HOUR = 8;
 
 async function scheduleDaily(): Promise<void> {
   try {

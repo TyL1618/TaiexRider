@@ -12,7 +12,7 @@ import DailyChallenge from "./screens/DailyChallenge";
 import ClassicSelect from "./screens/ClassicSelect";
 import Garage from "./screens/Garage";
 import type { TrackData } from "./data/tracks";
-import { submitDailyScore, fetchDailyTop, type GhostPathData } from "./lib/leaderboard";
+import { submitDailyScore, fetchDailyTop, type GhostRecord } from "./lib/leaderboard";
 import { submitClassicRecord } from "./lib/classicRecords";
 import { fetchHardestDailyMap, fetchDailyMapList, resolveSessionDate } from "./lib/dailyMap";
 import { onAuthStateChange, getUser, type User } from "./lib/auth";
@@ -20,7 +20,7 @@ import { getPlayerName } from "./lib/playerId";
 import { dailyKey } from "./data/pick";
 import { setPlaying } from "./pwa";
 import { logEvent, type AnalyticsMode } from "./lib/analytics";
-import { addCoins, earnCoins, syncWalletFromServer, grantDevWallet, recordMarketFinish, writeCoinsCache } from "./lib/garage";
+import { addCoins, earnCoins, syncWalletFromServer, grantDevWallet, recordMarketFinish, writeCoinsCache, getActiveSkinId } from "./lib/garage";
 import { recordRun } from "./lib/quests";
 import { recordWeeklyRun, claimWeeklyQuest, weekKey } from "./lib/weeklyQuests";
 import { collectStock } from "./lib/collection";
@@ -30,7 +30,7 @@ import { grantPlayReward, computePlayReward } from "./lib/playRewards";
 import { Capacitor } from "@capacitor/core";
 import { App as CapApp } from "@capacitor/app";
 import { ensureDailyReminder, maybeAskDailyReminder, onDailyReminderTapped } from "./lib/notifications";
-import { playMenuMusic, playGameMusic } from "./game/audio";
+import { playMenuMusic, playGameMusic, pauseBgm, resumeBgm } from "./game/audio";
 
 export default function App() {
   const [screen, setScreen]         = useState<Screen>("home");
@@ -41,7 +41,7 @@ export default function App() {
   const [marketMood, setMarketMood] = useState<MarketMood | null>(null);
   const [dailyRank, setDailyRank] = useState<number | null>(null); // 每日排名賽即時名次（提交成功後非同步算出）
   const [completedQuests, setCompletedQuests] = useState<{ title: string; reward: number }[]>([]); // 本局新完成任務（結算畫面慶祝用）
-  const [ghostPath, setGhostPath] = useState<GhostPathData | null>(null); // 第一名鬼影路徑（DailyChallenge 開關+抓取後傳入）
+  const [ghost, setGhost] = useState<GhostRecord | null>(null); // 第一名鬼影路徑+車皮（DailyChallenge 開關+抓取後傳入）
   const gameKeyRef = useRef(0); // 每次 handleStartTrack +1，確保新局 GameCanvas 重建（revivalUsed 重置）
 
   // refs 讓 popstate 閉包隨時拿到最新值，不靠 useEffect 依賴陣列
@@ -123,6 +123,26 @@ export default function App() {
     if (track) playGameMusic();
     else playMenuMusic();
   }, [track]);
+
+  // App 切到背景（原生殼切去其他 App、或分頁被切走/縮小)自動暫停 BGM，回前景恢復。
+  // Capacitor appStateChange 涵蓋原生殼「切去其他 App」；visibilitychange 額外涵蓋
+  // 桌機/PWA 分頁切走（原生殼 WebView 通常也會同步觸發，兩者疊加無害，pause 是冪等的）。
+  useEffect(() => {
+    let appHandle: { remove: () => void } | undefined;
+    if (Capacitor.isNativePlatform()) {
+      CapApp.addListener("appStateChange", ({ isActive }) => {
+        if (isActive) resumeBgm(); else pauseBgm();
+      }).then((h) => { appHandle = h; });
+    }
+    const onVisibility = () => {
+      if (document.hidden) pauseBgm(); else resumeBgm();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      appHandle?.remove();
+    };
+  }, []);
 
   // App 啟動時預熱每日資料，進 DailyChallenge 時直接從快取拿，不需等待
   useEffect(() => {
@@ -243,6 +263,7 @@ export default function App() {
         timeMs:  stats.timeMs,
         flips:   stats.flips,
         perfect: stats.perfect,
+        skinId:  getActiveSkinId(),
         replay:  stats.replay,
       }).then(async () => {
         // 排名賽結算即時名次回饋：提交成功後重抓（快取已被 submitDailyScore 內部清掉）
@@ -348,7 +369,7 @@ export default function App() {
     trackRef.current = null;
     setTrack(null);
     setIsDailyRun(false);
-    setGhostPath(null); // 離開賽道：清掉這局的鬼影路徑，避免殘留到下一個非排名賽模式
+    setGhost(null); // 離開賽道：清掉這局的鬼影資料，避免殘留到下一個非排名賽模式
     setPlaying(false); // 離開賽道：若有待套用的新版立即 reload
   }, []);
 
@@ -370,7 +391,8 @@ export default function App() {
           uid={user?.id ?? null}
           dailyRank={dailyRank}
           completedQuests={completedQuests}
-          ghostPath={isDailyRun ? ghostPath : null}
+          ghostPath={isDailyRun ? ghost?.path ?? null : null}
+          ghostSkinId={isDailyRun ? ghost?.skinId ?? null : null}
         />
       </Suspense>
     );
@@ -391,7 +413,7 @@ export default function App() {
   if (screen === "daily")  return (
     <DailyChallenge
       user={user}
-      onPlay={(t, ghost) => { setIsDailyRun(true); setGhostPath(ghost); handleStartTrack(t); }}
+      onPlay={(t, g) => { setIsDailyRun(true); setGhost(g); handleStartTrack(t); }}
       onBack={goHome}
     />
   );

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import Sparkline from "../components/Sparkline";
 import { dailyTrack, dailyKey } from "../data/pick";
-import { fetchDailyTop, fetchDailyGhostPath, invalidateDailyTop, isLeaderboardConfigured, type ScoreRow, type GhostPathData } from "../lib/leaderboard";
+import { fetchDailyTop, fetchDailyGhostPath, invalidateDailyTop, isLeaderboardConfigured, type ScoreRow, type GhostRecord } from "../lib/leaderboard";
 import { fetchHardestDailyMap, resolveSessionDate, resolveSessionDisplayDate } from "../lib/dailyMap";
 import { signInWithGoogle, type User } from "../lib/auth";
 import { getPlayerName } from "../lib/playerId";
@@ -49,7 +49,7 @@ export default function DailyChallenge({
   onBack,
 }: {
   user: User | null;
-  onPlay: (t: TrackData, ghostPath: GhostPathData | null) => void;
+  onPlay: (t: TrackData, ghost: GhostRecord | null) => void;
   onBack: () => void;
 }) {
   const fallbackTrack = dailyTrack();
@@ -83,7 +83,7 @@ export default function DailyChallenge({
   // 體檢後補的方案 A）。null＝查詢中（樂觀維持可勾），查到的路徑順便快取起來，
   // handleStart 直接用、不用再抓第二次。
   const [ghostAvail, setGhostAvail] = useState<boolean | null>(null);
-  const ghostPathRef = useRef<GhostPathData | null>(null);
+  const ghostPathRef = useRef<GhostRecord | null>(null);
 
   // 2026-07-07：同裝置切換帳號時，本地次數快取重新從「這個 uid」自己的 key 讀取
   // （見 challengeAttempts.ts 頂部說明），避免沿用前一個使用者當天用掉的次數；
@@ -318,13 +318,13 @@ export default function DailyChallenge({
             // 鬼影路徑：優先用進頁面時已快取好的（零延遲）；還在查詢中（ghostAvail
             // === null 且快取空）才現場抓，帶 1.5s 逾時——網路卡住不擋「開始挑戰」，
             // 逾時就不帶鬼影直接進場（鬼影是純加分體驗，不值得讓玩家枯等）。
-            const ghostPath = ghostOn && ghostAvail !== false
+            const ghost = ghostOn && ghostAvail !== false
               ? (ghostPathRef.current ?? await Promise.race([
                   fetchDailyGhostPath(sessionKeyRef.current),
-                  new Promise<GhostPathData | null>((resolve) => { setTimeout(() => resolve(null), 1500); }),
+                  new Promise<GhostRecord | null>((resolve) => { setTimeout(() => resolve(null), 1500); }),
                 ]))
               : null;
-            onPlay(track, ghostPath);
+            onPlay(track, ghost);
           };
           return (
             <>

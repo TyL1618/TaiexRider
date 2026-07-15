@@ -79,6 +79,7 @@ create table public.daily_scores (
   flips          int     not null default 0,
   perfect        int     not null default 0,
   created_at     timestamptz default now(),
+  skin_id        text    not null default 'default',  -- 2026-07-15 起：提交當下使用的車皮 id
   unique (challenge_date, player_id)
 );
 alter table public.daily_scores enable row level security;
@@ -88,6 +89,8 @@ create policy "auth update"   on public.daily_scores for update using (auth.uid(
 ```
 
 提交走 `leaderboard.ts` 的 `submitDailyScore()` → RPC `submit_daily_score`（security definer），需 Google 登入（`auth.uid()` 伺服器端決定 player_id）。
+
+⚠️ **2026-07-15：鬼影改用紀錄保持者當下使用的車皮，不是玩家自己的車**（`migration_20260715.sql`）。`submit_daily_score` 新增 `p_skin_id`（存進 `skin_id` 欄位）；`get_daily_ghost_path(p_date)` 回傳型別從純 `jsonb`（path）改成 `table(path jsonb, skin_id text)`（回傳型別變更需 `drop function` 重建，不能 `create or replace`），PostgREST 因此改回陣列，前端 `fetchDailyGhostPath()` 讀 `data[0]`。渲染端（`GameCanvas.tsx` `drawGhost()`）用 `ghostSkinId` 查 `BIKE_SKINS` 载入對應貼圖，找不到 fallback 預設車；同時拿掉舊版的去色濾鏡（半透明 0.32 已足夠跟玩家自己的車區分，且能看清對手真實車款/顏色）。
 ⚠️ **`challenge_date` = `coalesce(max(map_date ≤ 台灣今天), 台灣今天)`**（與前端 `resolveSessionDate()` 同源），讓週末/連假整段成績累積在同一張榜、午夜才換新榜。**不可用 `current_date`（UTC）**（台灣午夜後存到前一天），**也不可只用台灣日曆日**（連假時 ≠ 最後交易日的 map_date，會跟讀取端的 max(map_date) 對不上 → 看似沒上榜）。⚠️ **改 schema 後 push 不會更新 RPC，要手動在 Supabase SQL Editor 跑 `create or replace function submit_daily_score`。** 詳見 CLAUDE.md「排行榜對齊」「時區踩雷」。
 
 ### 2.3 `keep_alive` — Supabase 保活

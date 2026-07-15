@@ -14,7 +14,7 @@ import { logEvent } from "../lib/analytics";
 import { haptics } from "../lib/haptics";
 import { fetchDeathHeatmap } from "../lib/deathHeatmap";
 import { startWakeLock } from "../lib/wakeLock";
-import { getActiveBikeSkin, addCoins, earnCoins, getAdsRemoved } from "../lib/garage";
+import { getActiveBikeSkin, addCoins, earnCoins, getAdsRemoved, BIKE_SKINS } from "../lib/garage";
 import { requestRewardedAd, preloadRewardedAd } from "../lib/ads";
 import { grantPlayReward, computePlayReward } from "../lib/playRewards";
 import { maybeRequestReview } from "../lib/review";
@@ -60,6 +60,9 @@ interface GameCanvasProps {
   // 第一名鬼影路徑（只有每日排名賽開啟開關時才有值）。兩種格式：
   // v1（vc28 錄的）＝純數字陣列（x 每 500ms，貼地重建）；v2＝[x,y,角度] 每 250ms。
   ghostPath?: (number | [number, number, number])[] | null;
+  // 鬼影使用的車皮 id（紀錄保持者提交當下用的車，見 migration_20260715.sql）。
+  // 找不到對應車款（未知 id/舊資料）時 fallback 預設車，不會退回顯示玩家自己的車。
+  ghostSkinId?: string | null;
 }
 
 interface Hud {
@@ -178,7 +181,7 @@ function getBikeImageEntry(src: string): BikeImgEntry {
 }
 getBikeImageEntry(`${import.meta.env.BASE_URL}bike.png`); // 預熱預設車皮
 
-export default function GameCanvas({ prices, label, name, subtitle, onExit, onGameOver, hideMinimap = false, revivalEnabled = false, analyticsMode, pbKey, uid = null, dailyRank = null, completedQuests = [], ghostPath = null }: GameCanvasProps) {
+export default function GameCanvas({ prices, label, name, subtitle, onExit, onGameOver, hideMinimap = false, revivalEnabled = false, analyticsMode, pbKey, uid = null, dailyRank = null, completedQuests = [], ghostPath = null, ghostSkinId = null }: GameCanvasProps) {
   const stars = difficultyStars(calcDifficulty(prices));
   const cityBuildings = generateCity(prices.length * 31 + Math.round((prices[0] || 0) * 100));
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -404,6 +407,17 @@ export default function GameCanvas({ prices, label, name, subtitle, onExit, onGa
     const bikeSpriteW = activeSkin.spriteW ?? BIKE.spriteW;
     const bikeOffsetX = activeSkin.spriteOffsetX ?? BIKE.spriteOffsetX;
     const bikeOffsetY = activeSkin.spriteOffsetY ?? BIKE.spriteOffsetY;
+
+    // 鬼影車皮（紀錄保持者提交當下用的車，不是玩家自己選用的車，還原真實狀況）：
+    // 找不到對應 id（未知/舊資料）fallback 預設車，跟玩家自己選用車皮的邏輯完全獨立。
+    const ghostSkin = (ghostSkinId && BIKE_SKINS.find((s) => s.id === ghostSkinId)) || BIKE_SKINS[0];
+    const ghostImgSrc = ghostSkin.src
+      ? `${import.meta.env.BASE_URL}${ghostSkin.src}`
+      : `${import.meta.env.BASE_URL}bike.png`;
+    const ghostBikeEntry = getBikeImageEntry(ghostImgSrc);
+    const ghostSpriteW = ghostSkin.spriteW ?? BIKE.spriteW;
+    const ghostOffsetX = ghostSkin.spriteOffsetX ?? BIKE.spriteOffsetX;
+    const ghostOffsetY = ghostSkin.spriteOffsetY ?? BIKE.spriteOffsetY;
     const bikeHueDeg = activeSkin.src ? 0 : activeSkin.hueRotateDeg;
     const bikeFilter = bikeHueDeg !== 0 ? `hue-rotate(${bikeHueDeg}deg)` : "none";
 
@@ -1338,31 +1352,16 @@ let crashTimer = 0;
       );
     };
 
-    // 鬼影去色車圖（離屏預渲染一次）：每幀設 ctx.filter 在 Android WebView 的
-    // Canvas2D 是已知昂貴操作（會強制走軟體路徑），改為首次要畫時烘一張灰階版，
-    // 之後每幀純 drawImage，成本跟畫自己的車一樣。
-    let ghostSpriteCanvas: HTMLCanvasElement | null = null;
-    const ghostSprite = (): HTMLCanvasElement | null => {
-      if (ghostSpriteCanvas) return ghostSpriteCanvas;
-      if (!bikeEntry.ready) return null;
-      const c = document.createElement("canvas");
-      c.width = bikeEntry.img.naturalWidth;
-      c.height = bikeEntry.img.naturalHeight;
-      const g = c.getContext("2d");
-      if (!g) return null;
-      g.filter = "grayscale(1) brightness(1.6)";
-      g.drawImage(bikeEntry.img, 0, 0);
-      ghostSpriteCanvas = c;
-      return c;
-    };
-
     // 第一名鬼影（純視覺、無物理）：依 raceTimeMs 對 ghostPath 線性插值。
     // v2 格式（[x,y,累計旋轉角] 每 250ms）＝完整復刻原局軌跡：空中拋物線、後空翻
     // 轉速、落地姿態全都是當時的真實數據（角度是累計值不繞圈，插值天然正確）；
     // v1 舊格式（純 x 每 500ms，vc28 錄的）＝退回貼地重建（地形函式算高度/傾角）。
-    // 半透明+去色，跟玩家自己的車一眼區分。
+    // 貼紀錄保持者當下實際使用的車皮（ghostBikeEntry，見上方 ghostSkin），不套去色
+    // 濾鏡——半透明（globalAlpha 0.32）已足以跟玩家自己的車一眼區分，且能讓玩家
+    // 看清楚對手騎的是什麼車款（也是車庫買車的展示誘因）。無 ctx.filter 疊加，跟
+    // 畫玩家自己的車一樣直接 drawImage，Android WebView Canvas2D 成本零增加。
     const drawGhost = () => {
-      if (!ghostPath || ghostPath.length < 2) return;
+      if (!ghostPath || ghostPath.length < 2 || !ghostBikeEntry.ready) return;
       const isV2 = Array.isArray(ghostPath[0]);
       const stepMs = isV2 ? REPLAY_SAMPLE_MS : 500;
       const idx = raceTimeMs / stepMs;
@@ -1388,18 +1387,16 @@ let crashTimer = 0;
       if (gx > track.finishX) return; // 鬼影已抵達終點，不繼續畫在終點閃爍
       const sx = wx(gx);
       if (sx < -60 || sx > W + 60) return; // 畫面外不畫，省效能
-      const sprite = ghostSprite();
-      if (!sprite) return;
       ctx.save();
       ctx.globalAlpha = 0.32;
       ctx.translate(sx, wy(gy));
       ctx.rotate(gAngle);
-      const w = bikeSpriteW;
-      const h = w * (sprite.height / sprite.width);
+      const w = ghostSpriteW;
+      const h = w * (ghostBikeEntry.img.naturalHeight / ghostBikeEntry.img.naturalWidth);
       ctx.drawImage(
-        sprite,
-        (-w / 2 + bikeOffsetX) * scale,
-        (-h / 2 + bikeOffsetY) * scale,
+        ghostBikeEntry.img,
+        (-w / 2 + ghostOffsetX) * scale,
+        (-h / 2 + ghostOffsetY) * scale,
         w * scale,
         h * scale,
       );

@@ -21,11 +21,20 @@ export interface ScoreRow {
 // v1（vc28）＝純數字陣列（x 每 500ms）；v2（vc29 起）＝[x, y, 累計旋轉角] 每 250ms。
 export type GhostPathData = (number | [number, number, number])[];
 
+// 鬼影完整資料＝路徑 + 紀錄保持者當下使用的車皮 id（2026-07-15 起，見
+// migration_20260715.sql）。skinId 找不到對應車款時渲染端會 fallback 預設車。
+export interface GhostRecord {
+  path: GhostPathData;
+  skinId: string;
+}
+
 export interface SubmitStats {
   score: number;
   timeMs: number;
   flips: number;
   perfect: number;
+  // 提交當下玩家使用的車皮 id，供其他玩家的鬼影還原真實車款（見 migration_20260715.sql）。
+  skinId?: string;
   // 反作弊 Phase C + Ghost 用的輕量錄製（見 migration_20260712b/20260713b.sql）。
   // 舊版客戶端沒有這欄位時 RPC 用 p_replay 預設值 null，完全向下相容。
   replay?: { events: [number, string, number][]; path: [number, number, number][] };
@@ -90,6 +99,7 @@ export async function submitDailyScore(
         p_flips:   s.flips,
         p_perfect: s.perfect,
         p_replay:  s.replay ?? null,
+        p_skin_id: s.skinId ?? "default",
       }),
     });
     if (r.ok) {
@@ -104,10 +114,12 @@ export async function submitDailyScore(
   }
 }
 
-// Ghost 鬼影賽跑：抓「當日目前第一名（非可疑）」的鬼影路徑（格式見 GhostPathData）。
-// 純公開讀取，anon key 即可（不需登入）。第一名還沒有帶 replay 的成績時會回 null
-//（正常現象，不是錯誤），呼叫端應靜默不顯示鬼影。
-export async function fetchDailyGhostPath(challengeDate: string): Promise<GhostPathData | null> {
+// Ghost 鬼影賽跑：抓「當日目前第一名（非可疑）」的鬼影路徑＋當時使用的車皮 id
+// （格式見 GhostRecord）。純公開讀取，anon key 即可（不需登入）。第一名還沒有帶
+// replay 的成績時會回 null（正常現象，不是錯誤），呼叫端應靜默不顯示鬼影。
+// RPC 改成 returns table(path, skin_id) 後 PostgREST 回傳陣列（見 migration_20260715.sql），
+// 跟舊版單一 jsonb 純量回傳格式不同，故取 data[0]。
+export async function fetchDailyGhostPath(challengeDate: string): Promise<GhostRecord | null> {
   if (!isLeaderboardConfigured) return null;
   try {
     const r = await fetch(`${URL}/rest/v1/rpc/get_daily_ghost_path`, {
@@ -116,8 +128,10 @@ export async function fetchDailyGhostPath(challengeDate: string): Promise<GhostP
       body: JSON.stringify({ p_date: challengeDate }),
     });
     if (!r.ok) return null;
-    const data = (await r.json()) as GhostPathData | null;
-    return Array.isArray(data) && data.length > 0 ? data : null;
+    const data = (await r.json()) as { path: GhostPathData | null; skin_id: string }[] | null;
+    const row = data?.[0];
+    if (!row || !Array.isArray(row.path) || row.path.length === 0) return null;
+    return { path: row.path, skinId: row.skin_id || "default" };
   } catch {
     return null;
   }
