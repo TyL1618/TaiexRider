@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
-import { TRACKS, trackDifficulty, type TrackData } from "./data/tracks";
+import type { TrackData } from "./data/tracks";
 import { fetchDailyMapList, fetchStockDailyMap, resolveSessionDisplayDate, type DailyMapMeta } from "./lib/dailyMap";
 import { fetchLongTrack, fetchLongPreview, type LongPick } from "./lib/longTrack";
 import Sparkline from "./components/Sparkline";
@@ -13,8 +13,6 @@ type SortDir = "asc" | "desc";
 const SORT_LABELS: Record<SortBy, string> = { code: "股號", difficulty: "困難度" };
 const DEFAULT_DIR: Record<SortBy, SortDir> = { code: "asc", difficulty: "desc" };
 const PAGE = 30;
-
-const LOCAL_INTRADAY = TRACKS.filter((t) => t.mode === "intraday");
 
 function starsFromScore(d: number): number {
   if (d < 0.005) return 1;
@@ -83,11 +81,11 @@ export default function TrackSelect({
     return () => obs.disconnect();
   }); // 無 deps：每次 render 後重新 attach，確保 sentinel 位置正確
 
-  // 前次盤勢：優先 Supabase，fallback 本地 24 支
+  // 前次盤勢：一律用 Supabase daily_map（resolveSessionDate 已內建「沿用最近一期」；
+  // 完全抓不到＝離線，顯示需連線提示）。曾經有 24 支打包進 build 的靜態樣本當 fallback
+  // 且選股時「本地優先」，導致熱門股永遠玩到 2026-06-15 的舊盤——已移除，不再走靜態。
   const intradayList = useMemo(() => {
-    const src: DailyMapMeta[] = remoteList.length > 0
-      ? remoteList
-      : LOCAL_INTRADAY.map((t) => ({ stock_code: t.label, stock_name: t.name, difficulty: trackDifficulty(t.prices) }));
+    const src: DailyMapMeta[] = remoteList;
     const q = query.trim().toLowerCase();
     let out = q ? src.filter((t) => t.stock_code.includes(q) || t.stock_name.toLowerCase().includes(q)) : src;
     if (sortBy === "difficulty") {
@@ -103,8 +101,6 @@ export default function TrackSelect({
 
   const handlePickIntraday = useCallback(async (item: DailyMapMeta) => {
     if (picking) return;
-    const local = LOCAL_INTRADAY.find((t) => t.label === item.stock_code);
-    if (local) { onPick(local); return; }
     setPicking(true);
     const row = await fetchStockDailyMap(dailyKey(), item.stock_code);
     setPicking(false);
@@ -130,7 +126,7 @@ export default function TrackSelect({
     });
   }, [longPicking, onPick]);
 
-  const intradayCount = remoteList.length > 0 ? remoteList.length : LOCAL_INTRADAY.length;
+  const intradayCount = remoteList.length;
   const visibleList   = intradayList.slice(0, visibleCount);
   const hasMore       = visibleCount < intradayList.length;
 
@@ -186,6 +182,8 @@ export default function TrackSelect({
         {mode === "intraday" ? (
           !remoteLoaded && remoteList.length === 0 ? (
             <p className="empty-hint">市場資料載入中…</p>
+          ) : remoteList.length === 0 ? (
+            <p className="empty-hint">需連線才能載入市場資料，請檢查網路後重進此頁</p>
           ) : intradayList.length === 0 ? (
             <p className="empty-hint">找不到「{query}」</p>
           ) : (

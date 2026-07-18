@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import Sparkline from "../components/Sparkline";
-import { dailyTrack, dailyKey } from "../data/pick";
+import { dailyKey } from "../data/pick";
 import { fetchDailyTop, fetchDailyGhostPath, invalidateDailyTop, isLeaderboardConfigured, type ScoreRow, type GhostRecord } from "../lib/leaderboard";
 import { fetchHardestDailyMap, resolveSessionDate, resolveSessionDisplayDate } from "../lib/dailyMap";
 import { signInWithGoogle, type User } from "../lib/auth";
@@ -52,14 +52,15 @@ export default function DailyChallenge({
   onPlay: (t: TrackData, ghost: GhostRecord | null) => void;
   onBack: () => void;
 }) {
-  const fallbackTrack = dailyTrack();
   // 標題日期 = 實際盤勢日（resolveSessionDate − 1），連假時 ≠ 今天 − 1。先放今天當 fallback，解析後更新。
   const [dateStr, setDateStr] = useState(() => {
     const t = new Date();
     return `${t.getFullYear()}/${String(t.getMonth() + 1).padStart(2, "0")}/${String(t.getDate()).padStart(2, "0")}`;
   });
-  const [track, setTrack] = useState<TrackData>(fallbackTrack);
-  const [isLive, setIsLive] = useState(false);
+  // 今日地圖一律來自 daily_map（resolveSessionDate 已內建連假沿用最近一期）。
+  // 抓不到（離線）就維持 null、擋住開始挑戰——排名賽榜是照真實地圖比的，
+  // 絕不能退回靜態舊圖讓玩家在不同地形上交分數。
+  const [track, setTrack] = useState<TrackData | null>(null);
   const [rows, setRows] = useState<ScoreRow[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -129,7 +130,6 @@ export default function DailyChallenge({
       if (!alive) return;
       if (row) {
         setTrack({ label: row.stock_code, name: row.stock_name, kind: "taiex", mode: "intraday", desc: "前一交易日走勢", prices: row.prices });
-        setIsLive(true);
       }
     });
     // 排行榜第 3~5 次「看廣告開始」會用到廣告，進畫面就在背景先備好，點下去幾乎瞬開。
@@ -213,7 +213,9 @@ export default function DailyChallenge({
         <div className="daily-tag">🏆 每日排名賽 ・ {dateStr}</div>
 
         <div className="daily-chart">
-          <Sparkline prices={track.prices} width={320} height={150} />
+          {track
+            ? <Sparkline prices={track.prices} width={320} height={150} />
+            : <div className="daily-chart-loading">今日地圖載入中…</div>}
         </div>
 
         {(() => {
@@ -236,10 +238,10 @@ export default function DailyChallenge({
         })()}
 
         <div className="daily-info">
-          <span className="daily-label">{track.label}</span>
-          <span className="daily-name">{track.name}</span>
+          <span className="daily-label">{track?.label ?? "——"}</span>
+          <span className="daily-name">{track?.name ?? ""}</span>
         </div>
-        <div className="daily-period">{isLive ? "前次盤勢 ・ 今日地圖" : "近月日線 ・ 今日地圖"}</div>
+        <div className="daily-period">{track ? "前次盤勢 ・ 今日地圖" : "需連線載入今日地圖"}</div>
 
         {streak > 0 && (
           <div className={`daily-streak${streakLive ? " live" : ""}`}>
@@ -286,7 +288,9 @@ export default function DailyChallenge({
           // 2026-07-07：未登入玩家完全鎖住不能開始（原本只是提示「登入後成績才會
           // 上榜」，卻仍能實際遊玩、還會消耗次數——同張地圖想玩免登入版本可以走
           // 自選賽道，排行榜這裡直接要求登入比較單純）。
-          const canPlay = !!user && attempts < MAX_ATTEMPTS && !serverMaxed;
+          // track === null＝今日地圖還沒載到（或離線）——排名賽必須在真實地圖上比，
+          // 地圖沒到手前不開放開始。
+          const canPlay = !!user && !!track && attempts < MAX_ATTEMPTS && !serverMaxed;
           const showAd  = !adsRemoved && attempts >= FREE_ATTEMPTS;
           const num     = attempts + 1; // 即將進行的第幾次
           // 已登入玩家先問伺服器 consume_attempt()（真正把關，清 localStorage 也繞不過）；
@@ -294,6 +298,7 @@ export default function DailyChallenge({
           // 第 3~5 次（showAd）：廣告要先看完才消耗次數——放在 consumeAttemptServer() 之前，
           // 廣告沒看完/失敗就直接 return，不會白白扣掉一次今日僅 5 次的挑戰機會。
           const handleStart = async () => {
+            if (!track) return;
             if (showAd) {
               setWatchingAd(true);
               const granted = await requestRewardedAd("coin");
@@ -346,6 +351,8 @@ export default function DailyChallenge({
               >
                 {!user
                   ? "登入才能挑戰"
+                  : !track
+                    ? "今日地圖載入中…"
                   : !canPlay
                     ? "今日已達上限"
                     : watchingAd

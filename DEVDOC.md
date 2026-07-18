@@ -257,6 +257,13 @@ log 一起回滾，前端又慣例把 RPC 失敗靜默吞掉 → 玩家只是「
 - **連假 fallback**：日曆日超過最後交易日的 map_date 時，`lte + desc` 往回取「最近
   一期」→ 整段沿用最後交易日的盤。（2026-06-20 曾因舊邏輯精準比對 `[今天,明天]` 錯過
   `map_date=6/19` 而掉回靜態 24 支。）
+- **靜態樣本已全數移除（2026-07-18）**：Phase 2 時代打包進 build 的 24 支
+  `sample-*.json`（2026-06-15 快照）曾同時是 fallback 兼「選股時本地優先」的短路來源
+  ——TrackSelect/RandomSlot 只要選/抽到那 24 支熱門股就直接用舊快照、完全不查
+  daily_map，造成「愈熱門的股票盤勢愈舊」（7/17 史上大跌隔天被玩家發現 0050/2330
+  地圖對不上真實盤勢）。現在三個入口（自選/隨機/每日排名賽）一律只走 daily_map，
+  完全抓不到（離線）就顯示需連線提示／鎖住開始鈕，**絕不退回過期地圖**——排名賽
+  尤其如此，榜是照真實地圖比的，退回舊圖等於讓玩家在不同地形上交分數。
 - **排行榜對齊（同一張榜跨連假）**：challenge key 也用 `resolveSessionDate()`，讀取
   （`DailyChallenge`）、提交清快取（`leaderboard.ts`）、RPC 寫入（`submit_daily_score`
   的 `v_today := coalesce(max(map_date)≤台灣今天, 台灣日曆日)`）三者同源 → 週末/連假
@@ -422,11 +429,10 @@ src/
 │   └── StatsScreen.tsx    # 隱藏統計頁（連點版本號 5 下開啟，admin_stats RPC）
 ├── TrackSelect.tsx        # 自選賽道（Supabase ~1000 支 + 無限捲動 30/次）
 ├── data/
-│   ├── tracks.ts          # 本地內建 24 支賽道（月線 fallback）
-│   ├── pick.ts            # dailyKey() / dailyTrack()
+│   ├── tracks.ts          # TrackData 型別（靜態 24 支樣本 2026-07-18 已移除，見 §3.1b）
+│   ├── pick.ts            # dailyKey()
 │   ├── classics.ts        # 經典模式型別 + classicToTrack()
-│   ├── classics.json      # 經典關卡靜態資料（scripts/fetchClassics.ts 一次性產出）
-│   └── sample-*.json      # 預抓樣本（2330/0050/2454/TAIEX）
+│   └── classics.json      # 經典關卡靜態資料（scripts/fetchClassics.ts 一次性產出）
 ├── lib/
 │   ├── dailyMap.ts           # Supabase daily_map 讀取 + promise 快取
 │   ├── leaderboard.ts        # Supabase daily_scores 讀寫
