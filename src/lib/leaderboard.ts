@@ -72,13 +72,18 @@ export function fetchDailyTop(challengeDate: string, limit = 100): Promise<Score
   return _topCache.get(challengeDate)!;
 }
 
+// 2026-07-21k 起改呼叫 get_daily_top() RPC（即時 join player_wallet.equipped），
+// 不再直接 REST 查 daily_scores_ranked VIEW——VIEW 沒有權限 join player_wallet
+// （該表 revoke all from anon/authenticated，只有 security definer 函式能讀），
+// 只能停在提交當下的快照，玩家「打完當日次數後才回車庫換裝備」時排行榜會整天
+// 看不到最新裝備，體驗比純本地讀還差，見 migration_20260721k.sql。
 async function _fetchTop(challengeDate: string, limit: number): Promise<ScoreRow[]> {
-  const q =
-    `${URL}/rest/v1/daily_scores_ranked?challenge_date=eq.${challengeDate}` +
-    `&order=score.desc,time_ms.asc&limit=${limit}` +
-    `&select=player_name,score,time_ms,flips,perfect,cosmetics`;
   try {
-    const r = await fetch(q, { headers: anonHeaders() });
+    const r = await fetch(`${URL}/rest/v1/rpc/get_daily_top`, {
+      method: "POST",
+      headers: { ...anonHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({ p_date: challengeDate, p_limit: limit }),
+    });
     if (!r.ok) return [];
     return (await r.json()) as ScoreRow[];
   } catch {
