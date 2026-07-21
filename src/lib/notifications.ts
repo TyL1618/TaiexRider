@@ -21,12 +21,34 @@ import { LocalNotifications } from "@capacitor/local-notifications";
 const ASKED_KEY = "tr_notif_asked"; // 已經跳過一次系統權限框（不分帳號：權限是裝置級的）
 const REMINDER_ID = 9001;           // 固定 id：重複 schedule 會覆蓋同 id 的舊排程
 
+// 通知頻道（Android 8+ 強制）：不指定的話外掛套內建預設頻道，使用者去「設定→App→
+// 通知」看到的是看不懂的英文預設分類名。自建一個有中文名的頻道，讓使用者能一眼看懂
+// 這是什麼通知、能獨立開關。channelId 要跟 schedule 時帶的一致，否則各走各的頻道。
+const CHANNEL_ID = "daily_reminder";
+
 // 每天 8:00：台灣午夜已換圖，早上發送讓玩家一整天都還有機會上榜，
 // 避免傍晚才提醒導致只剩幾小時可玩（2026-07-15 由 20:00 改到早上）。
 const REMINDER_HOUR = 8;
 
+// 建立/更新中文命名的通知頻道。冪等：同 id 重複呼叫是更新不是新增。
+// 只在 Android 有效（iOS 沒有頻道概念，外掛在 iOS 是 no-op）。importance 3 = 預設
+// （會出現在狀態列但不會強制彈出橫幅/聲音打擾），對「每日提醒」剛好。
+async function ensureChannel(): Promise<void> {
+  try {
+    await LocalNotifications.createChannel({
+      id: CHANNEL_ID,
+      name: "每日賽道提醒",
+      description: "每天早上提醒你今日賽道已更新",
+      importance: 3,
+    });
+  } catch (err) {
+    console.warn("[notif] 建立通知頻道失敗", err);
+  }
+}
+
 async function scheduleDaily(): Promise<void> {
   try {
+    await ensureChannel();
     // 先取消再排，確保任何舊版排程（未來若改時間/文案）不殘留
     await LocalNotifications.cancel({ notifications: [{ id: REMINDER_ID }] });
     await LocalNotifications.schedule({
@@ -35,6 +57,8 @@ async function scheduleDaily(): Promise<void> {
         title: "TAIEX RIDER",
         body: "今日賽道已更新，上榜機會別錯過 🏍️",
         schedule: { on: { hour: REMINDER_HOUR, minute: 0 }, allowWhileIdle: true },
+        // 指定自建的中文頻道（見 CHANNEL_ID / ensureChannel），不指定會落到外掛預設頻道。
+        channelId: CHANNEL_ID,
         // Android 5.0+ 狀態列小圖示規定必須是白色去背剪影，不能是彩色 App icon
         // （不指定的話外掛回退用彩色 icon，系統無法轉剪影會顯示系統預設的「i」符號）。
         // 剪影圖檔見 android/app/src/main/res/drawable-*dpi/ic_stat_notify.png。
