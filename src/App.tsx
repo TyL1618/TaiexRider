@@ -11,6 +11,7 @@ import RandomSlot from "./screens/RandomSlot";
 import DailyChallenge from "./screens/DailyChallenge";
 import ClassicSelect from "./screens/ClassicSelect";
 import Garage from "./screens/Garage";
+import LotterySlot from "./screens/LotterySlot";
 import type { TrackData } from "./data/tracks";
 import { submitDailyScore, fetchDailyTop, type GhostRecord } from "./lib/leaderboard";
 import { submitClassicRecord } from "./lib/classicRecords";
@@ -250,7 +251,7 @@ export default function App() {
   // 疊在哨兵 entry 之上。
   useEffect(() => {
     const goto = new URLSearchParams(window.location.search).get("goto");
-    if (goto === "daily" || goto === "random" || goto === "custom" || goto === "classic") {
+    if (goto === "daily" || goto === "random" || goto === "custom" || goto === "classic" || goto === "lottery") {
       window.history.replaceState(null, "", window.location.pathname);
       window.history.pushState({ taiex: true }, "");
       screenRef.current = goto;
@@ -425,6 +426,7 @@ export default function App() {
   if (screen === "random")  return <RandomSlot    onPick={handleStartTrack} onBack={goHome} />;
   if (screen === "classic") return <ClassicSelect user={user} onPick={handleStartTrack} onBack={goHome} />;
   if (screen === "garage")  return <Garage user={user} onBack={goHome} />;
+  if (screen === "lottery") return <LotterySlot user={user} onBack={goHome} />;
   if (screen === "daily")  return (
     <DailyChallenge
       user={user}

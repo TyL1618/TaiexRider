@@ -193,6 +193,69 @@ export function playSlotStop() {
   src.stop(now + 0.09);
 }
 
+// ---- 抽獎轉輪音效（LotterySlot，質感獨立於選賽道拉霸機，走「水晶鈴」音色）----
+
+// 「叮」：水晶鈴滾輪音，用純正弦+泛音疊加取代木頭撞擊感，聽起來更輕盈/高級。
+export function playLotteryTick() {
+  const c = ctx();
+  const now = c.currentTime;
+  const f0 = 1400 + Math.random() * 300;
+  for (const mul of [1, 2.4]) {
+    const osc = c.createOscillator();
+    const gain = c.createGain();
+    osc.connect(gain);
+    gain.connect(masterGain());
+    osc.type = "sine";
+    osc.frequency.value = f0 * mul;
+    gain.gain.setValueAtTime(mul === 1 ? 0.09 : 0.03, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+    osc.start(now);
+    osc.stop(now + 0.055);
+  }
+}
+
+// 「鐺——」：停格收尾，比拉霸機的「哐」更悠揚（長尾正弦+高頻泛音，鐘聲質感）。
+export function playLotteryStop() {
+  const c = ctx();
+  const now = c.currentTime;
+  for (const [mul, amp] of [[1, 0.24], [2, 0.1], [3, 0.05]] as [number, number][]) {
+    const osc = c.createOscillator();
+    const gain = c.createGain();
+    osc.connect(gain);
+    gain.connect(masterGain());
+    osc.type = "sine";
+    osc.frequency.value = 660 * mul;
+    gain.gain.setValueAtTime(amp, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.9);
+    osc.start(now);
+    osc.stop(now + 0.95);
+  }
+}
+
+// 稀有中獎收尾：普通獎項不用另外呼叫（停格音已經夠），P 系列/黑天鵝這種大獎額外
+// 加一段上揚琶音強化爽感，rarity 影響音高range/顆數——黑天鵝用最高階、最多顆音符。
+export function playLotteryWin(rarity: "rare" | "epic") {
+  const c = ctx();
+  const now = c.currentTime;
+  const notes = rarity === "epic"
+    ? [523, 659, 784, 1047, 1319] // C5-E5-G5-C6-E6，黑天鵝專屬更燦爛
+    : [523, 659, 784, 1047];      // P 系列車款
+  notes.forEach((freq, i) => {
+    const osc = c.createOscillator();
+    const gain = c.createGain();
+    osc.connect(gain);
+    gain.connect(masterGain());
+    osc.type = "triangle";
+    osc.frequency.value = freq;
+    const t = now + i * 0.09;
+    gain.gain.setValueAtTime(0.001, t);
+    gain.gain.linearRampToValueAtTime(0.26, t + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+    osc.start(t);
+    osc.stop(t + 0.52);
+  });
+}
+
 // ---- 引擎持續音 ----
 
 let engOsc: OscillatorNode | null = null;

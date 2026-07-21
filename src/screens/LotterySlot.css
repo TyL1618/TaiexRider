@@ -1,0 +1,100 @@
+/* 抽獎轉輪：金色/黑色高級質感，跟 RandomSlot 的青/紅配色做出區隔 */
+
+.lottery-title {
+  color: var(--neon-amber);
+  text-shadow: 0 0 8px var(--neon-amber), 0 0 24px rgba(255, 179, 0, 0.4);
+}
+
+.lottery-machine {
+  background: linear-gradient(160deg, rgba(255, 179, 0, 0.14), rgba(10, 10, 14, 0.4));
+  border: 2px solid rgba(255, 179, 0, 0.45);
+  box-shadow: 0 0 34px rgba(255, 179, 0, 0.25), inset 0 0 26px rgba(0, 0, 0, 0.65);
+}
+
+.lottery-item-icon {
+  font-size: 1.7rem;
+  line-height: 1;
+}
+
+.lottery-winline {
+  border-top: 2px solid var(--neon-amber);
+  border-bottom: 2px solid var(--neon-amber);
+  box-shadow: 0 0 18px rgba(255, 179, 0, 0.55), inset 0 0 24px rgba(255, 179, 0, 0.14);
+}
+
+.lottery-spin-btn {
+  background: var(--neon-amber);
+  box-shadow: 0 0 24px rgba(255, 179, 0, 0.55);
+}
+.lottery-paid-btn {
+  background: linear-gradient(135deg, #7dd3ea, var(--neon-cyan));
+}
+
+.lottery-error {
+  margin-top: 0.6rem;
+  font-size: 0.8rem;
+  color: var(--neon-red, #ff4d5e);
+}
+
+.lottery-odds-link {
+  margin-top: 0.9rem;
+  font-size: 0.82rem;
+}
+
+.lottery-result-icon {
+  font-size: 3.2rem;
+  line-height: 1;
+}
+
+.lottery-odds-modal {
+  gap: 0.9rem;
+}
+.lottery-odds-title {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: var(--neon-amber);
+  letter-spacing: 0.06em;
+}
+.lottery-odds-list {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  max-height: 50vh;
+  overflow-y: auto;
+}
+.lottery-odds-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.8rem;
+  font-size: 0.85rem;
+  color: var(--text-dim);
+  padding: 0.2rem 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.lottery-odds-pct {
+  color: var(--text);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* 稀有中獎特效：畫面震動 + 對應主題色暈染，rare=P系列金色、epic=黑天鵝黑金 */
+@keyframes lottery-shake {
+  0%, 100% { transform: translate(0, 0); }
+  20% { transform: translate(-6px, 3px); }
+  40% { transform: translate(5px, -4px); }
+  60% { transform: translate(-4px, -2px); }
+  80% { transform: translate(6px, 2px); }
+}
+.lottery-shake-rare { animation: lottery-shake 0.4s ease-in-out 2; }
+.lottery-shake-epic { animation: lottery-shake 0.4s ease-in-out 3; }
+
+.lottery-result-rare {
+  border-color: var(--neon-amber) !important;
+  box-shadow: 0 0 40px rgba(255, 179, 0, 0.55) !important;
+}
+.lottery-result-epic {
+  border-color: #b39ddb !important;
+  background: linear-gradient(160deg, rgba(10, 10, 14, 0.96), rgba(40, 20, 50, 0.9)) !important;
+  box-shadow: 0 0 50px rgba(179, 157, 219, 0.6), 0 0 90px rgba(255, 179, 0, 0.25) !important;
+}

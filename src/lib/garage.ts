@@ -107,6 +107,14 @@ export const BIKE_SKINS: BikeSkin[] = [
     price: 600, currency: "diamond", hueRotateDeg: 0, src: "bikes/p2-galaxy.png",
     spriteW: 73.3, spriteOffsetX: -0.4, spriteOffsetY: -2.7,
   },
+  // 黑天鵝（隱藏車款，見 LOTTERY_DESIGN.md §3）：locked:true 沿用 Q 系列「不自動
+  // 擁有」機制，但解鎖來源是抽獎 lottery_spin() RPC，不是成就系統。取得前 Garage.tsx
+  // 用全黑剪影渲染（濾鏡處理，不用另外做美術），src 待 Grok 出圖完成後補上。
+  {
+    id: "hidden-blackswan", name: "黑天鵝", desc: "萬中無一的異象降臨，抽獎極稀有大獎",
+    price: 0, locked: true, hueRotateDeg: 0, src: "bikes/hidden-blackswan.png",
+    spriteW: 75, spriteOffsetX: 0, spriteOffsetY: -5,
+  },
 ];
 
 const COINS_KEY = "tr_garage_coins";
@@ -114,6 +122,7 @@ const DIAMONDS_KEY = "tr_garage_diamonds";
 const OWNED_KEY = "tr_garage_owned";
 const ACTIVE_KEY = "tr_garage_active";
 const ADS_REMOVED_KEY = "tr_ads_removed";
+const TICKETS_KEY = "tr_garage_tickets"; // 廣告券（LOTTERY_DESIGN.md §6），伺服器權威同 coins/diamonds
 
 // 目前裝備車皮（ACTIVE_KEY）帳號隔離：跟 coins/diamonds/owned 不同，這個偏好從來
 // 沒有存在伺服器上（純本地選擇），舊版是單一全域 key，登出時 resetWalletCache() 會
@@ -142,6 +151,9 @@ function writeOwnedCache(owned: string[]): void {
 function writeAdsRemovedCache(v: boolean): void {
   try { localStorage.setItem(ADS_REMOVED_KEY, v ? "1" : "0"); } catch { /* 靜默 */ }
 }
+export function writeTicketsCache(n: number): void {
+  try { localStorage.setItem(TICKETS_KEY, String(Math.max(0, n))); } catch { /* 靜默 */ }
+}
 
 // 永久去廣告：復活廣告/每日拿金幣廣告/每日排名賽後 3 次挑戰的廣告標籤，購買後全部跳過
 // （見 App.tsx/GameCanvas.tsx/Garage.tsx/DailyChallenge.tsx 的判斷點）。未登入一律 false
@@ -164,7 +176,7 @@ export async function syncWalletFromServer(): Promise<void> {
     coins: number; diamonds: number; owned: string[];
     bull_finishes: number; bear_finishes: number;
     streak_count: number; last_session_key: string | null;
-    collection: string[]; ads_removed: boolean;
+    collection: string[]; ads_removed: boolean; tickets: number;
   };
   writeCoinsCache(row.coins);
   writeDiamondsCache(row.diamonds);
@@ -173,6 +185,7 @@ export async function syncWalletFromServer(): Promise<void> {
   writeStreakCache(row.last_session_key, row.streak_count);
   writeCollectionCache(row.collection ?? []);
   writeAdsRemovedCache(row.ads_removed ?? false);
+  writeTicketsCache(row.tickets ?? 0);
 }
 
 // 購買永久去廣告成功後呼叫（garage.ts 以外的地方買完直接寫快取，不用整包重新同步）。
@@ -192,6 +205,15 @@ export function resetWalletCache(): void {
   resetStreakCache();
   resetCollectionCache();
   writeAdsRemovedCache(false);
+  writeTicketsCache(0);
+}
+
+export function getTickets(): number {
+  try {
+    return parseInt(localStorage.getItem(TICKETS_KEY) ?? "0", 10) || 0;
+  } catch {
+    return 0;
+  }
 }
 
 // 完賽時呼叫（App.tsx，僅已登入玩家；未登入走 achievements.ts 本地 recordFinish）。
@@ -400,4 +422,121 @@ export function setActiveSkin(id: string, uid: string | null = null): boolean {
 // GameCanvas 繪車時讀取目前選用的完整車皮設定
 export function getActiveBikeSkin(uid: string | null = null): BikeSkin {
   return BIKE_SKINS.find((s) => s.id === getActiveSkinId(uid)) ?? BIKE_SKINS[0];
+}
+
+// ============================================================
+// 抽獎轉輪 + 鑽石新出口（LOTTERY_DESIGN.md）——只有已登入玩家能用（跟鑽石一樣，
+// 訪客沒有伺服器錢包可寫入）。中獎結果一律伺服器 lottery_spin() 決定，前端
+// 只負責播動畫，見文件 §8 技術要求。
+// ============================================================
+
+export interface LotterySpinResult {
+  ok: boolean;
+  prizeKind: "diamond" | "skin" | null;
+  prizeId: string | null; // 鑽石數量（文字）或車款 id
+  diamonds: number;
+  tickets: number;
+  owned: string[];
+}
+
+// p_paid=false：消耗今日免費額度（上限 2，超過 ok=false）；p_paid=true：扣 20 鑽石抽一次。
+export async function lotterySpin(paid: boolean): Promise<LotterySpinResult | null> {
+  const uid = await getUid();
+  if (!uid) return null;
+  const { data, error } = await supabase.rpc("lottery_spin", { p_paid: paid });
+  if (error || !data || !data[0]) { console.error("[lottery] lottery_spin 失敗", error); return null; }
+  const row = data[0] as {
+    ok: boolean; prize_kind: "diamond" | "skin" | null; prize_id: string | null;
+    diamonds: number; tickets: number; owned: string[];
+  };
+  writeDiamondsCache(row.diamonds);
+  writeTicketsCache(row.tickets);
+  writeOwnedCache(row.owned);
+  return { ok: row.ok, prizeKind: row.prize_kind, prizeId: row.prize_id, diamonds: row.diamonds, tickets: row.tickets, owned: row.owned };
+}
+
+// 今日已用的免費抽獎次數（進抽獎畫面時呼叫，決定按鈕顯示「看廣告抽」還是「20鑽石/次」）。
+export async function lotteryState(): Promise<number | null> {
+  const uid = await getUid();
+  if (!uid) return null;
+  const { data, error } = await supabase.rpc("lottery_state");
+  if (error || !data || !data[0]) return null;
+  return (data[0] as { free_spins_used: number }).free_spins_used;
+}
+
+// 購買鑽石新出口道具（暱稱顏色/稱號/前綴圖示/尾焰特效顏色/鬼影顏色），id 前綴見
+// LOTTERY_DESIGN.md §4 白名單。黑天鵝專屬項目不在白名單內，伺服器會靜默拒絕。
+export async function walletSpendItem(itemId: string): Promise<boolean> {
+  if (isOwned(itemId)) return true;
+  const uid = await getUid();
+  if (!uid) return false;
+  const { data, error } = await supabase.rpc("wallet_spend_item", { p_item_id: itemId });
+  if (error || !data || !data[0]) return false;
+  const row = data[0] as { diamonds: number; owned: string[]; ok: boolean };
+  writeDiamondsCache(row.diamonds);
+  writeOwnedCache(row.owned);
+  return row.ok;
+}
+
+// 花 1 張票券跳過廣告（用於「復活」這類非貨幣型獎勵，扣成功後前端照既有
+// 「看完廣告」邏輯繼續走）。
+export async function consumeTicket(): Promise<boolean> {
+  const uid = await getUid();
+  if (!uid) return false;
+  const { data, error } = await supabase.rpc("consume_ticket");
+  if (error || !data || !data[0]) return false;
+  const row = data[0] as { ok: boolean; tickets: number };
+  writeTicketsCache(row.tickets);
+  return row.ok;
+}
+
+// 花 1 張票券直接領取原本要看廣告才有的貨幣獎勵（車庫拿金幣/結算雙倍，含長征模式）。
+// p_amount 只有 kind==="long_crash" 才會用到，同 earnCoins() 的既有慣例。
+export async function earnViaTicket(
+  kind: "finish" | "crash" | "long_finish" | "long_crash" | "quest" | "ad",
+  amount?: number,
+): Promise<boolean> {
+  const uid = await getUid();
+  if (!uid) return false;
+  const { data, error } = await supabase.rpc("wallet_earn_via_ticket", { p_kind: kind, p_amount: amount ?? null });
+  if (error || !data || !data[0]) return false;
+  const row = data[0] as { ok: boolean; coins: number; diamonds: number; tickets: number };
+  writeCoinsCache(row.coins);
+  writeDiamondsCache(row.diamonds);
+  writeTicketsCache(row.tickets);
+  return row.ok;
+}
+
+// 看廣告換 1 張票券，每日上限 2 張。
+export async function earnTicket(): Promise<boolean | null> {
+  const uid = await getUid();
+  if (!uid) return null;
+  const { data, error } = await supabase.rpc("wallet_earn_ticket");
+  if (error || !data || !data[0]) return null;
+  const row = data[0] as { ok: boolean; tickets: number };
+  writeTicketsCache(row.tickets);
+  return row.ok;
+}
+
+// ── 個人化裝備（稱號/暱稱顏色/前綴圖示/尾焰特效顏色/鬼影顏色）：純本地偏好，
+// 帳號隔離，比照 activeSkinKey() 的既有慣例（見該函式註解——這類「目前裝備中」
+// 的展示偏好不是安全/公平性敏感資料，只有「擁有清單」才需要伺服器權威）。
+function cosmeticActiveKey(kind: string, uid: string | null): string {
+  return `tr_${kind}_active_${uid ?? "guest"}`;
+}
+export function getActiveCosmetic(kind: "title" | "nickcolor" | "badge" | "trail" | "ghostcolor", uid: string | null = null): string | null {
+  try {
+    const id = localStorage.getItem(cosmeticActiveKey(kind, uid));
+    return id && isOwned(id) ? id : null;
+  } catch {
+    return null;
+  }
+}
+export function setActiveCosmetic(kind: "title" | "nickcolor" | "badge" | "trail" | "ghostcolor", id: string | null, uid: string | null = null): boolean {
+  if (id !== null && !isOwned(id)) return false;
+  try {
+    if (id === null) localStorage.removeItem(cosmeticActiveKey(kind, uid));
+    else localStorage.setItem(cosmeticActiveKey(kind, uid), id);
+  } catch { /* 靜默 */ }
+  return true;
 }

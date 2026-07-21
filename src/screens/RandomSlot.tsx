@@ -7,7 +7,10 @@ import { playSlotTick, playSlotStop } from "../game/audio";
 import "./RandomSlot.css";
 
 const ITEM_H = 72;
-const VISIBLE = 7;
+// 2026-07-21 使用者回報「抽賽道」按鈕貼在畫面最下緣不好按：VISIBLE 從 7 縮到 5
+// （少 2 個項目高度＝144px），.slot-screen 用 justify-content:center 置中整個
+// 區塊，滾輪變矮後整組（標題/滾輪/按鈕）自然往畫面中央靠、按鈕跟著往上移。
+const VISIBLE = 5;
 const VIEWPORT_H = ITEM_H * VISIBLE;
 const CENTER_OFFSET = (VIEWPORT_H - ITEM_H) / 2;
 const REPEAT = 8;

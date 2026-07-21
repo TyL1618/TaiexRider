@@ -14,7 +14,7 @@ import { logEvent } from "../lib/analytics";
 import { haptics } from "../lib/haptics";
 import { fetchDeathHeatmap } from "../lib/deathHeatmap";
 import { startWakeLock } from "../lib/wakeLock";
-import { getActiveBikeSkin, addCoins, earnCoins, getAdsRemoved, BIKE_SKINS } from "../lib/garage";
+import { getActiveBikeSkin, addCoins, earnCoins, earnViaTicket, consumeTicket, getTickets, getAdsRemoved, BIKE_SKINS } from "../lib/garage";
 import { requestRewardedAd, preloadRewardedAd } from "../lib/ads";
 import { grantPlayReward, computePlayReward } from "../lib/playRewards";
 import { maybeRequestReview } from "../lib/review";
@@ -218,17 +218,24 @@ export default function GameCanvas({ prices, label, name, subtitle, onExit, onGa
   // 摔車當下走到賽道的比例（0~1），長征模式摔車金幣按比例、雙倍時也照這個比例算。
   const deathProgressRef = useRef(0);
   const [adDoubleState, setAdDoubleState] = useState<"idle" | "watching" | "claimed">("idle");
+  const [tickets, setTickets] = useState(() => getTickets());
+  const [showTicketPrompt, setShowTicketPrompt] = useState<"revive" | "double" | null>(null);
   const coinRewardEligible = analyticsMode !== "daily" && analyticsMode !== "classic";
   const isLongMarch = analyticsMode === "long";
+
+  const doubleKind = () => (isLongMarch ? (finished ? "long_finish" : "long_crash") : (finished ? "finish" : "crash"));
+  const doubleAmount = () => computePlayReward(isLongMarch, finished, finished ? 1 : deathProgressRef.current);
+
+  const grantDoubleLocal = (amount: number) => {
+    addCoins(grantPlayReward(dailyKey(), amount, uid));
+  };
+
   const handleWatchAdDouble = () => {
     if (!coinRewardEligible || adDoubleState !== "idle") return;
     const grantDouble = () => {
-      const progressPct = finished ? 1 : deathProgressRef.current;
-      const amount = computePlayReward(isLongMarch, finished, progressPct);
-      addCoins(grantPlayReward(dailyKey(), amount, uid));
-      const kind = isLongMarch
-        ? (finished ? "long_finish" : "long_crash")
-        : (finished ? "finish" : "crash");
+      const amount = doubleAmount();
+      grantDoubleLocal(amount);
+      const kind = doubleKind();
       earnCoins(kind, kind === "long_crash" ? amount : undefined);
     };
     // 已買永久去廣告：不用看廣告，點擊直接領取雙倍（比照看廣告復活的既有作法）
@@ -237,11 +244,29 @@ export default function GameCanvas({ prices, label, name, subtitle, onExit, onGa
       grantDouble();
       return;
     }
+    // 有票券：先問要不要消耗一張跳過廣告直接領取（LOTTERY_DESIGN.md §6）
+    if (tickets > 0) {
+      setShowTicketPrompt("double");
+      return;
+    }
     setAdDoubleState("watching");
     requestRewardedAd("coin").then((ok) => {
       setAdDoubleState(ok ? "claimed" : "idle");
       if (ok) grantDouble();
     });
+  };
+
+  // 票券消耗＝直接呼叫 wallet_earn_via_ticket，伺服器一次做完「扣票券+發金幣」，
+  // 跟看廣告共用同一組每日上限，不會多領；本地端的 grantPlayReward 樂觀更新照樣做，
+  // 讓畫面立刻反映（跟看廣告路徑的 grantDouble() 行為一致）。
+  const useTicketForDouble = async () => {
+    setShowTicketPrompt(null);
+    const amount = doubleAmount();
+    grantDoubleLocal(amount);
+    const kind = doubleKind();
+    const ok = await earnViaTicket(kind, kind === "long_crash" ? amount : undefined);
+    setTickets(getTickets());
+    setAdDoubleState(ok ? "claimed" : "idle");
   };
   // 結算面板剛彈出時短暫吃掉點擊（防止摔車/完賽瞬間手指還按著油門，畫面切換後
   // 抬指剛好落在新出現的「分享成績」等按鈕上被誤判成一次點擊）
@@ -277,6 +302,11 @@ export default function GameCanvas({ prices, label, name, subtitle, onExit, onGa
       requestRevive();
       return;
     }
+    // 有票券：先問要不要消耗一張跳過廣告直接復活（LOTTERY_DESIGN.md §6）
+    if (tickets > 0) {
+      setShowTicketPrompt("revive");
+      return;
+    }
     setReviveWatching(true);
     requestRewardedAd("revive").then((ok) => {
       setReviveWatching(false);
@@ -285,6 +315,17 @@ export default function GameCanvas({ prices, label, name, subtitle, onExit, onGa
         requestRevive();
       }
     });
+  };
+
+  // 復活不涉及貨幣，只是一個布林門檻，消耗 1 張票券成功即可直接復活。
+  const useTicketForRevive = async () => {
+    setShowTicketPrompt(null);
+    const ok = await consumeTicket();
+    setTickets(getTickets());
+    if (ok) {
+      setRevivalUsed(true);
+      requestRevive();
+    }
   };
 
   // 進遊戲就在背景把「復活」廣告備好——摔車是隨時可能發生、也最想「立刻復活」的
@@ -1887,6 +1928,50 @@ let crashTimer = 0;
               );
             })()}
           </div>
+          {showTicketPrompt && (
+            <div className="modal-overlay" onClick={() => setShowTicketPrompt(null)}>
+              <div className="slot-result" onClick={(e) => e.stopPropagation()}>
+                <div className="overlay-play-reward-amount">
+                  🎫 要消耗一張票券，{showTicketPrompt === "revive" ? "直接復活" : "直接領取雙倍獎勵"}嗎？
+                </div>
+                <div className="slot-result-actions">
+                  <button
+                    className="modal-btn"
+                    onClick={showTicketPrompt === "revive" ? useTicketForRevive : useTicketForDouble}
+                  >
+                    消耗票券
+                  </button>
+                  <button
+                    className="modal-link"
+                    onClick={() => {
+                      const kind = showTicketPrompt;
+                      setShowTicketPrompt(null);
+                      if (kind === "revive") {
+                        setReviveWatching(true);
+                        requestRewardedAd("revive").then((ok) => {
+                          setReviveWatching(false);
+                          if (ok) { setRevivalUsed(true); requestRevive(); }
+                        });
+                      } else {
+                        setAdDoubleState("watching");
+                        requestRewardedAd("coin").then((ok) => {
+                          setAdDoubleState(ok ? "claimed" : "idle");
+                          if (ok) {
+                            const amount = doubleAmount();
+                            grantDoubleLocal(amount);
+                            const k = doubleKind();
+                            earnCoins(k, k === "long_crash" ? amount : undefined);
+                          }
+                        });
+                      }
+                    }}
+                  >
+                    還是看廣告
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
           {/* 中段透明點擊區：切換賽道 / 走勢圖（長征模式無單一走勢圖，隱藏切換） */}
           {!hideMinimap ? (
             <div

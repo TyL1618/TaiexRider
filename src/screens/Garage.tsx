@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { BIKE_SKINS, getCoins, getDiamonds, isOwned, getActiveSkinId, purchaseSkin, setActiveSkin, addCoins, earnCoins, unlockAchievementSkin, syncWalletFromServer, fetchDailyUsage, writeDiamondsCache, getAdsRemoved, markAdsRemoved, type BikeSkin } from "../lib/garage";
+import { BIKE_SKINS, getCoins, getDiamonds, getTickets, isOwned, getActiveSkinId, purchaseSkin, setActiveSkin, addCoins, earnCoins, earnTicket, earnViaTicket, walletSpendItem, getActiveCosmetic, setActiveCosmetic, unlockAchievementSkin, syncWalletFromServer, fetchDailyUsage, writeDiamondsCache, getAdsRemoved, markAdsRemoved, type BikeSkin } from "../lib/garage";
 import { requestRewardedAd, preloadRewardedAd } from "../lib/ads";
 import { AD_COIN_REWARD, MAX_AD_COIN_CLAIMS_PER_DAY, getAdCoinClaims, incrementAdCoinClaims, setAdCoinClaims } from "../lib/adRewards";
 import { getAchievementBikes, type AchvBikeView } from "../lib/achievements";
@@ -15,11 +15,62 @@ import "./Garage.css";
 // 鑽石車款（P 系列）5 台已全數生圖完成，皆已登記進 garage.ts 的
 // BIKE_SKINS（currency:"diamond"），走一般購買流程，不再需要「敬請期待」佔位卡。
 
+// 個人化裝備（LOTTERY_DESIGN.md §4）：稱號/暱稱顏色/前綴圖示/尾焰特效顏色/鬼影顏色。
+// 價格白名單要跟 supabase migration_20260721.sql 的 wallet_spend_item() 同步，
+// 這裡改價格記得也要改 SQL。price:-1＝不可購買，只能靠抽獎轉輪贈送（黑天鵝專屬）。
+type CosmeticKind = "title" | "nickcolor" | "badge" | "trail" | "ghostcolor";
+interface CosmeticOption { id: string; label: string; price: number; swatch?: string }
+const COSMETIC_CATALOG: Record<CosmeticKind, CosmeticOption[]> = {
+  nickcolor: [
+    { id: "nickcolor:neon-cyan", label: "霓虹青", price: 50, swatch: "#2de2e6" },
+    { id: "nickcolor:amber-gold", label: "琥珀金", price: 50, swatch: "#ffb300" },
+    { id: "nickcolor:danger-red", label: "危險紅", price: 80, swatch: "#ff4d5e" },
+    { id: "nickcolor:deep-purple", label: "深邃紫", price: 80, swatch: "#8855ff" },
+    { id: "nickcolor:ghost-gray", label: "幽靈灰", price: 100, swatch: "#9aa0a6" },
+    { id: "nickcolor:black-gold", label: "黑金", price: 250, swatch: "#caa25c" },
+  ],
+  title: [
+    { id: "title:gravity-challenger", label: "地心引力挑戰者", price: 60 },
+    { id: "title:air-walker", label: "空中飛人", price: 60 },
+    { id: "title:perfect-landing", label: "完美落地大師", price: 80 },
+    { id: "title:win-streak", label: "連勝狂魔", price: 80 },
+    { id: "title:leaderboard-regular", label: "排行榜常客", price: 100 },
+    { id: "title:taiex-god", label: "台股股神", price: 200 },
+    { id: "title:blackswan-witness", label: "黑天鵝目擊者", price: -1 },
+  ],
+  badge: [
+    { id: "badge:fire", label: "🔥", price: 80 },
+    { id: "badge:star", label: "⭐", price: 80 },
+    { id: "badge:crown", label: "👑", price: 150 },
+    { id: "badge:diamond", label: "💎", price: 150 },
+    { id: "badge:motorcycle", label: "🏍️", price: 100 },
+    { id: "badge:blackswan", label: "🦢", price: -1 },
+  ],
+  trail: [
+    { id: "trail:amber", label: "琥珀", price: 80, swatch: "#ffb300" },
+    { id: "trail:magenta", label: "洋紅", price: 80, swatch: "#ff5fa8" },
+    { id: "trail:green", label: "綠", price: 80, swatch: "#4caf50" },
+    { id: "trail:white", label: "白", price: 100, swatch: "#ffffff" },
+  ],
+  ghostcolor: [
+    { id: "ghostcolor:amber", label: "琥珀", price: 80, swatch: "#ffb300" },
+    { id: "ghostcolor:magenta", label: "洋紅", price: 80, swatch: "#ff5fa8" },
+    { id: "ghostcolor:green", label: "綠", price: 80, swatch: "#4caf50" },
+    { id: "ghostcolor:white", label: "白", price: 100, swatch: "#ffffff" },
+  ],
+};
+const COSMETIC_SECTION_LABEL: Record<CosmeticKind, string> = {
+  title: "稱號", nickcolor: "暱稱顏色", badge: "前綴圖示", trail: "尾焰特效顏色", ghostcolor: "鬼影顏色",
+};
+
 export default function Garage({ user, onBack }: { user: User | null; onBack: () => void }) {
   const [coins, setCoins] = useState(() => getCoins());
   const [diamonds, setDiamonds] = useState(() => getDiamonds());
+  const [tickets, setTickets] = useState(() => getTickets());
   const [active, setActive] = useState(() => getActiveSkinId(user?.id ?? null));
   const [watchingAd, setWatchingAd] = useState(false);
+  const [watchingTicketAd, setWatchingTicketAd] = useState(false);
+  const [showAdTicketPrompt, setShowAdTicketPrompt] = useState(false);
   const [adClaims, setAdClaims] = useState(() => getAdCoinClaims(dailyKey(), user?.id ?? null));
   const [achvBikes, setAchvBikes] = useState<AchvBikeView[]>(() => getAchievementBikes(0));
   const [billingAvailable] = useState(() => isBillingAvailable());
@@ -105,6 +156,7 @@ export default function Garage({ user, onBack }: { user: User | null; onBack: ()
       if (!alive) return;
       setCoins(getCoins());
       setDiamonds(getDiamonds());
+      setTickets(getTickets());
       setAdsRemoved(getAdsRemoved());
       setActive(getActiveSkinId(user?.id ?? null)); // 帳號隔離：換帳號要重讀這個帳號自己的裝備車
       await refreshAchvBikes(() => alive);
@@ -149,31 +201,26 @@ export default function Garage({ user, onBack }: { user: User | null; onBack: ()
     }
   };
 
-  const handleWatchAd = () => {
-    if (watchingAd || adClaims >= MAX_AD_COIN_CLAIMS_PER_DAY) return;
-    const grantAdCoins = () => {
-      setAdNotice("");
-      incrementAdCoinClaims(dailyKey(), user?.id ?? null);
-      setAdClaims(getAdCoinClaims(dailyKey(), user?.id ?? null));
-      setCoins(addCoins(AD_COIN_REWARD));
-      // granted===false：伺服器明確拒絕（當日已達上限）。earnCoins 已把餘額覆寫回真實值，
-      // 這裡把畫面次數也校正成滿檔並說明原因——否則玩家只看到金幣閃一下就消失、沒有
-      // 任何提示，體感像是被吃錢（2026-07-10 真機實測回報）。
-      // granted===null（未登入/RPC 失敗/DB 還沒跑 migration）維持原本「樂觀值先頂著」行為。
-      earnCoins("ad").then((granted) => {
-        setCoins(getCoins());
-        if (granted === false) {
-          setAdCoinClaims(dailyKey(), user?.id ?? null, MAX_AD_COIN_CLAIMS_PER_DAY);
-          setAdClaims(MAX_AD_COIN_CLAIMS_PER_DAY);
-          setAdNotice("今日領取次數已用完，明天再來");
-        }
-      });
-    };
-    // 已買永久去廣告：不用看廣告，點擊直接領取（比照看廣告復活/雙倍金幣的既有作法）
-    if (adsRemoved) {
-      grantAdCoins();
-      return;
-    }
+  const grantAdCoins = () => {
+    setAdNotice("");
+    incrementAdCoinClaims(dailyKey(), user?.id ?? null);
+    setAdClaims(getAdCoinClaims(dailyKey(), user?.id ?? null));
+    setCoins(addCoins(AD_COIN_REWARD));
+    // granted===false：伺服器明確拒絕（當日已達上限）。earnCoins 已把餘額覆寫回真實值，
+    // 這裡把畫面次數也校正成滿檔並說明原因——否則玩家只看到金幣閃一下就消失、沒有
+    // 任何提示，體感像是被吃錢（2026-07-10 真機實測回報）。
+    // granted===null（未登入/RPC 失敗/DB 還沒跑 migration）維持原本「樂觀值先頂著」行為。
+    earnCoins("ad").then((granted) => {
+      setCoins(getCoins());
+      if (granted === false) {
+        setAdCoinClaims(dailyKey(), user?.id ?? null, MAX_AD_COIN_CLAIMS_PER_DAY);
+        setAdClaims(MAX_AD_COIN_CLAIMS_PER_DAY);
+        setAdNotice("今日領取次數已用完，明天再來");
+      }
+    });
+  };
+
+  const proceedWithAd = () => {
     setWatchingAd(true);
     requestRewardedAd("coin").then((ok) => {
       setWatchingAd(false);
@@ -181,8 +228,68 @@ export default function Garage({ user, onBack }: { user: User | null; onBack: ()
     });
   };
 
+  const handleWatchAd = () => {
+    if (watchingAd || adClaims >= MAX_AD_COIN_CLAIMS_PER_DAY) return;
+    // 已買永久去廣告：不用看廣告，點擊直接領取（比照看廣告復活/雙倍金幣的既有作法）
+    if (adsRemoved) {
+      grantAdCoins();
+      return;
+    }
+    // 有票券：先問要不要消耗一張跳過廣告直接領取（LOTTERY_DESIGN.md §6）
+    if (tickets > 0) {
+      setShowAdTicketPrompt(true);
+      return;
+    }
+    proceedWithAd();
+  };
+
+  // 票券消耗＝直接呼叫 wallet_earn_via_ticket，伺服器一次做完「扣票券+發金幣」，
+  // 跟看廣告共用同一組每日上限（wallet_earn_log kind='ad'），不會多領。
+  const useTicketForCoins = async () => {
+    setShowAdTicketPrompt(false);
+    const ok = await earnViaTicket("ad");
+    setTickets(getTickets());
+    setCoins(getCoins());
+    if (ok) {
+      incrementAdCoinClaims(dailyKey(), user?.id ?? null);
+      setAdClaims(getAdCoinClaims(dailyKey(), user?.id ?? null));
+    } else {
+      setAdNotice("今日領取次數已用完，明天再來");
+    }
+  };
+
+  // 看廣告換 1 張票券，每日上限 2 張（wallet_earn_ticket RPC，migration_20260721b.sql）。
+  const handleWatchTicketAd = () => {
+    if (watchingTicketAd) return;
+    setWatchingTicketAd(true);
+    requestRewardedAd("ticket").then((ok) => {
+      setWatchingTicketAd(false);
+      if (!ok) return;
+      earnTicket().then((granted) => {
+        setTickets(getTickets());
+        if (granted === false) setAdNotice("今日票券已領完，明天再來");
+      });
+    });
+  };
+
   const handleEquip = (id: string) => {
     if (setActiveSkin(id, user?.id ?? null)) setActive(id);
+  };
+
+  // 個人化裝備：未擁有→購買（走 wallet_spend_item RPC，跟車款分開一支，見
+  // garage.ts 註解）；已擁有→點擊切換裝備/取消裝備（同一項再點一次＝取消裝備，
+  // 回到「無」，跟車皮裝備不同——這幾類本來就允許「不裝備任何一個」）。
+  const handleCosmeticClick = async (kind: CosmeticKind, opt: CosmeticOption) => {
+    if (opt.price < 0) return; // 不可購買（黑天鵝專屬贈品）
+    if (!isOwned(opt.id)) {
+      if (diamonds < opt.price) return;
+      const ok = await walletSpendItem(opt.id);
+      if (ok) { setDiamonds(getDiamonds()); forceRender((n) => n + 1); }
+      return;
+    }
+    const current = getActiveCosmetic(kind, user?.id ?? null);
+    setActiveCosmetic(kind, current === opt.id ? null : opt.id, user?.id ?? null);
+    forceRender((n) => n + 1);
   };
 
   const renderSkinCard = (s: BikeSkin) => {
@@ -231,6 +338,7 @@ export default function Garage({ user, onBack }: { user: User | null; onBack: ()
       <h1 className="select-title">車庫</h1>
       <p className="garage-coins"><CoinIcon size={22} /> 金幣 {coins}</p>
       <p className="garage-coins garage-diamonds">💎 鑽石 {diamonds}</p>
+      <p className="garage-coins garage-tickets">🎫 票券 {tickets}</p>
       <p className="garage-intro">完賽/摔車與每日任務都能賺金幣，解鎖車皮換上場</p>
       {!user && (
         <p className="garage-guest-notice">⚠️ 訪客進度僅存於本機，清除資料或換裝置會遺失。登入 Google 可雲端保存</p>
@@ -248,7 +356,24 @@ export default function Garage({ user, onBack }: { user: User | null; onBack: ()
               ? `🎁 領取 +${AD_COIN_REWARD} 金幣 (${adClaims}/${MAX_AD_COIN_CLAIMS_PER_DAY})`
               : `📺 看廣告 +${AD_COIN_REWARD} 金幣 (${adClaims}/${MAX_AD_COIN_CLAIMS_PER_DAY})`}
       </button>
+      {!adsRemoved && (
+        <button className="garage-ad-btn garage-ticket-btn" disabled={watchingTicketAd} onClick={handleWatchTicketAd}>
+          {watchingTicketAd ? "廣告播放中…" : "🎫 看廣告 +1 票券（每日 2 張）"}
+        </button>
+      )}
       {adNotice && <p className="garage-ad-notice">{adNotice}</p>}
+
+      {showAdTicketPrompt && (
+        <div className="modal-overlay" onClick={() => setShowAdTicketPrompt(false)}>
+          <div className="slot-result" onClick={(e) => e.stopPropagation()}>
+            <div className="garage-card-name">🎫 要消耗一張票券，跳過廣告直接領取嗎？</div>
+            <div className="slot-result-actions">
+              <button className="modal-btn" onClick={useTicketForCoins}>消耗票券直接領取</button>
+              <button className="modal-link" onClick={() => { setShowAdTicketPrompt(false); proceedWithAd(); }}>還是看廣告</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="garage-list">
         {BIKE_SKINS.filter((s) => !s.locked && s.currency !== "diamond").map(renderSkinCard)}
@@ -283,6 +408,70 @@ export default function Garage({ user, onBack }: { user: User | null; onBack: ()
       <div className="garage-list">
         {BIKE_SKINS.filter((s) => s.currency === "diamond").map(renderSkinCard)}
       </div>
+
+      {/* 隱藏車款（黑天鵝，LOTTERY_DESIGN.md §3）：只能靠抽獎轉輪取得，不開放直接
+          購買。取得前顯示全黑剪影 + 神秘符號，不像成就車款有進度條（純機率，沒有
+          「進度」這個概念）。 */}
+      <h2 className="garage-section-title">🖤 隱藏車款</h2>
+      <div className="garage-list">
+        {BIKE_SKINS.filter((s) => s.id === "hidden-blackswan").map((s) => {
+          if (isOwned(s.id)) return renderSkinCard(s);
+          return (
+            <div key={s.id} className="garage-card locked garage-card-mystery">
+              <div className="garage-preview garage-preview-locked">
+                <img
+                  src={`${import.meta.env.BASE_URL}${s.src}`}
+                  alt="???"
+                  className="garage-silhouette-img"
+                />
+                <span className="garage-lock-icon">❓</span>
+              </div>
+              <div className="garage-card-body">
+                <div className="garage-card-name">？？？</div>
+                <div className="garage-card-desc">萬中無一的異象——只能靠抽獎轉輪取得</div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* 個人化裝備（LOTTERY_DESIGN.md §4）：稱號/暱稱顏色/前綴圖示/尾焰特效顏色/
+          鬼影顏色，花鑽石購買，訪客沒有伺服器鑽石可花，這區只給已登入玩家看。 */}
+      {user && (
+        <>
+          <h2 className="garage-section-title">🎨 個人化裝備</h2>
+          {(Object.keys(COSMETIC_CATALOG) as CosmeticKind[]).map((kind) => {
+            const activeId = getActiveCosmetic(kind, user.id);
+            return (
+              <div key={kind} className="cosmetic-row">
+                <div className="cosmetic-row-label">{COSMETIC_SECTION_LABEL[kind]}</div>
+                <div className="cosmetic-chip-list">
+                  {COSMETIC_CATALOG[kind].map((opt) => {
+                    const owned = isOwned(opt.id);
+                    const equipped = activeId === opt.id;
+                    const exclusive = opt.price < 0;
+                    const afford = diamonds >= opt.price;
+                    return (
+                      <button
+                        key={opt.id}
+                        className={`cosmetic-chip${equipped ? " equipped" : ""}${!owned && (exclusive || !afford) ? " disabled" : ""}`}
+                        disabled={exclusive && !owned}
+                        onClick={() => handleCosmeticClick(kind, opt)}
+                        title={owned ? opt.label : exclusive ? `${opt.label}（抽獎專屬）` : `${opt.label} · ${opt.price} 鑽石`}
+                      >
+                        {opt.swatch && <span className="cosmetic-swatch" style={{ background: opt.swatch }} />}
+                        <span>{opt.label}</span>
+                        {!owned && !exclusive && <span className="cosmetic-price">{opt.price}💎</span>}
+                        {!owned && exclusive && <span className="cosmetic-price">🔒</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </>
+      )}
 
       {/* 未登入玩家：TWA 支援購買但沒有帳號可入帳，一律不顯示購買按鈕（billing.ts 也在
           付款前再擋一層），改顯示登入提示，避免訪客扣了錢卻無處發放。 */}

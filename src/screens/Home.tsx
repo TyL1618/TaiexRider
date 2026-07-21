@@ -12,7 +12,7 @@ import StatsScreen from "./StatsScreen";
 import Encyclopedia from "../components/Encyclopedia";
 import "./Home.css";
 
-export type Screen = "home" | "custom" | "random" | "daily" | "classic" | "garage";
+export type Screen = "home" | "custom" | "random" | "daily" | "classic" | "garage" | "lottery";
 
 const MOOD_LABEL: Record<MarketMood["mood"], string> = {
   up: "收盤上漲",
@@ -191,6 +191,11 @@ export default function Home({
           <span className="home-btn-icon">🏛️</span>
           <span className="home-btn-main">經典模式</span>
           <span className="home-btn-desc">重現歷史著名股災與飆漲盤勢</span>
+        </button>
+        <button className="home-btn lottery" onClick={() => onNav("lottery")}>
+          <span className="home-btn-icon">🎰</span>
+          <span className="home-btn-main">幸運轉輪</span>
+          <span className="home-btn-desc">每日 2 次免費抽獎，手氣好還能抽到隱藏車款</span>
         </button>
       </div>
 
