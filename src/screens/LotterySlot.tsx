@@ -28,8 +28,10 @@ const PAID_SPIN_COST = 20;
 // 機率表文案（見 LOTTERY_DESIGN.md，跟伺服器 lottery_spin() 的機率區間同步）——
 // 純顯示用，不影響實際抽獎（實際結果一律伺服器決定）。
 const ODDS_TABLE: { label: string; pct: string }[] = [
-  { label: "5 鑽石", pct: "75.00%" },
-  { label: "10 鑽石", pct: "18.00%" },
+  { label: "🎫 1 張票券", pct: "8.00%" },
+  { label: "🎫 2 張票券", pct: "2.00%" },
+  { label: "5 鑽石", pct: "67.00%" },
+  { label: "10 鑽石", pct: "16.00%" },
   { label: "30 鑽石", pct: "3.50%" },
   { label: "100 鑽石", pct: "0.60%" },
   { label: "300 鑽石", pct: "0.09%" },
@@ -45,6 +47,8 @@ const ODDS_TABLE: { label: string; pct: string }[] = [
 // 視覺滾輪的填充符號池（跟真實機率無關，純粹讓轉輪跑起來好看）。
 type Sym = { key: string; icon: string; label: string };
 const SYMBOL_POOL: Sym[] = [
+  { key: "t1", icon: "🎫", label: "1 張票券" },
+  { key: "t2", icon: "🎫", label: "2 張票券" },
   { key: "d5", icon: "💎", label: "5" },
   { key: "d10", icon: "💎", label: "10" },
   { key: "d30", icon: "💎", label: "30" },
@@ -59,7 +63,11 @@ const SYMBOL_POOL: Sym[] = [
   { key: "hidden-blackswan", icon: "🖤", label: "黑天鵝" },
 ];
 
-function symbolFor(prizeKind: "diamond" | "skin", prizeId: string): Sym {
+function symbolFor(prizeKind: "diamond" | "skin" | "ticket", prizeId: string): Sym {
+  if (prizeKind === "ticket") {
+    const found = SYMBOL_POOL.find((s) => s.key === `t${prizeId}`);
+    return found ?? { key: `t${prizeId}`, icon: "🎫", label: `${prizeId} 張票券` };
+  }
   if (prizeKind === "diamond") {
     const found = SYMBOL_POOL.find((s) => s.key === `d${prizeId}`);
     return found ?? { key: `d${prizeId}`, icon: "💎", label: prizeId };
@@ -284,6 +292,8 @@ export default function LotterySlot({ user, onBack }: { user: User | null; onBac
               <span className="slot-result-name">
                 {result.prizeKind === "diamond"
                   ? `獲得 ${result.prizeId} 鑽石`
+                  : result.prizeKind === "ticket"
+                  ? `獲得 ${result.prizeId} 張票券`
                   : `獲得車款：${symbolFor("skin", result.prizeId!).label}`}
               </span>
             </div>

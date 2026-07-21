@@ -21,7 +21,7 @@ import { getPlayerName } from "./lib/playerId";
 import { dailyKey } from "./data/pick";
 import { setPlaying } from "./pwa";
 import { logEvent, type AnalyticsMode } from "./lib/analytics";
-import { addCoins, earnCoins, syncWalletFromServer, grantDevWallet, recordMarketFinish, writeCoinsCache, getActiveSkinId } from "./lib/garage";
+import { addCoins, earnCoins, syncWalletFromServer, grantDevWallet, recordMarketFinish, recordRunStats, maybeEarnTicket, writeCoinsCache, getActiveSkinId } from "./lib/garage";
 import { recordRun } from "./lib/quests";
 import { recordWeeklyRun, claimWeeklyQuest, weekKey } from "./lib/weeklyQuests";
 import { collectStock } from "./lib/collection";
@@ -317,7 +317,16 @@ export default function App() {
         ? (stats.finished ? "long_finish" : "long_crash")
         : (stats.finished ? "finish" : "crash");
       earnCoins(kind, kind === "long_crash" ? amount : undefined);
+      // 一般/長征模式結算機率型票券獎勵（使用者拍板：票券不該只有看廣告一種
+      // 來源，這樣才會吸引玩家玩排行榜以外的模式），排行榜/經典模式不給
+      // （避免跟那兩個模式的鑽石獎勵疊加太多管道）。8% 機率、每日上限 3 張，
+      // 見 wallet_maybe_earn_ticket()。
+      if (user) maybeEarnTicket();
     }
+    // 稱號成就（連勝狂魔/排行榜常客/空中飛人/地心引力挑戰者/完美落地大師）不分
+    // 模式累計終身翻轉圈數/完美落地次數，跟 Q 系列車款同一套「不分模式累計」
+    // 哲學（見 record_market_finish 同段落）。
+    if (user) recordRunStats(stats.flips, stats.perfect);
     // 狂暴盤日（|漲跌|≥2.5%）任務獎勵 ×2：已登入時伺服器 wallet_earn/claim_weekly_quest
     // 各自重算當期漲跌決定是否加倍（不信任前端），這裡的倍率只影響未登入玩家的本地樂觀值。
     const rageMultiplier = marketMood?.isRage ? 2 : 1;

@@ -16,7 +16,7 @@
 // 同步後」的快取值。未登入玩家（無法上排行榜、竄改零風險）維持純本地。
 
 import { supabase } from "./supabase";
-import { writeAchievementsCache, resetAchievementsCache } from "./achievements";
+import { writeAchievementsCache, resetAchievementsCache, writeRunStatsCache } from "./achievements";
 import { writeStreakCache, resetStreakCache } from "./streak";
 import { writeCollectionCache, resetCollectionCache } from "./collection";
 
@@ -177,15 +177,39 @@ export async function syncWalletFromServer(): Promise<void> {
     bull_finishes: number; bear_finishes: number;
     streak_count: number; last_session_key: string | null;
     collection: string[]; ads_removed: boolean; tickets: number;
+    total_flips: number; total_perfect: number;
   };
   writeCoinsCache(row.coins);
   writeDiamondsCache(row.diamonds);
   writeOwnedCache(row.owned);
-  writeAchievementsCache(row.bull_finishes, row.bear_finishes);
+  writeAchievementsCache(row.bull_finishes, row.bear_finishes, row.total_flips, row.total_perfect);
   writeStreakCache(row.last_session_key, row.streak_count);
   writeCollectionCache(row.collection ?? []);
   writeAdsRemovedCache(row.ads_removed ?? false);
   writeTicketsCache(row.tickets ?? 0);
+}
+
+// 每局結束呼叫（App.tsx handleGameOver，任何模式完賽/摔車都算，跟 Q 系列同一套
+// 「不分模式累計」哲學）：累加終身翻轉圈數/完美落地次數，供稱號成就解鎖判斷。
+export async function recordRunStats(flips: number, perfect: number): Promise<void> {
+  const uid = await getUid();
+  if (!uid) return;
+  const { data, error } = await supabase.rpc("record_run_stats", { p_flips: flips, p_perfect: perfect });
+  if (error || !data || !data[0]) return;
+  const row = data[0] as { total_flips: number; total_perfect: number };
+  writeRunStatsCache(row.total_flips, row.total_perfect);
+}
+
+// 一般/長征模式結算時的機率型票券獎勵（8% 機率、每日上限 3 張，見
+// wallet_maybe_earn_ticket() 註解）。回傳 true=有中，false=沒中或已達上限。
+export async function maybeEarnTicket(): Promise<boolean> {
+  const uid = await getUid();
+  if (!uid) return false;
+  const { data, error } = await supabase.rpc("wallet_maybe_earn_ticket");
+  if (error || !data || !data[0]) return false;
+  const row = data[0] as { granted: boolean; tickets: number };
+  writeTicketsCache(row.tickets);
+  return row.granted;
 }
 
 // 購買永久去廣告成功後呼叫（garage.ts 以外的地方買完直接寫快取，不用整包重新同步）。
@@ -432,8 +456,8 @@ export function getActiveBikeSkin(uid: string | null = null): BikeSkin {
 
 export interface LotterySpinResult {
   ok: boolean;
-  prizeKind: "diamond" | "skin" | null;
-  prizeId: string | null; // 鑽石數量（文字）或車款 id
+  prizeKind: "diamond" | "skin" | "ticket" | null;
+  prizeId: string | null; // 鑽石/票券數量（文字）或車款 id
   diamonds: number;
   tickets: number;
   owned: string[];
@@ -446,7 +470,7 @@ export async function lotterySpin(paid: boolean): Promise<LotterySpinResult | nu
   const { data, error } = await supabase.rpc("lottery_spin", { p_paid: paid });
   if (error || !data || !data[0]) { console.error("[lottery] lottery_spin 失敗", error); return null; }
   const row = data[0] as {
-    ok: boolean; prize_kind: "diamond" | "skin" | null; prize_id: string | null;
+    ok: boolean; prize_kind: "diamond" | "skin" | "ticket" | null; prize_id: string | null;
     diamonds: number; tickets: number; owned: string[];
   };
   writeDiamondsCache(row.diamonds);

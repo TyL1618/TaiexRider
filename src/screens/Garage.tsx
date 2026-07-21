@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { BIKE_SKINS, getCoins, getDiamonds, getTickets, isOwned, getActiveSkinId, purchaseSkin, setActiveSkin, addCoins, earnCoins, earnTicket, earnViaTicket, walletSpendItem, getActiveCosmetic, setActiveCosmetic, unlockAchievementSkin, syncWalletFromServer, fetchDailyUsage, writeDiamondsCache, getAdsRemoved, markAdsRemoved, type BikeSkin } from "../lib/garage";
 import { requestRewardedAd, preloadRewardedAd } from "../lib/ads";
 import { AD_COIN_REWARD, MAX_AD_COIN_CLAIMS_PER_DAY, getAdCoinClaims, incrementAdCoinClaims, setAdCoinClaims } from "../lib/adRewards";
-import { getAchievementBikes, type AchvBikeView } from "../lib/achievements";
+import { getAchievementBikes, getAchievementTitles, type AchvBikeView, type AchvTitleView } from "../lib/achievements";
 import { getStreak } from "../lib/streak";
 import { resolveSessionDate } from "../lib/dailyMap";
 import { isBillingAvailable, fetchPackPrices, purchaseDiamondPack, purchaseRemoveAds, reconcilePurchases, getLastPurchaseError, getPriceDiag, DIAMOND_PACKS, REMOVE_ADS_SKU } from "../lib/billing";
@@ -29,13 +29,20 @@ const COSMETIC_CATALOG: Record<CosmeticKind, CosmeticOption[]> = {
     { id: "nickcolor:ghost-gray", label: "幽靈灰", price: 100, swatch: "#9aa0a6" },
     { id: "nickcolor:black-gold", label: "黑金", price: 250, swatch: "#caa25c" },
   ],
+  // 2026-07-21 改版：可購買的稱號改成純粹好玩、跟遊戲實力無關的股市梗，售價
+  // 統一 200 鑽——原本規劃可花錢買的「連勝狂魔/排行榜常客/空中飛人/地心引力
+  // 挑戰者/完美落地大師」使用者拍板改成成就解鎖（不可購買，見下方
+  // ACHIEVEMENT_TITLE_IDS 與 achievements.ts getAchievementTitles()）。
   title: [
-    { id: "title:gravity-challenger", label: "地心引力挑戰者", price: 60 },
-    { id: "title:air-walker", label: "空中飛人", price: 60 },
-    { id: "title:perfect-landing", label: "完美落地大師", price: 80 },
-    { id: "title:win-streak", label: "連勝狂魔", price: 80 },
-    { id: "title:leaderboard-regular", label: "排行榜常客", price: 100 },
+    { id: "title:newbie-knight", label: "新手騎士", price: 200 },
     { id: "title:taiex-god", label: "台股股神", price: 200 },
+    { id: "title:shoeshine-boy", label: "擦鞋童", price: 200 },
+    { id: "title:shoeshine-chairman", label: "擦鞋董", price: 200 },
+    { id: "title:bull-bear-clash", label: "多空交戰", price: 200 },
+    { id: "title:park-homeless", label: "公園街友", price: 200 },
+    { id: "title:finance-haojiao", label: "財經皓角", price: 200 },
+    { id: "title:chives", label: "韭菜", price: 200 },
+    { id: "title:fourth-institution", label: "第四大法人", price: 200 },
     { id: "title:blackswan-witness", label: "黑天鵝目擊者", price: -1 },
   ],
   badge: [
@@ -73,6 +80,7 @@ export default function Garage({ user, onBack }: { user: User | null; onBack: ()
   const [showAdTicketPrompt, setShowAdTicketPrompt] = useState(false);
   const [adClaims, setAdClaims] = useState(() => getAdCoinClaims(dailyKey(), user?.id ?? null));
   const [achvBikes, setAchvBikes] = useState<AchvBikeView[]>(() => getAchievementBikes(0));
+  const [achvTitles, setAchvTitles] = useState<AchvTitleView[]>(() => getAchievementTitles(0));
   const [billingAvailable] = useState(() => isBillingAvailable());
   const [packPrices, setPackPrices] = useState<Map<string, string>>(new Map());
   const [purchasingSku, setPurchasingSku] = useState<string | null>(null);
@@ -136,7 +144,10 @@ export default function Garage({ user, onBack }: { user: User | null; onBack: ()
   // Q 系列 streak 進度依「目前這一期」session key 讀（連假整段算同一期，跟 DailyChallenge 同源）
   const refreshAchvBikes = async (checkAlive: () => boolean) => {
     const key = await resolveSessionDate(dailyKey());
-    if (checkAlive()) setAchvBikes(getAchievementBikes(getStreak(key)));
+    if (!checkAlive()) return;
+    const streakDays = getStreak(key);
+    setAchvBikes(getAchievementBikes(streakDays));
+    setAchvTitles(getAchievementTitles(streakDays));
   };
   useEffect(() => {
     let alive = true;
@@ -188,10 +199,19 @@ export default function Garage({ user, onBack }: { user: User | null; onBack: ()
           changed = true;
         }
       }
+      // 稱號成就（連勝狂魔/排行榜常客/空中飛人/地心引力挑戰者/完美落地大師）不是
+      // 車皮，沒有「美術到位」這個前提，達標就直接解鎖（unlockAchievementSkin 通用
+      // 呼叫 wallet_unlock_achievement RPC，白名單見 migration_20260721e.sql）。
+      for (const t of achvTitles) {
+        if (t.unlocked && !isOwned(t.id)) {
+          await unlockAchievementSkin(t.id);
+          changed = true;
+        }
+      }
       if (changed && alive) forceRender((n) => n + 1);
     })();
     return () => { alive = false; };
-  }, [achvBikes]);
+  }, [achvBikes, achvTitles]);
 
   const handleBuy = async (id: string) => {
     if (await purchaseSkin(id)) {
@@ -398,6 +418,51 @@ export default function Garage({ user, onBack }: { user: User | null; onBack: ()
                 <div className="achv-progress-text">
                   {a.unlocked ? "已達成・車皮製作中，敬請期待" : `${a.progress} / ${a.target}`}
                 </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* 稱號成就（2026-07-21 改版）：連勝狂魔/排行榜常客/空中飛人/地心引力挑戰者/
+          完美落地大師——跟 Q 系列車款一樣達標自動解鎖，不可購買（花錢買的稱號改成
+          下面「個人化裝備」區塊那批股市梗）。未解鎖顯示進度條，解鎖後可直接裝備。 */}
+      <h2 className="garage-section-title">🎯 成就稱號</h2>
+      <div className="garage-list">
+        {achvTitles.map((t) => {
+          if (t.unlocked) {
+            const equipped = getActiveCosmetic("title", user?.id ?? null) === t.id;
+            return (
+              <div key={t.id} className={`garage-card locked achv-done`}>
+                <div className="garage-preview garage-preview-locked">
+                  <span className="garage-lock-icon">🏆</span>
+                </div>
+                <div className="garage-card-body">
+                  <div className="garage-card-name">{t.name}{equipped && <span className="garage-equipped-tag">使用中</span>}</div>
+                  <div className="garage-card-desc">{t.desc}</div>
+                  <button
+                    className={`garage-btn${equipped ? " disabled" : ""}`}
+                    disabled={equipped}
+                    onClick={() => { setActiveCosmetic("title", t.id, user?.id ?? null); forceRender((n) => n + 1); }}
+                  >
+                    {equipped ? "使用中" : "裝備"}
+                  </button>
+                </div>
+              </div>
+            );
+          }
+          return (
+            <div key={t.id} className="garage-card locked">
+              <div className="garage-preview garage-preview-locked">
+                <span className="garage-lock-icon">🔒</span>
+              </div>
+              <div className="garage-card-body">
+                <div className="garage-card-name">{t.name}</div>
+                <div className="garage-card-desc">{t.desc}</div>
+                <div className="achv-progress-track">
+                  <div className="achv-progress-fill" style={{ width: `${(t.progress / t.target) * 100}%` }} />
+                </div>
+                <div className="achv-progress-text">{t.progress} / {t.target}</div>
               </div>
             </div>
           );
