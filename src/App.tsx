@@ -418,6 +418,7 @@ export default function App() {
           completedQuests={completedQuests}
           ghostPath={isDailyRun ? ghost?.path ?? null : null}
           ghostSkinId={isDailyRun ? ghost?.skinId ?? null : null}
+          ghostColorId={isDailyRun ? ghost?.ghostColorId ?? null : null}
         />
       </Suspense>
     );

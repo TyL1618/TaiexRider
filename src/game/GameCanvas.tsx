@@ -63,6 +63,10 @@ interface GameCanvasProps {
   // 鬼影使用的車皮 id（紀錄保持者提交當下用的車，見 migration_20260715.sql）。
   // 找不到對應車款（未知 id/舊資料）時 fallback 預設車，不會退回顯示玩家自己的車。
   ghostSkinId?: string | null;
+  // 鬼影顏色（紀錄保持者自己裝備的鬼影顏色，見 migration_20260721j.sql）——不是
+  // 正在看的這個人自己的偏好，這樣鬼影顏色才是「別人能看到你裝備了什麼」的展示，
+  // 不是純自用的顯示設定。沒有值就不上色（跟從沒裝備過一樣）。
+  ghostColorId?: string | null;
 }
 
 interface Hud {
@@ -181,7 +185,7 @@ function getBikeImageEntry(src: string): BikeImgEntry {
 }
 getBikeImageEntry(`${import.meta.env.BASE_URL}bike.png`); // 預熱預設車皮
 
-export default function GameCanvas({ prices, label, name, subtitle, onExit, onGameOver, hideMinimap = false, revivalEnabled = false, analyticsMode, pbKey, uid = null, dailyRank = null, completedQuests = [], ghostPath = null, ghostSkinId = null }: GameCanvasProps) {
+export default function GameCanvas({ prices, label, name, subtitle, onExit, onGameOver, hideMinimap = false, revivalEnabled = false, analyticsMode, pbKey, uid = null, dailyRank = null, completedQuests = [], ghostPath = null, ghostSkinId = null, ghostColorId = null }: GameCanvasProps) {
   const stars = difficultyStars(calcDifficulty(prices));
   const cityBuildings = generateCity(prices.length * 31 + Math.round((prices[0] || 0) * 100));
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -468,7 +472,9 @@ export default function GameCanvas({ prices, label, name, subtitle, onExit, onGa
     const trailColor = trailColorId ? COSMETIC_COLOR_SWATCH[trailColorId] ?? null : null;
     // 鬼影顏色：疊在鬼影車皮上的色調濾鏡（不取代真實車皮，2026-07-15 拍板過鬼影要
     // 秀出對手真實車款當購買誘因，這裡只加一層淡淡的色調圈，不是整台換色）。
-    const ghostColorId = getActiveCosmetic("ghostcolor", uid);
+    // 2026-07-21j 起改讀 ghostColorId prop（紀錄保持者自己裝備的顏色，App.tsx 從
+    // GhostRecord 傳入）——不是「正在看的這個人」自己的 getActiveCosmetic 偏好，
+    // 這樣鬼影顏色才是真的展示給別人看，不是只有自己看得到自己的裝飾。
     const ghostTintColor = ghostColorId ? COSMETIC_COLOR_SWATCH[ghostColorId] ?? null : null;
 
     // ---- 建立世界 ----

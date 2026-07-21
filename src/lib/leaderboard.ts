@@ -9,12 +9,22 @@ const KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
 
 export const isLeaderboardConfigured = Boolean(URL && KEY);
 
+// 提交當下裝備的個人化道具快照（2026-07-21j 起，見 migration_20260721j.sql）——
+// 讓「別人」也看得到你裝備了什麼，不再是只有自己手機看得到自己那列的裝飾。
+export interface ScoreCosmetics {
+  title?: string | null;
+  nickcolor?: string | null;
+  badge?: string | null;
+  ghostcolor?: string | null;
+}
+
 export interface ScoreRow {
   player_name: string;
   score: number;
   time_ms: number;
   flips: number;
   perfect: number;
+  cosmetics?: ScoreCosmetics | null;
 }
 
 // 鬼影路徑資料。兩種格式並存（伺服器/渲染端都相容，等 vc28 客戶端絕跡後可收斂）：
@@ -22,10 +32,14 @@ export interface ScoreRow {
 export type GhostPathData = (number | [number, number, number])[];
 
 // 鬼影完整資料＝路徑 + 紀錄保持者當下使用的車皮 id（2026-07-15 起，見
-// migration_20260715.sql）。skinId 找不到對應車款時渲染端會 fallback 預設車。
+// migration_20260715.sql）+ 鬼影顏色（2026-07-21j 起，見 migration_20260721j.sql
+// ——鬼影身上的色調要顯示「紀錄保持者自己裝備的顏色」，不是正在看的這個人自己
+// 的偏好，才有「別人看得到你裝備了什麼」的意義）。skinId 找不到對應車款時渲染端
+// 會 fallback 預設車，ghostColorId 沒有時不上色（跟從沒裝備過一樣）。
 export interface GhostRecord {
   path: GhostPathData;
   skinId: string;
+  ghostColorId: string | null;
 }
 
 export interface SubmitStats {
@@ -62,7 +76,7 @@ async function _fetchTop(challengeDate: string, limit: number): Promise<ScoreRow
   const q =
     `${URL}/rest/v1/daily_scores_ranked?challenge_date=eq.${challengeDate}` +
     `&order=score.desc,time_ms.asc&limit=${limit}` +
-    `&select=player_name,score,time_ms,flips,perfect`;
+    `&select=player_name,score,time_ms,flips,perfect,cosmetics`;
   try {
     const r = await fetch(q, { headers: anonHeaders() });
     if (!r.ok) return [];
@@ -115,10 +129,11 @@ export async function submitDailyScore(
 }
 
 // Ghost 鬼影賽跑：抓「當日目前第一名（非可疑）」的鬼影路徑＋當時使用的車皮 id
-// （格式見 GhostRecord）。純公開讀取，anon key 即可（不需登入）。第一名還沒有帶
-// replay 的成績時會回 null（正常現象，不是錯誤），呼叫端應靜默不顯示鬼影。
-// RPC 改成 returns table(path, skin_id) 後 PostgREST 回傳陣列（見 migration_20260715.sql），
-// 跟舊版單一 jsonb 純量回傳格式不同，故取 data[0]。
+// ＋當時裝備的鬼影顏色（格式見 GhostRecord，2026-07-21j 起見 migration_20260721j.sql
+// ——鬼影顏色是紀錄保持者自己的裝備，不是正在看的這個人自己的偏好）。純公開讀取，
+// anon key 即可（不需登入）。第一名還沒有帶 replay 的成績時會回 null（正常現象，
+// 不是錯誤），呼叫端應靜默不顯示鬼影。RPC 改成 returns table(...) 後 PostgREST
+// 回傳陣列，跟舊版單一 jsonb 純量回傳格式不同，故取 data[0]。
 export async function fetchDailyGhostPath(challengeDate: string): Promise<GhostRecord | null> {
   if (!isLeaderboardConfigured) return null;
   try {
@@ -128,10 +143,10 @@ export async function fetchDailyGhostPath(challengeDate: string): Promise<GhostR
       body: JSON.stringify({ p_date: challengeDate }),
     });
     if (!r.ok) return null;
-    const data = (await r.json()) as { path: GhostPathData | null; skin_id: string }[] | null;
+    const data = (await r.json()) as { path: GhostPathData | null; skin_id: string; cosmetics: ScoreCosmetics | null }[] | null;
     const row = data?.[0];
     if (!row || !Array.isArray(row.path) || row.path.length === 0) return null;
-    return { path: row.path, skinId: row.skin_id || "default" };
+    return { path: row.path, skinId: row.skin_id || "default", ghostColorId: row.cosmetics?.ghostcolor ?? null };
   } catch {
     return null;
   }
