@@ -37,11 +37,11 @@ const ODDS_TABLE: { label: string; pct: string }[] = [
   { label: "300 鑽石", pct: "0.09%" },
   { label: "1000 鑽石（大獎）", pct: "0.01%" },
   { label: "🖤 黑天鵝（隱藏車款）", pct: "0.05%" },
-  { label: "赤紅暴走（P1）", pct: "1.00%" },
-  { label: "電馭武士（P4）", pct: "0.70%" },
-  { label: "黃金期貨（P3）", pct: "0.50%" },
-  { label: "匿蹤幽靈（P5）", pct: "0.35%" },
-  { label: "銀河鍍鉻（P2，最稀有）", pct: "0.20%" },
+  { label: "赤紅暴走", pct: "1.00%" },
+  { label: "電馭武士", pct: "0.70%" },
+  { label: "黃金期貨", pct: "0.50%" },
+  { label: "匿蹤幽靈", pct: "0.35%" },
+  { label: "銀河鍍鉻", pct: "0.20%" },
 ];
 
 // 視覺滾輪的填充符號池（跟真實機率無關，純粹讓轉輪跑起來好看）。
@@ -114,11 +114,19 @@ export default function LotterySlot({ user, onBack }: { user: User | null; onBac
       return;
     }
 
-    const winner = symbolFor(res.prizeKind, res.prizeId);
-    const others = SYMBOL_POOL
-      .filter((s) => s.key !== winner.key)
-      .sort(() => Math.random() - 0.5)
-      .slice(0, VISUAL_SIZE - 1);
+    // ⚠️ 2026-07-21 修過的 bug：SYMBOL_POOL 只有 14 種符號，VISUAL_SIZE 卻設 24，
+    // 原本用 filter+slice「不重複抽樣」最多只能抓到 13 個（扣掉 winner），導致
+    // 每個循環區塊實際只有 14 格而不是預期的 24 格，但下面算「中獎格要停在哪」
+    // 的數學是照 24 格算的，造成轉輪捲到超出實際內容範圍的空白處（畫面看起來
+    // 像動畫跑到一半圖示全部消失，音效/結果都正常，因為那兩者不依賴視覺捲動）。
+    // 改成「有放回抽樣」，不管 VISUAL_SIZE 多大都一定能填滿，不再受符號池大小限制。
+    // 重複補償（res.duplicateOf 非 null）：轉輪要照「實際抽到的車」停格，不是照
+    // 換算後的鑽石數字停格，畫面才會跟結算文案（「已擁有，換成等值鑽石」）對得上。
+    const winner = res.duplicateOf ? symbolFor("skin", res.duplicateOf) : symbolFor(res.prizeKind, res.prizeId);
+    const others = Array.from(
+      { length: VISUAL_SIZE - 1 },
+      () => SYMBOL_POOL[Math.floor(Math.random() * SYMBOL_POOL.length)],
+    );
     const visualPool = [...others, winner];
     const newReel = Array.from({ length: REPEAT }, () => visualPool).flat();
     setReel(newReel);
@@ -160,8 +168,11 @@ export default function LotterySlot({ user, onBack }: { user: User | null; onBac
         setDiamonds(res.diamonds);
         if (!paid) setFreeSpinsUsed((n) => (n ?? 0) + 1);
 
-        const isBlackSwan = res.prizeKind === "skin" && res.prizeId === "hidden-blackswan";
-        const isPSeries = res.prizeKind === "skin" && res.prizeId?.startsWith("p");
+        // 重複補償一樣算「抽中稀有車款」，特效等級照原本抽到的車判斷，不是照
+        // 換算後的鑽石結果（不然重複補償永遠只會是普通鑽石特效，不合理）。
+        const drawnId = res.duplicateOf ?? res.prizeId;
+        const isBlackSwan = drawnId === "hidden-blackswan";
+        const isPSeries = res.duplicateOf ? res.duplicateOf.startsWith("p") : (res.prizeKind === "skin" && res.prizeId?.startsWith("p"));
         if (isBlackSwan || isPSeries) {
           const rarity = isBlackSwan ? "epic" : "rare";
           timerRef.current = setTimeout(() => {
@@ -286,16 +297,23 @@ export default function LotterySlot({ user, onBack }: { user: User | null; onBac
         <div className="modal-overlay" onClick={(e) => e.stopPropagation()}>
           <div className={`slot-result lottery-result${shake ? ` lottery-result-${shake}` : ""}`}>
             <div className="lottery-result-icon">
-              {symbolFor(result.prizeKind ?? "diamond", result.prizeId ?? "0").icon}
+              {result.duplicateOf
+                ? symbolFor("skin", result.duplicateOf).icon
+                : symbolFor(result.prizeKind ?? "diamond", result.prizeId ?? "0").icon}
             </div>
             <div className="slot-result-info">
               <span className="slot-result-name">
-                {result.prizeKind === "diamond"
+                {result.duplicateOf
+                  ? `抽中：${symbolFor("skin", result.duplicateOf).label}`
+                  : result.prizeKind === "diamond"
                   ? `獲得 ${result.prizeId} 鑽石`
                   : result.prizeKind === "ticket"
                   ? `獲得 ${result.prizeId} 張票券`
                   : `獲得車款：${symbolFor("skin", result.prizeId!).label}`}
               </span>
+              {result.duplicateOf && (
+                <span className="lottery-duplicate-note">您已擁有這台車，已換成等值 {result.prizeId} 鑽石</span>
+              )}
             </div>
             <div className="slot-result-actions">
               <button className="modal-btn" onClick={reset}>太棒了！</button>

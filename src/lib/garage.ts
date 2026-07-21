@@ -461,6 +461,7 @@ export interface LotterySpinResult {
   diamonds: number;
   tickets: number;
   owned: string[];
+  duplicateOf: string | null; // 非 null＝重複保護觸發，原本抽到的車款 id（見 migration_20260721f.sql）
 }
 
 // p_paid=false：消耗今日免費額度（上限 2，超過 ok=false）；p_paid=true：扣 20 鑽石抽一次。
@@ -471,12 +472,15 @@ export async function lotterySpin(paid: boolean): Promise<LotterySpinResult | nu
   if (error || !data || !data[0]) { console.error("[lottery] lottery_spin 失敗", error); return null; }
   const row = data[0] as {
     ok: boolean; prize_kind: "diamond" | "skin" | "ticket" | null; prize_id: string | null;
-    diamonds: number; tickets: number; owned: string[];
+    diamonds: number; tickets: number; owned: string[]; duplicate_of: string | null;
   };
   writeDiamondsCache(row.diamonds);
   writeTicketsCache(row.tickets);
   writeOwnedCache(row.owned);
-  return { ok: row.ok, prizeKind: row.prize_kind, prizeId: row.prize_id, diamonds: row.diamonds, tickets: row.tickets, owned: row.owned };
+  return {
+    ok: row.ok, prizeKind: row.prize_kind, prizeId: row.prize_id, diamonds: row.diamonds,
+    tickets: row.tickets, owned: row.owned, duplicateOf: row.duplicate_of,
+  };
 }
 
 // 今日已用的免費抽獎次數（進抽獎畫面時呼叫，決定按鈕顯示「看廣告抽」還是「20鑽石/次」）。
@@ -527,17 +531,6 @@ export async function earnViaTicket(
   const row = data[0] as { ok: boolean; coins: number; diamonds: number; tickets: number };
   writeCoinsCache(row.coins);
   writeDiamondsCache(row.diamonds);
-  writeTicketsCache(row.tickets);
-  return row.ok;
-}
-
-// 看廣告換 1 張票券，每日上限 2 張。
-export async function earnTicket(): Promise<boolean | null> {
-  const uid = await getUid();
-  if (!uid) return null;
-  const { data, error } = await supabase.rpc("wallet_earn_ticket");
-  if (error || !data || !data[0]) return null;
-  const row = data[0] as { ok: boolean; tickets: number };
   writeTicketsCache(row.tickets);
   return row.ok;
 }

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { BIKE_SKINS, getCoins, getDiamonds, getTickets, isOwned, getActiveSkinId, purchaseSkin, setActiveSkin, addCoins, earnCoins, earnTicket, earnViaTicket, walletSpendItem, getActiveCosmetic, setActiveCosmetic, unlockAchievementSkin, syncWalletFromServer, fetchDailyUsage, writeDiamondsCache, getAdsRemoved, markAdsRemoved, type BikeSkin } from "../lib/garage";
+import { BIKE_SKINS, getCoins, getDiamonds, getTickets, isOwned, getActiveSkinId, purchaseSkin, setActiveSkin, addCoins, earnCoins, earnViaTicket, walletSpendItem, getActiveCosmetic, setActiveCosmetic, unlockAchievementSkin, syncWalletFromServer, fetchDailyUsage, writeDiamondsCache, getAdsRemoved, markAdsRemoved, type BikeSkin } from "../lib/garage";
 import { requestRewardedAd, preloadRewardedAd } from "../lib/ads";
 import { AD_COIN_REWARD, MAX_AD_COIN_CLAIMS_PER_DAY, getAdCoinClaims, incrementAdCoinClaims, setAdCoinClaims } from "../lib/adRewards";
 import { getAchievementBikes, getAchievementTitles, type AchvBikeView, type AchvTitleView } from "../lib/achievements";
@@ -76,7 +76,6 @@ export default function Garage({ user, onBack }: { user: User | null; onBack: ()
   const [tickets, setTickets] = useState(() => getTickets());
   const [active, setActive] = useState(() => getActiveSkinId(user?.id ?? null));
   const [watchingAd, setWatchingAd] = useState(false);
-  const [watchingTicketAd, setWatchingTicketAd] = useState(false);
   const [showAdTicketPrompt, setShowAdTicketPrompt] = useState(false);
   const [adClaims, setAdClaims] = useState(() => getAdCoinClaims(dailyKey(), user?.id ?? null));
   const [achvBikes, setAchvBikes] = useState<AchvBikeView[]>(() => getAchievementBikes(0));
@@ -278,20 +277,6 @@ export default function Garage({ user, onBack }: { user: User | null; onBack: ()
     }
   };
 
-  // 看廣告換 1 張票券，每日上限 2 張（wallet_earn_ticket RPC，migration_20260721b.sql）。
-  const handleWatchTicketAd = () => {
-    if (watchingTicketAd) return;
-    setWatchingTicketAd(true);
-    requestRewardedAd("ticket").then((ok) => {
-      setWatchingTicketAd(false);
-      if (!ok) return;
-      earnTicket().then((granted) => {
-        setTickets(getTickets());
-        if (granted === false) setAdNotice("今日票券已領完，明天再來");
-      });
-    });
-  };
-
   const handleEquip = (id: string) => {
     if (setActiveSkin(id, user?.id ?? null)) setActive(id);
   };
@@ -376,11 +361,6 @@ export default function Garage({ user, onBack }: { user: User | null; onBack: ()
               ? `🎁 領取 +${AD_COIN_REWARD} 金幣 (${adClaims}/${MAX_AD_COIN_CLAIMS_PER_DAY})`
               : `📺 看廣告 +${AD_COIN_REWARD} 金幣 (${adClaims}/${MAX_AD_COIN_CLAIMS_PER_DAY})`}
       </button>
-      {!adsRemoved && (
-        <button className="garage-ad-btn garage-ticket-btn" disabled={watchingTicketAd} onClick={handleWatchTicketAd}>
-          {watchingTicketAd ? "廣告播放中…" : "🎫 看廣告 +1 票券（每日 2 張）"}
-        </button>
-      )}
       {adNotice && <p className="garage-ad-notice">{adNotice}</p>}
 
       {showAdTicketPrompt && (

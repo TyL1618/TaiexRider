@@ -145,6 +145,9 @@ export default function Home({
         <button className="ency-entry-btn" onClick={() => setShowEncyclopedia(true)}>
           📖 <span className="ency-entry-label">圖鑑</span>
         </button>
+        <button className="lottery-entry-btn" onClick={() => onNav("lottery")}>
+          🎰 <span className="lottery-entry-label">幸運轉輪</span>
+        </button>
       </div>
       <p className="account-status">
         當前帳號：{user
@@ -177,25 +180,20 @@ export default function Home({
           <span className="home-btn-main">每日排名賽</span>
           <span className="home-btn-desc">每日精選賽道，排行競技</span>
         </button>
-        <button className="home-btn random" onClick={() => onNav("random")}>
-          <span className="home-btn-icon">🎲</span>
-          <span className="home-btn-main">隨機賽道</span>
-          <span className="home-btn-desc">前次盤勢圖池，隨機抽取賽道</span>
-        </button>
         <button className="home-btn custom" onClick={() => onNav("custom")}>
           <span className="home-btn-icon">📈</span>
           <span className="home-btn-main">自選賽道</span>
           <span className="home-btn-desc">自選股市賽道&每日隨機串聯關卡</span>
         </button>
+        <button className="home-btn random" onClick={() => onNav("random")}>
+          <span className="home-btn-icon">🎲</span>
+          <span className="home-btn-main">隨機賽道</span>
+          <span className="home-btn-desc">前次盤勢圖池，隨機抽取賽道</span>
+        </button>
         <button className="home-btn classic" onClick={() => onNav("classic")}>
           <span className="home-btn-icon">🏛️</span>
           <span className="home-btn-main">經典模式</span>
           <span className="home-btn-desc">重現歷史著名股災與飆漲盤勢</span>
-        </button>
-        <button className="home-btn lottery" onClick={() => onNav("lottery")}>
-          <span className="home-btn-icon">🎰</span>
-          <span className="home-btn-main">幸運轉輪</span>
-          <span className="home-btn-desc">每日 2 次免費抽獎，手氣好還能抽到隱藏車款</span>
         </button>
       </div>
 

@@ -67,6 +67,26 @@
   cursor: pointer;
 }
 .ency-entry-btn:active { transform: scale(0.96); }
+
+/* 幸運轉輪入口：2026-07-21 從遊戲模式清單移到這排——本質上是收藏/經濟系統，
+   不是騎車玩法，跟車庫/圖鑑放在一起比較顯眼也比較符合定位（粉色系跟前兩者
+   的琥珀/青色系區隔）。 */
+.lottery-entry-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.9rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--text);
+  background: rgba(255, 95, 168, 0.06);
+  border: 1px solid rgba(255, 95, 168, 0.4);
+  border-radius: 999px;
+  box-shadow: 0 0 16px rgba(255, 95, 168, 0.18);
+  cursor: pointer;
+}
+.lottery-entry-btn:active { transform: scale(0.96); }
 .garage-entry-coins {
   font-size: 1rem;
   font-weight: 800;
@@ -239,10 +259,6 @@
 .home-btn.classic { border-color: rgba(199, 125, 255, 0.4); }
 .home-btn.classic:hover { border-color: #c77dff; box-shadow: 0 0 22px rgba(199, 125, 255, 0.3); background: rgba(199, 125, 255, 0.08); }
 .home-btn.classic .home-btn-main { color: #c77dff; text-shadow: 0 0 10px rgba(199, 125, 255, 0.5); }
-
-.home-btn.lottery { border-color: rgba(255, 95, 168, 0.4); }
-.home-btn.lottery:hover { border-color: #ff5fa8; box-shadow: 0 0 22px rgba(255, 95, 168, 0.3); background: rgba(255, 95, 168, 0.08); }
-.home-btn.lottery .home-btn-main { color: #ff5fa8; text-shadow: 0 0 10px rgba(255, 95, 168, 0.5); }
 
 /* ---- 設定 modal 帳號區塊 ---- */
 .settings-account {

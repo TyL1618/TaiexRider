@@ -46,6 +46,12 @@
   line-height: 1;
 }
 
+.lottery-duplicate-note {
+  font-size: 0.78rem;
+  color: var(--text-dim);
+  text-align: center;
+}
+
 .lottery-odds-modal {
   gap: 0.9rem;
 }
