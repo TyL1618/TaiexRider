@@ -311,23 +311,34 @@
 .rk-pos { width: 2.5rem; text-align: left; }
 .rk-score { flex: 1; text-align: right; }
 .rk-time { flex: 1; text-align: right; }
-.rk-user { flex: 1.4; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rk-user {
+  flex: 1.4;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  text-align: right;
+  min-width: 0;
+}
+.rk-user-line1 { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .rk-badge { margin-right: 0.2rem; }
 .rk-title {
-  margin-left: 0.35rem;
+  margin-top: 0.2rem;
   font-size: 0.68rem;
   padding: 0.05rem 0.35rem;
   border-radius: 999px;
   background: rgba(255, 179, 0, 0.16);
   color: var(--neon-amber);
-  vertical-align: middle;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .rank-list { display: flex; flex-direction: column; }
 .rank-row {
   display: flex;
   align-items: center;
-  padding: 0.55rem 0.9rem;
+  padding: 0.65rem 0.9rem;
   font-size: 0.9rem;
   color: var(--text);
   border-bottom: 1px solid rgba(45, 226, 230, 0.08);

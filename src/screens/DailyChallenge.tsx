@@ -422,8 +422,10 @@ export default function DailyChallenge({
                   <span className="rk-score">{r.score}</span>
                   <span className="rk-time">{fmtMs(r.time_ms)}</span>
                   <span className="rk-user">
-                    {badgeIcon && <span className="rk-badge">{badgeIcon}</span>}
-                    <span style={nickSwatch ? { color: nickSwatch } : undefined}>{r.player_name}</span>
+                    <span className="rk-user-line1">
+                      {badgeIcon && <span className="rk-badge">{badgeIcon}</span>}
+                      <span style={nickSwatch ? { color: nickSwatch } : undefined}>{r.player_name}</span>
+                    </span>
                     {titleLabel && <span className="rk-title">{titleLabel}</span>}
                   </span>
                 </div>

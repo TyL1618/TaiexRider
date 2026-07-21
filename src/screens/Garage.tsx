@@ -77,6 +77,7 @@ export default function Garage({ user, onBack }: { user: User | null; onBack: ()
   const [active, setActive] = useState(() => getActiveSkinId(user?.id ?? null));
   const [watchingAd, setWatchingAd] = useState(false);
   const [showAdTicketPrompt, setShowAdTicketPrompt] = useState(false);
+  const [confirmBuy, setConfirmBuy] = useState<{ kind: CosmeticKind; opt: CosmeticOption } | null>(null);
   const [adClaims, setAdClaims] = useState(() => getAdCoinClaims(dailyKey(), user?.id ?? null));
   const [achvBikes, setAchvBikes] = useState<AchvBikeView[]>(() => getAchievementBikes(0));
   const [achvTitles, setAchvTitles] = useState<AchvTitleView[]>(() => getAchievementTitles(0));
@@ -281,20 +282,28 @@ export default function Garage({ user, onBack }: { user: User | null; onBack: ()
     if (setActiveSkin(id, user?.id ?? null)) setActive(id);
   };
 
-  // 個人化裝備：未擁有→購買（走 wallet_spend_item RPC，跟車款分開一支，見
-  // garage.ts 註解）；已擁有→點擊切換裝備/取消裝備（同一項再點一次＝取消裝備，
-  // 回到「無」，跟車皮裝備不同——這幾類本來就允許「不裝備任何一個」）。
-  const handleCosmeticClick = async (kind: CosmeticKind, opt: CosmeticOption) => {
+  // 個人化裝備：未擁有→跳確認彈窗問要不要花鑽石買（2026-07-21 使用者回報直接扣款
+  // 容易手滑誤買，改成先跳 confirmBuy 彈窗，按「確定購買」才真的呼叫 doPurchaseCosmetic）；
+  // 已擁有→點擊切換裝備/取消裝備（同一項再點一次＝取消裝備，回到「無」，跟車皮裝備
+  // 不同——這幾類本來就允許「不裝備任何一個」）。
+  const handleCosmeticClick = (kind: CosmeticKind, opt: CosmeticOption) => {
     if (opt.price < 0) return; // 不可購買（黑天鵝專屬贈品）
     if (!isOwned(opt.id)) {
       if (diamonds < opt.price) return;
-      const ok = await walletSpendItem(opt.id);
-      if (ok) { setDiamonds(getDiamonds()); forceRender((n) => n + 1); }
+      setConfirmBuy({ kind, opt });
       return;
     }
     const current = getActiveCosmetic(kind, user?.id ?? null);
     setActiveCosmetic(kind, current === opt.id ? null : opt.id, user?.id ?? null);
     forceRender((n) => n + 1);
+  };
+
+  const doPurchaseCosmetic = async () => {
+    if (!confirmBuy) return;
+    const { opt } = confirmBuy;
+    setConfirmBuy(null);
+    const ok = await walletSpendItem(opt.id);
+    if (ok) { setDiamonds(getDiamonds()); forceRender((n) => n + 1); }
   };
 
   const renderSkinCard = (s: BikeSkin) => {
@@ -370,6 +379,21 @@ export default function Garage({ user, onBack }: { user: User | null; onBack: ()
             <div className="slot-result-actions">
               <button className="modal-btn" onClick={useTicketForCoins}>消耗票券直接領取</button>
               <button className="modal-link" onClick={() => { setShowAdTicketPrompt(false); proceedWithAd(); }}>還是看廣告</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 個人化裝備購買確認彈窗（2026-07-21 使用者回報直接扣款容易手滑誤買） */}
+      {confirmBuy && (
+        <div className="modal-overlay" onClick={() => setConfirmBuy(null)}>
+          <div className="slot-result" onClick={(e) => e.stopPropagation()}>
+            <div className="garage-card-name">
+              花 {confirmBuy.opt.price}💎 購買「{confirmBuy.opt.label}」嗎？
+            </div>
+            <div className="slot-result-actions">
+              <button className="modal-btn" onClick={doPurchaseCosmetic}>確定購買</button>
+              <button className="modal-link" onClick={() => setConfirmBuy(null)}>取消</button>
             </div>
           </div>
         </div>

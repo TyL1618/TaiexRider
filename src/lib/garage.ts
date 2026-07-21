@@ -358,14 +358,16 @@ export function isOwned(id: string): boolean {
   return getOwnedSkins().includes(id);
 }
 
-// Q 系列成就解鎖：不扣金幣，直接加入擁有清單（由 Garage.tsx 偵測 achievements.ts
-// 進度已達成時呼叫，冪等——重複呼叫不影響已擁有狀態）。已登入時改走
-// wallet_unlock_achievement RPC 寫回伺服器擁有清單（v1 仍信任客戶端算的成就進度，
-// 見 migration_20260705.sql 註解；未登入維持純本地）。
+// 成就解鎖：不扣金幣，直接加入擁有清單（由 Garage.tsx 偵測 achievements.ts 進度已
+// 達成時呼叫，冪等——重複呼叫不影響已擁有狀態）。已登入時改走 wallet_unlock_achievement
+// RPC 寫回伺服器擁有清單（v1 仍信任客戶端算的成就進度，見 migration_20260705.sql
+// 註解；未登入維持純本地）。用於兩類 id：Q 系列車皮（BIKE_SKINS 有登記）+ 2026-07-21
+// 新增的 5 個成就稱號（title:win-streak 等，純 cosmetic id，不是車皮，BIKE_SKINS
+// 裡本來就找不到）——**這裡刻意不檢查 id 是否存在於 BIKE_SKINS**，2026-07-21 稍早
+// 版本誤留了這條車皮限定的檢查，導致成就稱號解鎖後 owned 清單從未真的寫入，裝備
+// 按鈕點了沒反應（呼叫端已經用 achievements.ts 的 unlocked 進度把關，這裡不用重查）。
 export async function unlockAchievementSkin(id: string): Promise<boolean> {
   if (isOwned(id)) return true;
-  const skin = BIKE_SKINS.find((s) => s.id === id);
-  if (!skin) return false;
 
   const uid = await getUid();
   if (uid) {
