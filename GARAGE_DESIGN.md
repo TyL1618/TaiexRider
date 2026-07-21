@@ -312,6 +312,65 @@ narrowed eyes. Wheel rims glow deep red, dimmer and more sinister than
 other bikes. Silent. Deadly. Almost invisible.
 ```
 
+### 🖤 隱藏車款（2 台）——抽獎轉輪專屬，**尚未生圖（0/2）**
+
+不走一般車庫購買，只能靠 [LOTTERY_DESIGN.md](LOTTERY_DESIGN.md) 的抽獎轉輪抽到，
+定位比 P 系列更稀有。跟前面十台一樣，生圖時要先貼「共用規格」段落（附上
+`public/bike.png` 當範例圖），再貼下面對應那台的 STYLE。
+
+**黑天鵝**（`hidden-blackswan`，抽中機率 0.05%，見 `lottery_spin()` 機率表）
+```
+VEHICLE TYPE: elegant low sport-cruiser with a long, low, gracefully
+curving tail section evoking a swan's folded neck — NOT a full-fairing
+sportbike, NOT a bagger/tourer. Slim, sinuous silhouette.
+STYLE: An ominous, mythical "black swan event" bike. Obsidian-black
+lacquered bodywork with a subtle iridescent oil-slick sheen (shifting
+hints of deep purple and green in the black, like real black swan
+feathers catching light), fine feather-texture etching sweeping back
+along the tank and tail. Thin cracks of glowing blood-red light break
+through the seams of the bodywork as if something catastrophic is
+happening beneath the surface — small, contained, not a full glow, just
+hairline fractures of red. A single thin gold accent line traces along
+the top of the tank evoking a swan's beak. Wheel rims glow deep
+crimson-gold, dimmer and more ominous than any other bike's rim glow —
+clearly distinct from P3's bright champagne gold. Absolutely no ground
+shadow beneath the chassis — the bike should look like it's floating on
+pure white, not sitting on a surface. This is the rarest, most unsettling
+bike in the garage: the day the market broke.
+```
+
+**看不見的手**（id 待定，構想車款，尚未排進機率表，跟使用者確認要不要正式排入
+抽獎後再補登記）——刻意違反共用規格裡「要有完整車身輪廓」的預設，需要額外覆蓋
+指示：
+```
+VEHICLE TYPE: a motorcycle where the ENTIRE body, frame, tank, seat, and
+fairing are 100% invisible/transparent — render NOTHING for the bodywork,
+as if the frame is made of glass with a refractive index of exactly 1.0
+(completely see-through, not frosted or tinted). ONLY the two wheels
+(tires + rims) are visible, held in their exact locked positions as if
+by an invisible frame — do not draw any connecting structure, axle line,
+or frame silhouette between them, not even a faint outline. The wheels
+should appear to float independently in their correct fixed spots with
+empty white space between and around them.
+STYLE: "The Invisible Hand" — a nod to Adam Smith's economic theory, the
+market force nobody can see but that moves everything. Only the two
+wheels exist: glossy black tires with sharp tread detail, chrome-silver
+rims with spoke detail, glowing icy-white rim light (distinct from every
+other bike's colored glow — this one is pure white/silver, cold and
+clinical). No bodywork of any kind, no ghost outline, no faint silhouette
+hint — total invisibility of everything except the two wheels. Absolutely
+no ground contact shadow beneath either wheel or in the empty space
+between them — pure flat white background with zero shading anywhere,
+including where a body would normally cast a shadow. This should look
+unmistakably like just two wheels floating on a blank white canvas with
+nothing else present.
+```
+
+⚠️ 「看不見的手」生圖風險較高——生圖模型通常很難真的畫出「什麼都沒有」，可能會
+偷畫出淡淡的車身輪廓或連接線殘留，收圖後要仔細檢查，必要時要求重畫或手動去背
+修掉殘留痕跡。黑天鵝風險較低，是「有車身、只是配色詭異」的正常類型，跟其他車
+一樣的處理流程即可。
+
 ## 3. 生圖後驗收流程
 
 1. Grok 產出後先去背（若非純白底需另外去背，跟現有 bike.png 一樣走透明 PNG）。
