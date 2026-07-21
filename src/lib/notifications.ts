@@ -35,7 +35,11 @@ async function scheduleDaily(): Promise<void> {
         title: "TAIEX RIDER",
         body: "今日賽道已更新，上榜機會別錯過 🏍️",
         schedule: { on: { hour: REMINDER_HOUR, minute: 0 }, allowWhileIdle: true },
-        // smallIcon 不指定：讓外掛用預設（App icon），避免指到不存在的資源名
+        // Android 5.0+ 狀態列小圖示規定必須是白色去背剪影，不能是彩色 App icon
+        // （不指定的話外掛回退用彩色 icon，系統無法轉剪影會顯示系統預設的「i」符號）。
+        // 剪影圖檔見 android/app/src/main/res/drawable-*dpi/ic_stat_notify.png。
+        smallIcon: "ic_stat_notify",
+        iconColor: "#ffb300",
       }],
     });
   } catch (err) {
