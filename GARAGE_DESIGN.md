@@ -312,64 +312,108 @@ narrowed eyes. Wheel rims glow deep red, dimmer and more sinister than
 other bikes. Silent. Deadly. Almost invisible.
 ```
 
-### 🖤 隱藏車款（2 台）——抽獎轉輪專屬，**尚未生圖（0/2）**
+### 🖤 隱藏車款（2 台）——抽獎轉輪專屬，**✅ 生圖完成、已登記（2/2）**
 
 不走一般車庫購買，只能靠 [LOTTERY_DESIGN.md](LOTTERY_DESIGN.md) 的抽獎轉輪抽到，
-定位比 P 系列更稀有。跟前面十台一樣，生圖時要先貼「共用規格」段落（附上
-`public/bike.png` 當範例圖），再貼下面對應那台的 STYLE。
+定位比 P 系列更稀有，兩台皆 0.05% 機率（見 `migration_20260721g.sql`）。
 
-**黑天鵝**（`hidden-blackswan`，抽中機率 0.05%，見 `lottery_spin()` 機率表）
+> **2026-07-21 補登記**：兩台生圖過程踩了不少坑（黑天鵝前幾版不是長出真的天鵝
+> 頭/喙/脖子，就是矯枉過正變成「就是一台普通黑色機車」；看不見的手第一版被
+> Grok 理解成「拆殼透視圖」畫出整組引擎/車架骨架，完全違反設計初衷）。**教訓**：
+> ① 對生圖模型下「意象比喻」（像天鵝）不能只用抽象詞，模型會直接畫出寫實動物
+> 部位——要嘛完全避開解剖學詞彙+加強烈負面清單，要嘛乾脆比照 Q1/Q3 的既有作法
+> 只放一個「小範圍、扁平 2D 貼花」當動物符號錨點，不要讓整個車身變形；
+> ② 對生圖模型下「東西不存在/隱形」的指令一樣會失敗，模型天生會用「拆解/透視」
+> 來填補「拿掉車殼」的想像——正確做法是完全避免用「這是一台機車」當主詞去描述，
+> 改成直接描述「這是兩顆獨立輪子的靜物攝影」，不提 vehicle/motorcycle 這個詞，
+> 才能讓模型停止腦補中間的機械結構。最終定案 prompt 見下方，兩者皆已去背存檔、
+> 實測輪心像素位置校正 `spriteW`/`spriteOffsetX`/`spriteOffsetY`（見
+> [garage.ts](src/lib/garage.ts) 對應項目的註解——**這兩張圖實際生成的輪子位置
+> 明顯偏離共用規格假設的 15.6%/84.4%/71% 比例，量測後才拿到準確數字，不能直接
+> 套公式**）。
+
+**黑天鵝**（`hidden-blackswan`，抽中機率 0.05%，見 `lottery_spin()` 機率表；
+最終定案 prompt，經過 5 輪迭代——完整過程見對話紀錄，重點教訓已寫進上方）：
 ```
-VEHICLE TYPE: elegant low sport-cruiser with a long, low, gracefully
-curving tail section evoking a swan's folded neck — NOT a full-fairing
-sportbike, NOT a bagger/tourer. Slim, sinuous silhouette.
-STYLE: An ominous, mythical "black swan event" bike. Obsidian-black
-lacquered bodywork with a subtle iridescent oil-slick sheen (shifting
-hints of deep purple and green in the black, like real black swan
-feathers catching light), fine feather-texture etching sweeping back
-along the tank and tail. Thin cracks of glowing blood-red light break
-through the seams of the bodywork as if something catastrophic is
-happening beneath the surface — small, contained, not a full glow, just
-hairline fractures of red. A single thin gold accent line traces along
-the top of the tank evoking a swan's beak. Wheel rims glow deep
-crimson-gold, dimmer and more ominous than any other bike's rim glow —
-clearly distinct from P3's bright champagne gold. Absolutely no ground
-shadow beneath the chassis — the bike should look like it's floating on
-pure white, not sitting on a surface. This is the rarest, most unsettling
-bike in the garage: the day the market broke.
+VEHICLE TYPE: elegant low sport-cruiser — a LONG, LOW, gracefully curving
+tail section that sweeps upward at the very end (like a cafe racer's
+tail hump stretched longer and lower), a compact rounded tank, minimal
+or NO front fairing/cowling, handlebars positioned higher and further
+back than a sportbike (NOT low clip-ons mounted directly on the forks).
+The silhouette must be clearly LOW, LONG, and STRETCHED — closer to a
+cruiser or cafe racer proportions than a race replica. This must NOT be
+a full-fairing sportbike — no aggressive nose cowling, no sharp angular
+fairing panels, no low clip-ons — must read as CLEARLY DIFFERENT in
+silhouette from a race-replica sportbike (like P1's crimson bike).
+
+STYLE: An ominous, mythical "black swan event" bike — a reference to the
+black swan FINANCIAL METAPHOR (an unforeseeable market crash), NOT a
+literal bird. Deep obsidian black base. Bold, clearly visible sweeping
+iridescent oil-slick sheen (shifting purple/green/blue) across large
+areas of the tank/tail. A clearly visible fine feather-scale texture
+covers most of the tank and tail as a flat 2D surface pattern (must stay
+flush with the bodywork, never changes the silhouette). Irregular jagged
+hairline cracks glowing blood-red scattered across the body (fracture
+lines, NOT a decorative border). A thin irregular gold vein-like crack
+traces the top of the tank. Wheel rims glow deep blood-crimson red as
+the dominant color (clearly distinct from P3's champagne gold).
+
+SWAN IDENTITY ANCHOR: add ONE small, clearly readable, flat 2D stylized
+swan-wing silhouette motif decal on the tail fairing side panel — same
+scale/treatment as this set's other animal motifs (bull-horn winglets,
+phoenix-wing decal). Clean flat graphic silhouette only, NOT a literal
+sculpted 3D wing, NOT splayed feathers, NOT extending past the bike's
+silhouette. The overall body line should carry elegance/grace/poise.
+
+STRICT NEGATIVE CONSTRAINTS: no animal head, no beak, no sculpted neck,
+no bird silhouette, no wings/feather shapes extending beyond the
+bodywork outline — "swan" describes mood/texture only, never a literal
+shape. Also avoid: low contrast, flat/plain appearance — must look
+dramatic and unmistakably distinct from a plain black motorcycle.
 ```
 
-**看不見的手**（id 待定，構想車款，尚未排進機率表，跟使用者確認要不要正式排入
-抽獎後再補登記）——刻意違反共用規格裡「要有完整車身輪廓」的預設，需要額外覆蓋
-指示：
+**看不見的手**（`hidden-invisiblehand`，抽中機率 0.05%，見 `lottery_spin()`
+機率表；最終定案 prompt——完全跳脫「畫一台機車」的框架，不套用共用規格的敘述
+文字，只借用它的輪子座標數字）：
 ```
-VEHICLE TYPE: a motorcycle where the ENTIRE body, frame, tank, seat, and
-fairing are 100% invisible/transparent — render NOTHING for the bodywork,
-as if the frame is made of glass with a refractive index of exactly 1.0
-(completely see-through, not frosted or tinted). ONLY the two wheels
-(tires + rims) are visible, held in their exact locked positions as if
-by an invisible frame — do not draw any connecting structure, axle line,
-or frame silhouette between them, not even a faint outline. The wheels
-should appear to float independently in their correct fixed spots with
-empty white space between and around them.
-STYLE: "The Invisible Hand" — a nod to Adam Smith's economic theory, the
-market force nobody can see but that moves everything. Only the two
-wheels exist: glossy black tires with sharp tread detail, chrome-silver
-rims with spoke detail, glowing icy-white rim light (distinct from every
-other bike's colored glow — this one is pure white/silver, cold and
-clinical). No bodywork of any kind, no ghost outline, no faint silhouette
-hint — total invisibility of everything except the two wheels. Absolutely
-no ground contact shadow beneath either wheel or in the empty space
-between them — pure flat white background with zero shading anywhere,
-including where a body would normally cast a shadow. This should look
-unmistakably like just two wheels floating on a blank white canvas with
-nothing else present.
-```
+Use the attached image ONLY to determine two spatial reference points —
+do NOT generate a motorcycle, do NOT generate any vehicle, do NOT
+generate any frame, chassis, engine, or mechanical structure of any
+kind. This is a still-life product photograph of two separate,
+completely unconnected wheel-and-tire assemblies, nothing else.
 
-⚠️ 「看不見的手」生圖風險較高——生圖模型通常很難真的畫出「什麼都沒有」，可能會
-偷畫出淡淡的車身輪廓或連接線殘留，收圖後要仔細檢查，必要時要求重畫或手動去背
-修掉殘留痕跡。黑天鵝風險較低，是「有車身、只是配色詭異」的正常類型，跟其他車
-一樣的處理流程即可。
+COMPOSITION: Place two wheel-and-tire assemblies on a pure white
+background, matching the reference image's proportions — rear wheel
+center at 15.6% of image width, front wheel center at 84.4% of image
+width, both at 71% of image height, wheel diameter ≈ 28% of image width.
+Same canvas ratio as reference (~3:2 landscape, ≥1024px wide). The two
+wheels must sit on the same invisible horizontal ground line, same
+size/perspective/lighting as if they belonged to one motorcycle — but
+render absolutely nothing else.
+
+WHEEL STYLE: glossy black tires with sharp tread detail, chrome-silver
+spoked rims, glowing icy-white rim light on BOTH wheels identically
+(distinct from every other bike's colored glow — pure white/silver,
+cold and clinical). Flat vector / cel-shaded sticker art style matching
+the reference, bold clean outlines.
+
+STRICT NEGATIVE CONSTRAINTS — the following must be 100% absent, with
+zero exceptions: no frame, no chassis tubing, no engine block, no
+cylinders, no front forks, no handlebars, no exhaust pipe, no cables or
+wires, no seat, no fuel tank, no fender, no axle bar or connecting rod
+between the two wheels, no faint outline or ghost silhouette of a
+motorcycle body, no shadow or reflection implying a body is present. Do
+not interpret "invisible body" as "show the internal mechanics" — there
+is no mechanism to show. There must be pure, untouched white empty space
+between and around the two wheels, identical to the white background
+elsewhere in the image. If you are unsure whether to include a part,
+leave it out.
+
+BACKGROUND: absolutely no ground contact shadow of any kind beneath
+either wheel — flat shadeless white void, pixel-identical white
+everywhere except the two wheels themselves. No text, no logo, no
+watermark.
+```
 
 ## 3. 生圖後驗收流程
 

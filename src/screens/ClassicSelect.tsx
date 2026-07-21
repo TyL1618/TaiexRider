@@ -4,6 +4,8 @@ import { CLASSICS, classicToTrack } from "../data/classics";
 import { fetchClassicRecords, type ClassicRecord } from "../lib/classicRecords";
 import { classicPb, medalFor, nextMedalTarget, MEDAL_ICON } from "../lib/medals";
 import { signInWithGoogle, type User } from "../lib/auth";
+import { getPlayerName } from "../lib/playerId";
+import { getActiveCosmetic, COSMETIC_LABELS } from "../lib/garage";
 import type { TrackData } from "../data/tracks";
 import "../TrackSelect.css";
 import "./ClassicSelect.css";
@@ -25,6 +27,11 @@ export default function ClassicSelect({
   onBack: () => void;
 }) {
   const [records, setRecords] = useState<Map<string, ClassicRecord[]>>(new Map());
+  // 「自己那一列」暱稱顏色（見下方 classic-record-row）：這裡版面窄（單行小卡），
+  // 只套顏色，不加稱號/前綴圖示避免擠爆，跟 DailyChallenge.tsx 的完整版分工。
+  const myName = getPlayerName();
+  const myNickcolorId = getActiveCosmetic("nickcolor", user?.id ?? null);
+  const myNickSwatch = myNickcolorId ? COSMETIC_LABELS[myNickcolorId]?.swatch : undefined;
 
   useEffect(() => {
     let alive = true;
@@ -73,7 +80,7 @@ export default function ClassicSelect({
                 {recs.length > 0 ? (
                   recs.map((r, i) => (
                     <div key={i} className="classic-record-row">
-                      {RANK_ICON[i]} <span className="cr-name">{r.player_name}</span>・{r.score} 分・{fmtMs(r.time_ms)}
+                      {RANK_ICON[i]} <span className="cr-name" style={r.player_name === myName && myNickSwatch ? { color: myNickSwatch } : undefined}>{r.player_name}</span>・{r.score} 分・{fmtMs(r.time_ms)}
                     </div>
                   ))
                 ) : (

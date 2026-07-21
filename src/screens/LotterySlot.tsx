@@ -37,6 +37,7 @@ const ODDS_TABLE: { label: string; pct: string }[] = [
   { label: "300 鑽石", pct: "0.09%" },
   { label: "1000 鑽石（大獎）", pct: "0.01%" },
   { label: "🖤 黑天鵝（隱藏車款）", pct: "0.05%" },
+  { label: "🫥 看不見的手（隱藏車款）", pct: "0.05%" },
   { label: "赤紅暴走", pct: "1.00%" },
   { label: "電馭武士", pct: "0.70%" },
   { label: "黃金期貨", pct: "0.50%" },
@@ -61,6 +62,7 @@ const SYMBOL_POOL: Sym[] = [
   { key: "p5-phantom", icon: "🏍️", label: "匿蹤幽靈" },
   { key: "p2-galaxy", icon: "🏍️", label: "銀河鍍鉻" },
   { key: "hidden-blackswan", icon: "🖤", label: "黑天鵝" },
+  { key: "hidden-invisiblehand", icon: "🫥", label: "看不見的手" },
 ];
 
 function symbolFor(prizeKind: "diamond" | "skin" | "ticket", prizeId: string): Sym {
@@ -171,10 +173,10 @@ export default function LotterySlot({ user, onBack }: { user: User | null; onBac
         // 重複補償一樣算「抽中稀有車款」，特效等級照原本抽到的車判斷，不是照
         // 換算後的鑽石結果（不然重複補償永遠只會是普通鑽石特效，不合理）。
         const drawnId = res.duplicateOf ?? res.prizeId;
-        const isBlackSwan = drawnId === "hidden-blackswan";
+        const isHiddenTier = drawnId === "hidden-blackswan" || drawnId === "hidden-invisiblehand";
         const isPSeries = res.duplicateOf ? res.duplicateOf.startsWith("p") : (res.prizeKind === "skin" && res.prizeId?.startsWith("p"));
-        if (isBlackSwan || isPSeries) {
-          const rarity = isBlackSwan ? "epic" : "rare";
+        if (isHiddenTier || isPSeries) {
+          const rarity = isHiddenTier ? "epic" : "rare";
           timerRef.current = setTimeout(() => {
             playLotteryWin(rarity);
             setShake(rarity);

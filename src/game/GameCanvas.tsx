@@ -14,7 +14,7 @@ import { logEvent } from "../lib/analytics";
 import { haptics } from "../lib/haptics";
 import { fetchDeathHeatmap } from "../lib/deathHeatmap";
 import { startWakeLock } from "../lib/wakeLock";
-import { getActiveBikeSkin, addCoins, earnCoins, earnViaTicket, consumeTicket, getTickets, getAdsRemoved, BIKE_SKINS } from "../lib/garage";
+import { getActiveBikeSkin, addCoins, earnCoins, earnViaTicket, consumeTicket, getTickets, getAdsRemoved, BIKE_SKINS, getActiveCosmetic, COSMETIC_COLOR_SWATCH } from "../lib/garage";
 import { requestRewardedAd, preloadRewardedAd } from "../lib/ads";
 import { grantPlayReward, computePlayReward } from "../lib/playRewards";
 import { maybeRequestReview } from "../lib/review";
@@ -462,6 +462,15 @@ export default function GameCanvas({ prices, label, name, subtitle, onExit, onGa
     const bikeHueDeg = activeSkin.src ? 0 : activeSkin.hueRotateDeg;
     const bikeFilter = bikeHueDeg !== 0 ? `hue-rotate(${bikeHueDeg}deg)` : "none";
 
+    // 尾焰特效顏色（LOTTERY_DESIGN.md §4，個人化裝備）：純本地展示偏好，開局讀一次。
+    // 沒裝備任何顏色＝完全不畫尾焰（沒有免費預設特效，這是花鑽石解鎖的視覺道具）。
+    const trailColorId = getActiveCosmetic("trail", uid);
+    const trailColor = trailColorId ? COSMETIC_COLOR_SWATCH[trailColorId] ?? null : null;
+    // 鬼影顏色：疊在鬼影車皮上的色調濾鏡（不取代真實車皮，2026-07-15 拍板過鬼影要
+    // 秀出對手真實車款當購買誘因，這裡只加一層淡淡的色調圈，不是整台換色）。
+    const ghostColorId = getActiveCosmetic("ghostcolor", uid);
+    const ghostTintColor = ghostColorId ? COSMETIC_COLOR_SWATCH[ghostColorId] ?? null : null;
+
     // ---- 建立世界 ----
     // subSteps 每幀重讀（沒有任何東西被烘進剛體裡），DEV 面板可即時切換不用重開一局。
     let subSteps = Math.max(1, Math.round(PHYSICS.subSteps));
@@ -645,6 +654,11 @@ let crashTimer = 0;
       } catch { /* localStorage 不可用時略過 */ }
     };
 
+    // ---- 尾焰特效狀態（LOTTERY_DESIGN.md §4，只有裝備 trail 色票才會有內容）----
+    type TrailParticle = { x: number; y: number; vx: number; vy: number; life: number; size: number };
+    let trailParticles: TrailParticle[] = [];
+    const TRAIL_FADE_SEC = 0.45;
+
     // ---- 死亡動畫狀態 ----
     type DeathParticle = { x: number; y: number; vx: number; vy: number; life: number; color: string; size: number };
     let deathParticles: DeathParticle[] = [];
@@ -716,6 +730,7 @@ let crashTimer = 0;
       landingSnap = null;
       perfectFxFrames = 0;
       perfectFxPts = [];
+      trailParticles = [];
       deathParticles = [];
       deathFlashAlpha = 0;
       deathShakeAmp = 0;
@@ -967,6 +982,20 @@ let crashTimer = 0;
       const groundedNow = rearContacts > 0 || frontContacts > 0;
       const airborneFully = rearContacts === 0 && frontContacts === 0;
       if (groundedNow && !hasEverGrounded) hasEverGrounded = true;
+
+      // 尾焰特效：貼地加速時從後輪冒出，往後飄散淡出（純視覺，不影響物理/分數）。
+      if (trailColor && groundedNow && throttle) {
+        const rw = bike.rearWheel.position;
+        trailParticles.push({
+          x: rw.x + (Math.random() - 0.5) * 3,
+          y: rw.y + (Math.random() - 0.5) * 3,
+          vx: -(0.8 + Math.random() * 0.6),
+          vy: -(0.15 + Math.random() * 0.25),
+          life: 1,
+          size: 1.8 + Math.random() * 1.6,
+        });
+        if (trailParticles.length > 90) trailParticles.splice(0, trailParticles.length - 90);
+      }
 
       // [DEV] 即時穿透讀數：sink = 輪半徑 − 輪心到地形折線的最短距離。
       // 0 = 完美貼地；>0 = 輪心已在地表下；≥ 2×輪半徑 = 整顆輪子沒入（＝玩家看到的破圖）。
@@ -1429,11 +1458,25 @@ let crashTimer = 0;
       const sx = wx(gx);
       if (sx < -60 || sx > W + 60) return; // 畫面外不畫，省效能
       ctx.save();
-      ctx.globalAlpha = 0.32;
       ctx.translate(sx, wy(gy));
       ctx.rotate(gAngle);
       const w = ghostSpriteW;
       const h = w * (ghostBikeEntry.img.naturalHeight / ghostBikeEntry.img.naturalWidth);
+      // 鬼影顏色（LOTTERY_DESIGN.md §4）：疊一圈淡色光暈當色調，不取代真實車皮
+      // （2026-07-15 拍板鬼影要秀出對手真實車款當購買誘因）。用純色 arc + 'lighter'
+      // 疊加，不用 ctx.filter/shadowBlur——那兩個是 2026-07-13 修過的 Android WebView
+      // 已知昂貴逐像素操作，這裡沿用同一個教訓，只用便宜的向量 fill。
+      if (ghostTintColor) {
+        ctx.save();
+        ctx.globalCompositeOperation = "lighter";
+        ctx.globalAlpha = 0.28;
+        ctx.fillStyle = ghostTintColor;
+        ctx.beginPath();
+        ctx.arc(0, 0, (w * 0.5) * scale, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+      ctx.globalAlpha = 0.32;
       ctx.drawImage(
         ghostBikeEntry.img,
         (-w / 2 + ghostOffsetX) * scale,
@@ -1581,6 +1624,18 @@ let crashTimer = 0;
         }
         drawFlag(track.vertices[0].x, track.vertices[0].y, COLOR.start, "START");
         drawFlag(track.finishX, track.vertices[track.vertices.length - 1].y, COLOR.finish, "FIN");
+        if (trailColor && trailParticles.length > 0) {
+          ctx.save();
+          ctx.fillStyle = trailColor;
+          for (const p of trailParticles) {
+            if (p.life <= 0) continue;
+            ctx.globalAlpha = Math.max(0, p.life) * 0.65;
+            ctx.beginPath();
+            ctx.arc(wx(p.x), wy(p.y), Math.max(1, p.size * scale), 0, Math.PI * 2);
+            ctx.fill();
+          }
+          ctx.restore();
+        }
         drawGhost();
         drawBike(alpha);
         drawPerfectFx();
@@ -1666,6 +1721,18 @@ let crashTimer = 0;
       }
 
       // 鏡頭跟隨 / 終點全覽（dying 時鏡頭凍住，等動畫結束再開始縮放）
+      // 尾焰粒子衰減（跟死亡特效無關，隨時都在跑，跟 dt 掛鉤不受子步數影響）
+      if (trailParticles.length > 0) {
+        const trailDtSec = Math.min(dt, 60) / 1000;
+        for (let i = trailParticles.length - 1; i >= 0; i--) {
+          const p = trailParticles[i];
+          p.x += p.vx;
+          p.y += p.vy;
+          p.life -= trailDtSec / TRAIL_FADE_SEC;
+          if (p.life <= 0) trailParticles.splice(i, 1);
+        }
+      }
+
       const c = bike.chassis;
       if (overRef.current && !dyingRef.current) {
         if (!overviewComputed) {

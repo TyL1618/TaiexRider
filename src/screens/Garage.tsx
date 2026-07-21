@@ -454,12 +454,12 @@ export default function Garage({ user, onBack }: { user: User | null; onBack: ()
         {BIKE_SKINS.filter((s) => s.currency === "diamond").map(renderSkinCard)}
       </div>
 
-      {/* 隱藏車款（黑天鵝，LOTTERY_DESIGN.md §3）：只能靠抽獎轉輪取得，不開放直接
-          購買。取得前顯示全黑剪影 + 神秘符號，不像成就車款有進度條（純機率，沒有
-          「進度」這個概念）。 */}
+      {/* 隱藏車款（黑天鵝/看不見的手，LOTTERY_DESIGN.md §3）：只能靠抽獎轉輪取得，
+          不開放直接購買。取得前顯示全黑剪影 + 神秘符號，不像成就車款有進度條（純
+          機率，沒有「進度」這個概念）。 */}
       <h2 className="garage-section-title">🖤 隱藏車款</h2>
       <div className="garage-list">
-        {BIKE_SKINS.filter((s) => s.id === "hidden-blackswan").map((s) => {
+        {BIKE_SKINS.filter((s) => s.id.startsWith("hidden-")).map((s) => {
           if (isOwned(s.id)) return renderSkinCard(s);
           return (
             <div key={s.id} className="garage-card locked garage-card-mystery">

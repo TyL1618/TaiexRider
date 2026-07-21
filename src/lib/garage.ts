@@ -107,13 +107,21 @@ export const BIKE_SKINS: BikeSkin[] = [
     price: 600, currency: "diamond", hueRotateDeg: 0, src: "bikes/p2-galaxy.png",
     spriteW: 73.3, spriteOffsetX: -0.4, spriteOffsetY: -2.7,
   },
-  // 黑天鵝（隱藏車款，見 LOTTERY_DESIGN.md §3）：locked:true 沿用 Q 系列「不自動
-  // 擁有」機制，但解鎖來源是抽獎 lottery_spin() RPC，不是成就系統。取得前 Garage.tsx
-  // 用全黑剪影渲染（濾鏡處理，不用另外做美術），src 待 Grok 出圖完成後補上。
+  // 黑天鵝／看不見的手（隱藏車款，見 LOTTERY_DESIGN.md §3）：locked:true 沿用 Q 系列
+  // 「不自動擁有」機制，但解鎖來源是抽獎 lottery_spin() RPC，不是成就系統。
+  // 2026-07-21：生圖定案，spriteW/offsetX/offsetY 是實測 public/bikes/{id}.png
+  // 輪心像素位置（非套用共用規格假設的 15.6%/84.4%/71% 比例——兩張圖實際生成結果
+  // 都偏離該比例不少，套公式量出來的才準，量測用的一次性 scripts/_measure_wheels.cjs
+  // 已刪除不留版控，之後如需重量可用同技法：extract+SVG grid 疊圖用 Read 工具讀座標）。
   {
     id: "hidden-blackswan", name: "黑天鵝", desc: "萬中無一的異象降臨，抽獎極稀有大獎",
     price: 0, locked: true, hueRotateDeg: 0, src: "bikes/hidden-blackswan.png",
-    spriteW: 75, spriteOffsetX: 0, spriteOffsetY: -5,
+    spriteW: 79.6, spriteOffsetX: 0.2, spriteOffsetY: 0.7,
+  },
+  {
+    id: "hidden-invisiblehand", name: "看不見的手", desc: "亞當斯密的隱喻——市場的力量，無人能見卻主宰一切",
+    price: 0, locked: true, hueRotateDeg: 0, src: "bikes/hidden-invisiblehand.png",
+    spriteW: 79.7, spriteOffsetX: 0.2, spriteOffsetY: -1.5,
   },
 ];
 
@@ -534,6 +542,55 @@ export async function earnViaTicket(
   writeTicketsCache(row.tickets);
   return row.ok;
 }
+
+// 個人化裝備 id → 顯示用文字/色票，給排行榜「自己那一列」套用暱稱顏色/稱號/前綴
+// 圖示用（見 DailyChallenge.tsx）。內容需跟 Garage.tsx COSMETIC_CATALOG（購買型）+
+// achievements.ts getAchievementTitles()（成就解鎖型，5 個 title:）保持同步——
+// 沒有拆成單一資料源是因為 Garage.tsx 的 catalog 還帶著 price/購買 UI 邏輯，這裡只
+// 需要「id → 顯示文字」這個子集合，拆分成獨立小表更簡單、風險比大改 Garage.tsx 低。
+export const COSMETIC_LABELS: Record<string, { label: string; swatch?: string }> = {
+  "nickcolor:neon-cyan": { label: "霓虹青", swatch: "#2de2e6" },
+  "nickcolor:amber-gold": { label: "琥珀金", swatch: "#ffb300" },
+  "nickcolor:danger-red": { label: "危險紅", swatch: "#ff4d5e" },
+  "nickcolor:deep-purple": { label: "深邃紫", swatch: "#8855ff" },
+  "nickcolor:ghost-gray": { label: "幽靈灰", swatch: "#9aa0a6" },
+  "nickcolor:black-gold": { label: "黑金", swatch: "#caa25c" },
+  "title:newbie-knight": { label: "新手騎士" },
+  "title:taiex-god": { label: "台股股神" },
+  "title:shoeshine-boy": { label: "擦鞋童" },
+  "title:shoeshine-chairman": { label: "擦鞋董" },
+  "title:bull-bear-clash": { label: "多空交戰" },
+  "title:park-homeless": { label: "公園街友" },
+  "title:finance-haojiao": { label: "財經皓角" },
+  "title:chives": { label: "韭菜" },
+  "title:fourth-institution": { label: "第四大法人" },
+  "title:blackswan-witness": { label: "黑天鵝目擊者" },
+  "title:win-streak": { label: "連勝狂魔" },
+  "title:leaderboard-regular": { label: "排行榜常客" },
+  "title:air-walker": { label: "空中飛人" },
+  "title:gravity-challenger": { label: "地心引力挑戰者" },
+  "title:perfect-landing": { label: "完美落地大師" },
+  "badge:fire": { label: "🔥" },
+  "badge:star": { label: "⭐" },
+  "badge:crown": { label: "👑" },
+  "badge:diamond": { label: "💎" },
+  "badge:motorcycle": { label: "🏍️" },
+  "badge:blackswan": { label: "🦢" },
+};
+
+// 尾焰特效顏色／鬼影顏色的色票（跟 Garage.tsx COSMETIC_CATALOG 的 trail/ghostcolor
+// swatch 同一份數值，這裡是給 GameCanvas.tsx 實際畫圖時查表用，兩處色碼要對得上，
+// 改色請兩處一起改）。
+export const COSMETIC_COLOR_SWATCH: Record<string, string> = {
+  "trail:amber": "#ffb300",
+  "trail:magenta": "#ff5fa8",
+  "trail:green": "#4caf50",
+  "trail:white": "#ffffff",
+  "ghostcolor:amber": "#ffb300",
+  "ghostcolor:magenta": "#ff5fa8",
+  "ghostcolor:green": "#4caf50",
+  "ghostcolor:white": "#ffffff",
+};
 
 // ── 個人化裝備（稱號/暱稱顏色/前綴圖示/尾焰特效顏色/鬼影顏色）：純本地偏好，
 // 帳號隔離，比照 activeSkinKey() 的既有慣例（見該函式註解——這類「目前裝備中」

@@ -10,7 +10,7 @@ import { recordStreak, getStreak, playedThisSession, writeStreakCache } from "..
 import { fetchDeathHeatmap, type HeatBucket } from "../lib/deathHeatmap";
 import { getDailyQuests } from "../lib/quests";
 import { getWeeklyQuests, syncWeeklyFromServer, weekKey, type WeeklyQuestView } from "../lib/weeklyQuests";
-import { getAdsRemoved, syncWalletFromServer, fetchDailyUsage } from "../lib/garage";
+import { getAdsRemoved, syncWalletFromServer, fetchDailyUsage, getActiveCosmetic, COSMETIC_LABELS } from "../lib/garage";
 import { requestRewardedAd, preloadRewardedAd } from "../lib/ads";
 import { checkPendingSettlement, ackSettlement, type PendingSettlement } from "../lib/dailyDiamondSettlement";
 import CoinIcon from "../components/CoinIcon";
@@ -85,6 +85,12 @@ export default function DailyChallenge({
   // handleStart 直接用、不用再抓第二次。
   const [ghostAvail, setGhostAvail] = useState<boolean | null>(null);
   const ghostPathRef = useRef<GhostRecord | null>(null);
+
+  // 排行榜「自己那一列」個人化裝備（見下方 rows.map）：純顯示偏好，開局讀一次即可。
+  const myName = getPlayerName();
+  const myNickcolorId = getActiveCosmetic("nickcolor", user?.id ?? null);
+  const myBadgeId = getActiveCosmetic("badge", user?.id ?? null);
+  const myTitleId = getActiveCosmetic("title", user?.id ?? null);
 
   // 2026-07-07：同裝置切換帳號時，本地次數快取重新從「這個 uid」自己的 key 讀取
   // （見 challengeAttempts.ts 頂部說明），避免沿用前一個使用者當天用掉的次數；
@@ -401,14 +407,28 @@ export default function DailyChallenge({
           </div>
         ) : (
           <div className="rank-list">
-            {rows.map((r, i) => (
-              <div className={`rank-row ${i < 3 ? "top" : ""}`} key={i}>
-                <span className="rk-pos">{i + 1}</span>
-                <span className="rk-score">{r.score}</span>
-                <span className="rk-time">{fmtMs(r.time_ms)}</span>
-                <span className="rk-user">{r.player_name}</span>
-              </div>
-            ))}
+            {rows.map((r, i) => {
+              // 「自己那一列」套用個人化裝備（暱稱顏色/稱號/前綴圖示，LOTTERY_DESIGN.md
+              // §4）：排行榜 ScoreRow 沒有 player_id（anon key 讀不到），只能用暱稱
+              // 精確比對當作「是不是我」的判斷——跟 App.tsx 比對即時名次同一套heuristic，
+              // 撞名時可能誤判，但這只是自己端的顯示裝飾，不影響任何分數/名次判定。
+              const isMe = r.player_name === myName;
+              const nickSwatch = isMe && myNickcolorId ? COSMETIC_LABELS[myNickcolorId]?.swatch : undefined;
+              const badgeIcon = isMe && myBadgeId ? COSMETIC_LABELS[myBadgeId]?.label : undefined;
+              const titleLabel = isMe && myTitleId ? COSMETIC_LABELS[myTitleId]?.label : undefined;
+              return (
+                <div className={`rank-row ${i < 3 ? "top" : ""}`} key={i}>
+                  <span className="rk-pos">{i + 1}</span>
+                  <span className="rk-score">{r.score}</span>
+                  <span className="rk-time">{fmtMs(r.time_ms)}</span>
+                  <span className="rk-user">
+                    {badgeIcon && <span className="rk-badge">{badgeIcon}</span>}
+                    <span style={nickSwatch ? { color: nickSwatch } : undefined}>{r.player_name}</span>
+                    {titleLabel && <span className="rk-title">{titleLabel}</span>}
+                  </span>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
