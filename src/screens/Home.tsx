@@ -138,15 +138,19 @@ export default function Home({
 
       <div className="home-entry-row">
         <button className="garage-entry-btn" onClick={() => onNav("garage")}>
-          <CoinIcon size={22} />
-          <span className="garage-entry-coins">{getCoins()}</span>
+          <span className="garage-entry-top">
+            <CoinIcon size={20} />
+            <span className="garage-entry-coins">{getCoins()}</span>
+          </span>
           <span className="garage-entry-label">收藏車庫</span>
         </button>
         <button className="ency-entry-btn" onClick={() => setShowEncyclopedia(true)}>
-          📖 <span className="ency-entry-label">圖鑑</span>
+          <span className="ency-entry-icon">📖</span>
+          <span className="ency-entry-label">圖鑑</span>
         </button>
         <button className="lottery-entry-btn" onClick={() => onNav("lottery")}>
-          🎰 <span className="lottery-entry-label">幸運轉輪</span>
+          <span className="lottery-entry-icon">🎰</span>
+          <span className="lottery-entry-label">幸運轉輪</span>
         </button>
       </div>
       <p className="account-status">

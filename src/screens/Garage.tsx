@@ -286,7 +286,7 @@ export default function Garage({ user, onBack }: { user: User | null; onBack: ()
   // 容易手滑誤買，改成先跳 confirmBuy 彈窗，按「確定購買」才真的呼叫 doPurchaseCosmetic）；
   // 已擁有→點擊切換裝備/取消裝備（同一項再點一次＝取消裝備，回到「無」，跟車皮裝備
   // 不同——這幾類本來就允許「不裝備任何一個」）。
-  const handleCosmeticClick = (kind: CosmeticKind, opt: CosmeticOption) => {
+  const handleCosmeticClick = async (kind: CosmeticKind, opt: CosmeticOption) => {
     if (opt.price < 0) return; // 不可購買（黑天鵝專屬贈品）
     if (!isOwned(opt.id)) {
       if (diamonds < opt.price) return;
@@ -294,7 +294,8 @@ export default function Garage({ user, onBack }: { user: User | null; onBack: ()
       return;
     }
     const current = getActiveCosmetic(kind, user?.id ?? null);
-    setActiveCosmetic(kind, current === opt.id ? null : opt.id, user?.id ?? null);
+    forceRender((n) => n + 1); // 樂觀先重繪一次（setActiveCosmetic 內部也有本地樂觀寫入）
+    await setActiveCosmetic(kind, current === opt.id ? null : opt.id, user?.id ?? null);
     forceRender((n) => n + 1);
   };
 
@@ -447,7 +448,7 @@ export default function Garage({ user, onBack }: { user: User | null; onBack: ()
                   <button
                     className={`garage-btn${equipped ? " disabled" : ""}`}
                     disabled={equipped}
-                    onClick={() => { setActiveCosmetic("title", t.id, user?.id ?? null); forceRender((n) => n + 1); }}
+                    onClick={() => { setActiveCosmetic("title", t.id, user?.id ?? null).then(() => forceRender((n) => n + 1)); }}
                   >
                     {equipped ? "使用中" : "裝備"}
                   </button>

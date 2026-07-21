@@ -131,6 +131,10 @@ const OWNED_KEY = "tr_garage_owned";
 const ACTIVE_KEY = "tr_garage_active";
 const ADS_REMOVED_KEY = "tr_ads_removed";
 const TICKETS_KEY = "tr_garage_tickets"; // 廣告券（LOTTERY_DESIGN.md §6），伺服器權威同 coins/diamonds
+// 個人化裝備「目前裝備哪一個」快取（2026-07-21i 起伺服器權威，同 owned 整包覆寫，
+// 不分帳號隔離——見 cosmeticActiveKey 舊實作註解，改版原因是純本地 key 在使用者
+// 真機上重開 App 就會失效，owned 這條伺服器同步路徑已證實 100% 可靠，故比照辦理）。
+const EQUIPPED_KEY = "tr_garage_equipped";
 
 // 目前裝備車皮（ACTIVE_KEY）帳號隔離：跟 coins/diamonds/owned 不同，這個偏好從來
 // 沒有存在伺服器上（純本地選擇），舊版是單一全域 key，登出時 resetWalletCache() 會
@@ -155,6 +159,17 @@ export function writeDiamondsCache(n: number): void {
 }
 function writeOwnedCache(owned: string[]): void {
   try { localStorage.setItem(OWNED_KEY, JSON.stringify(owned)); } catch { /* 靜默 */ }
+}
+function writeEquippedCache(equipped: Record<string, string>): void {
+  try { localStorage.setItem(EQUIPPED_KEY, JSON.stringify(equipped ?? {})); } catch { /* 靜默 */ }
+}
+function getEquippedCache(): Record<string, string> {
+  try {
+    const raw = localStorage.getItem(EQUIPPED_KEY);
+    return raw ? (JSON.parse(raw) as Record<string, string>) : {};
+  } catch {
+    return {};
+  }
 }
 function writeAdsRemovedCache(v: boolean): void {
   try { localStorage.setItem(ADS_REMOVED_KEY, v ? "1" : "0"); } catch { /* 靜默 */ }
@@ -186,10 +201,12 @@ export async function syncWalletFromServer(): Promise<void> {
     streak_count: number; last_session_key: string | null;
     collection: string[]; ads_removed: boolean; tickets: number;
     total_flips: number; total_perfect: number;
+    equipped: Record<string, string> | null;
   };
   writeCoinsCache(row.coins);
   writeDiamondsCache(row.diamonds);
   writeOwnedCache(row.owned);
+  writeEquippedCache(row.equipped ?? {});
   writeAchievementsCache(row.bull_finishes, row.bear_finishes, row.total_flips, row.total_perfect);
   writeStreakCache(row.last_session_key, row.streak_count);
   writeCollectionCache(row.collection ?? []);
@@ -228,11 +245,13 @@ export function markAdsRemoved(): void {
 // 登出時呼叫：把錢包/成就/streak/圖鑑快取全部歸零成訪客預設值，避免下一個登入的帳號
 // （或登出後的訪客畫面）看到上一個帳號的金幣/鑽石/擁有清單/成就/收集殘影。
 // 裝備車皮（ACTIVE_KEY）不在這裡處理——已改帳號隔離（見 activeSkinKey()），各帳號
-// 各自的 key 天生不會互相污染，不需要也不應該在登出時重設。
+// 各自的 key 天生不會互相污染，不需要也不應該在登出時重設。個人化裝備
+// （EQUIPPED_KEY）改伺服器權威後跟 owned 同一套整包覆寫慣例，這裡要清。
 export function resetWalletCache(): void {
   writeCoinsCache(0);
   writeDiamondsCache(0);
   writeOwnedCache(["default"]);
+  writeEquippedCache({});
   resetAchievementsCache();
   resetStreakCache();
   resetCollectionCache();
@@ -594,25 +613,28 @@ export const COSMETIC_COLOR_SWATCH: Record<string, string> = {
   "ghostcolor:white": "#ffffff",
 };
 
-// ── 個人化裝備（稱號/暱稱顏色/前綴圖示/尾焰特效顏色/鬼影顏色）：純本地偏好，
-// 帳號隔離，比照 activeSkinKey() 的既有慣例（見該函式註解——這類「目前裝備中」
-// 的展示偏好不是安全/公平性敏感資料，只有「擁有清單」才需要伺服器權威）。
-function cosmeticActiveKey(kind: string, uid: string | null): string {
-  return `tr_${kind}_active_${uid ?? "guest"}`;
-}
+// ── 個人化裝備（稱號/暱稱顏色/前綴圖示/尾焰特效顏色/鬼影顏色）：目前裝備哪一個
+// 2026-07-21i 起改伺服器權威（migration_20260721i.sql wallet_set_cosmetic/
+// wallet_get 的 equipped 欄位），取代原本「純本地偏好、比照 activeSkinKey()
+// 帳號隔離」的設計——使用者真機實測發現那個純本地 key 重開 App 就會失效
+// （owned 這條伺服器同步路徑同一時間證實 100% 可靠，故比照辦理，見
+// migration_20260721i.sql 開頭說明）。訪客沒有伺服器鑽石可花，本來就買不到
+// 任何個人化裝備，uid=null 一律視為「無裝備」。
 export function getActiveCosmetic(kind: "title" | "nickcolor" | "badge" | "trail" | "ghostcolor", uid: string | null = null): string | null {
-  try {
-    const id = localStorage.getItem(cosmeticActiveKey(kind, uid));
-    return id && isOwned(id) ? id : null;
-  } catch {
-    return null;
-  }
+  if (!uid) return null;
+  const id = getEquippedCache()[kind];
+  return id && isOwned(id) ? id : null;
 }
-export function setActiveCosmetic(kind: "title" | "nickcolor" | "badge" | "trail" | "ghostcolor", id: string | null, uid: string | null = null): boolean {
+export async function setActiveCosmetic(kind: "title" | "nickcolor" | "badge" | "trail" | "ghostcolor", id: string | null, uid: string | null = null): Promise<boolean> {
+  if (!uid) return false;
   if (id !== null && !isOwned(id)) return false;
-  try {
-    if (id === null) localStorage.removeItem(cosmeticActiveKey(kind, uid));
-    else localStorage.setItem(cosmeticActiveKey(kind, uid), id);
-  } catch { /* 靜默 */ }
-  return true;
+  // 樂觀本地更新：畫面立刻反映，伺服器回應晚到也不卡 UI（同 addCoins() 既有慣例）。
+  const cur = getEquippedCache();
+  if (id === null) delete cur[kind]; else cur[kind] = id;
+  writeEquippedCache(cur);
+  const { data, error } = await supabase.rpc("wallet_set_cosmetic", { p_kind: kind, p_id: id });
+  if (error || !data || !data[0]) return true; // RPC 尚未建立/網路失敗：樂觀值先頂著
+  const row = data[0] as { equipped: Record<string, string> | null; ok: boolean };
+  if (row.ok) writeEquippedCache(row.equipped ?? {});
+  return row.ok;
 }

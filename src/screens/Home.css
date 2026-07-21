@@ -37,69 +37,80 @@
   margin-bottom: 1.1rem;
 }
 
+/* 2026-07-21 真機實測：三顆入口鈕原本橫向並排（icon+文字同一行），窄螢幕下
+   「收藏車庫」四個字被擠壓變形（逐字換行）。改成上下兩排（icon+數值一排、
+   文字標籤另起一排），不管螢幕多窄都不會擠在一起。 */
 .garage-entry-btn {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.4rem 1rem;
+  gap: 0.3rem;
+  padding: 0.5rem 0.9rem;
   background: rgba(255, 179, 0, 0.06);
   border: 1px solid rgba(255, 179, 0, 0.4);
-  border-radius: 999px;
+  border-radius: 16px;
   box-shadow: 0 0 16px rgba(255, 179, 0, 0.18);
   cursor: pointer;
 }
 .garage-entry-btn:active { transform: scale(0.96); }
+.garage-entry-top {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
 
 /* 圖鑑入口：跟收藏車庫同一行並排，省垂直空間（青色系跟車庫的琥珀色系區隔） */
 .ency-entry-btn {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 0.35rem;
-  padding: 0.4rem 0.9rem;
+  gap: 0.25rem;
+  padding: 0.5rem 0.8rem;
   font-size: 0.85rem;
   font-weight: 700;
   letter-spacing: 0.06em;
   color: var(--text);
   background: rgba(45, 226, 230, 0.06);
   border: 1px solid rgba(45, 226, 230, 0.4);
-  border-radius: 999px;
+  border-radius: 16px;
   box-shadow: 0 0 16px rgba(45, 226, 230, 0.18);
   cursor: pointer;
 }
 .ency-entry-btn:active { transform: scale(0.96); }
+.ency-entry-icon { font-size: 1.15rem; }
 
 /* 幸運轉輪入口：2026-07-21 從遊戲模式清單移到這排——本質上是收藏/經濟系統，
    不是騎車玩法，跟車庫/圖鑑放在一起比較顯眼也比較符合定位（粉色系跟前兩者
    的琥珀/青色系區隔）。 */
 .lottery-entry-btn {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 0.35rem;
-  padding: 0.4rem 0.9rem;
+  gap: 0.25rem;
+  padding: 0.5rem 0.8rem;
   font-size: 0.85rem;
   font-weight: 700;
   letter-spacing: 0.06em;
   color: var(--text);
   background: rgba(255, 95, 168, 0.06);
   border: 1px solid rgba(255, 95, 168, 0.4);
-  border-radius: 999px;
+  border-radius: 16px;
   box-shadow: 0 0 16px rgba(255, 95, 168, 0.18);
   cursor: pointer;
 }
 .lottery-entry-btn:active { transform: scale(0.96); }
+.lottery-entry-icon { font-size: 1.15rem; }
 .garage-entry-coins {
-  font-size: 1rem;
+  font-size: 0.95rem;
   font-weight: 800;
   color: var(--neon-amber);
   text-shadow: 0 0 8px rgba(255, 179, 0, 0.5);
 }
 .garage-entry-label {
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
   color: var(--text);
-  padding-left: 0.5rem;
-  border-left: 1px solid rgba(255, 179, 0, 0.35);
 }
 
 /* 目前登入帳號狀態：讓玩家一眼確認登入/登出是否成功，不用點開設定面板才看得到 */
