@@ -26,5 +26,5 @@ project(':capacitor-splash-screen').projectDir = new File('../node_modules/@capa
 include ':capgo-capacitor-social-login'
 project(':capgo-capacitor-social-login').projectDir = new File('../node_modules/@capgo/capacitor-social-login/android')
 
-include ':capacitor-native-purchases'
-project(':capacitor-native-purchases').projectDir = new File('../node_modules/capacitor-native-purchases/android')
+include ':capgo-native-purchases'
+project(':capgo-native-purchases').projectDir = new File('../node_modules/@capgo/native-purchases/android')

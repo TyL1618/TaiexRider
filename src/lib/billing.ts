@@ -15,21 +15,30 @@
 //
 // ── 2026-07-10 cap 沙盒：兩條路徑並存 ──────────────────────────────────────
 // TWA：沿用原本 Digital Goods API + PaymentRequest（下方 *TWA 開頭的函式）。
-// Capacitor 原生殼：改用 capacitor-native-purchases 外掛直接呼叫 Play Billing
+// Capacitor 原生殼：改用 @capgo/native-purchases 外掛直接呼叫 Play Billing
 //   （下方 *Native 開頭的函式）。兩條路徑最後都收斂到同一支 submitPurchaseToken()
 //   打同一支 verify-iap-purchase Edge Function，後端完全不用區分是哪個殼。
 //
-// ⚠️ capacitor-native-purchases 已知限制（讀過外掛原生原始碼 Purchases.java 確認）：
-// 它的 purchasesUpdatedListener 對「所有 INAPP 類型商品」一律自動呼叫原生
-// consumeAsync()，不分消耗型/非消耗型——這對鑽石包（本來就該可重複購買）是正確行為，
-// 但對 remove_ads_forever（設計上買一次終身有效）也會被自動 consume，導致 Google
-// 端誤判成「可以再買一次」。目前靠「UI 層」擋（車庫畫面拿到 server 端
-// adsRemoved=true 後不再顯示購買按鈕）當防線，不影響安全性（不會被騙鑽石/騙權限，
-// 頂多是使用者不小心誤按會被要求再次真的付款）。若正式遷移到 Capacitor 出貨，這裡
-// 要重新評估（例如自己 fork 外掛拿掉這段自動 consume，或原生層另外包一層判斷）。
+// ── 2026-07-22：jokio 的 capacitor-native-purchases（Billing 7.1.1）換成
+// @capgo/native-purchases（Billing 8.3.0+）──────────────────────────────
+// 原因：Google Play 政策要求 2026-08-31 起 App 一律要用 Billing Library 8.0.0+，
+// jokio 這個套件最後更新停在 2026-02、內部仍寫死 7.1.1，沒有跟進。改用 Cap-go
+// 維護中的替代品，大版號跟安裝的 Capacitor 8 對齊。
+// 這個外掛給了明確的消耗/確認控制權（purchaseProduct 的 isConsumable/
+// autoAcknowledgePurchases 參數），不像 jokio 舊版「所有 INAPP 商品一律自動
+// consume」（曾導致 remove_ads_forever 這種非消耗型商品被誤判成可以再買一次）。
+// 這裡刻意全部設 isConsumable:false + autoAcknowledgePurchases:false——完全不讓
+// 客戶端碰 consume/acknowledge，一律交給 verify-iap-purchase Edge Function 用
+// Google Play Developer API 在伺服器端處理（外掛官方文件也建議這樣做，理由是
+// 「先驗證再確認，不給客戶端竄改的機會」，剛好跟這個專案原本的架構一致）。
+// ⚠️ 已知限制：這版外掛（8.6.4）原生端對「使用者自己取消付款」跟「其他購買失敗」
+// 共用同一句泛用訊息（`onPurchasesUpdated` reject 分支一律丟 "Purchase is not
+// purchased"，沒有像 jokio 舊版的 BillingResponseCode 可以分辨），purchaseProduct()
+// 失敗時無法可靠分辨兩者，統一當「使用者取消」靜默處理（不彈錯誤訊息），真正的
+// 購買失敗只能靠 console.warn／logcat 除錯。
 
 import { Capacitor } from "@capacitor/core";
-import { Purchases } from "capacitor-native-purchases";
+import { NativePurchases, PURCHASE_TYPE, type Transaction } from "@capgo/native-purchases";
 import { isInsideTWA } from "./ads";
 import { supabase } from "./supabase";
 
@@ -172,27 +181,25 @@ async function fetchPackPricesTWA(skus: string[]): Promise<Map<string, string>> 
   return out;
 }
 
-// capacitor-native-purchases 的 getProductDetails() 內部會把查到的商品類型
-// （INAPP/SUBS）快取起來，之後 purchaseProduct()/getLatestTransaction() 才知道
-// 該查哪一種——所以查價這一步不只是「顯示用」，也是後面能不能購買的前置作業，
-// 一定要在購買前至少成功呼叫過一次（見檔頭 fetchPackPrices() 呼叫時機）。
+// @capgo/native-purchases 明確警告 getProduct() 不能用 Promise.all 併發呼叫（底層
+// billing client 不支援併發查詢，會 race condition）——改用 getProducts() 一次查
+// 全部 SKU，官方文件建議的正確用法，也剛好比舊版逐一併發查詢更省事。
 async function fetchPackPricesNative(skus: string[]): Promise<Map<string, string>> {
   const out = new Map<string, string>();
   const failures: string[] = [];
-  await Promise.all(skus.map(async (sku) => {
-    try {
-      const res = await Purchases.getProductDetails({ productIdentifier: sku });
-      if (res.responseCode === 0 && res.data) {
-        out.set(sku, res.data.price); // Google 已格式化好的字串（如 "NT$31"），直接顯示
-      } else {
-        failures.push(`${sku}: ${res.responseMessage}`);
-      }
-    } catch (e) {
-      failures.push(`${sku}: ${(e as { message?: string })?.message ?? String(e)}`);
-    }
-  }));
+  try {
+    const { products } = await NativePurchases.getProducts({
+      productIdentifiers: skus,
+      productType: PURCHASE_TYPE.INAPP,
+    });
+    for (const p of products) out.set(p.identifier, p.priceString); // Google 已格式化好的字串（如 "NT$31"），直接顯示
+    const missing = skus.filter((s) => !out.has(s));
+    if (missing.length > 0) failures.push(...missing.map((s) => `${s}: 查無此商品`));
+  } catch (e) {
+    failures.push((e as { message?: string })?.message ?? String(e));
+  }
   if (failures.length > 0) {
-    console.warn("[billing] getProductDetails 部分失敗：", failures);
+    console.warn("[billing] getProducts 部分失敗：", failures);
     if (out.size === 0) _priceDiag = `查無定價：${failures.join("; ")}`;
   }
   return out;
@@ -291,51 +298,38 @@ async function runPurchaseFlowTWA(sku: string, label: string): Promise<Record<st
   return data;
 }
 
-// Android BillingClient 的使用者取消代碼（BillingResponseCode.USER_CANCELED），
-// 跟 TWA 那邊的 AbortError 是同一種語意：使用者自己取消，不算錯誤，不顯示訊息。
-const NATIVE_USER_CANCELED_CODE = 1;
-
-// Capacitor 原生殼購買流程：capacitor-native-purchases 外掛觸發 Play Billing
-// 原生付款彈窗 → 用 getLatestTransaction() 從購買紀錄拿 purchase_token（不能只信
-// purchaseProduct() 的回傳值，它只回報「彈窗有沒有成功打開/完成」，不含 token）→
-// 送 Edge Function 驗證+發放。
+// Capacitor 原生殼購買流程：@capgo/native-purchases 外掛觸發 Play Billing 原生
+// 付款彈窗，成功時 purchaseProduct() 直接回傳 Transaction（已含 purchaseToken，
+// 不用像舊版另外呼叫 getLatestTransaction() 補查）→ 送 Edge Function 驗證+發放。
+// isConsumable:false + autoAcknowledgePurchases:false：客戶端完全不 consume/
+// acknowledge，交給後端用 Google Play Developer API 處理（見檔頭說明）。
 async function runPurchaseFlowNative(sku: string): Promise<Record<string, unknown> | null> {
   if (!(await requireLoginForPurchase())) return null;
 
+  let tx: Transaction;
   try {
-    // 確保這個 sku 的商品類型（INAPP/SUBS）已快取——purchaseProduct/getLatestTransaction
-    // 都依賴這個快取，車庫畫面通常已經因為 fetchPackPrices() 查過價而快取好了，這裡
-    // 保險再查一次（便宜的重複呼叫，換取「就算沒查過價也能購買」的穩健性）。
-    const details = await Purchases.getProductDetails({ productIdentifier: sku });
-    if (details.responseCode !== 0) {
-      _lastPurchaseError = `查無商品：${details.responseMessage}`;
-      return null;
-    }
-
-    const purchase = await Purchases.purchaseProduct({ productIdentifier: sku });
-    if (purchase.responseCode !== 0) {
-      if (purchase.responseCode !== NATIVE_USER_CANCELED_CODE) {
-        _lastPurchaseError = `付款失敗：${purchase.responseMessage}`;
-        console.warn("[billing] purchaseProduct 失敗：", purchase);
-      }
-      return null;
-    }
-
-    const tx = await Purchases.getLatestTransaction({ productIdentifier: sku });
-    if (tx.responseCode !== 0 || !tx.data?.purchaseToken) {
-      _lastPurchaseError = "付款完成但取不到交易憑證，重新進車庫會自動補發";
-      console.warn("[billing] getLatestTransaction 拿不到 purchaseToken：", tx);
-      return null;
-    }
-
-    const data = await submitPurchaseToken(sku, tx.data.purchaseToken);
-    if (!data && !_lastPurchaseError) _lastPurchaseError = "付款完成但發放暫時失敗，重新進車庫會自動補發";
-    return data;
+    tx = await NativePurchases.purchaseProduct({
+      productIdentifier: sku,
+      productType: PURCHASE_TYPE.INAPP,
+      isConsumable: false,
+      autoAcknowledgePurchases: false,
+    });
   } catch (e) {
-    _lastPurchaseError = `付款無法開始：${(e as { message?: string })?.message ?? String(e)}`;
-    console.warn("[billing] 原生購買流程例外：", e);
+    // 這裡沒辦法可靠分辨「使用者自己取消」跟「其他購買失敗」（見檔頭說明），統一
+    // 靜默處理不顯示錯誤訊息，只留 console.warn 給真機除錯用。
+    console.warn("[billing] purchaseProduct 失敗（可能是使用者取消）：", e);
     return null;
   }
+
+  if (!tx.purchaseToken) {
+    _lastPurchaseError = "付款完成但取不到交易憑證，重新進車庫會自動補發";
+    console.warn("[billing] purchaseProduct 回傳沒有 purchaseToken：", tx);
+    return null;
+  }
+
+  const data = await submitPurchaseToken(sku, tx.purchaseToken);
+  if (!data && !_lastPurchaseError) _lastPurchaseError = "付款完成但發放暫時失敗，重新進車庫會自動補發";
+  return data;
 }
 
 // 共用購買流程入口：依環境分流到 TWA 或 Capacitor 原生殼。
@@ -388,43 +382,40 @@ async function reconcilePurchasesTWA(): Promise<{ diamonds?: number; adsRemoved?
   return changed ? result : null;
 }
 
-// ⚠️ 跟 TWA 版 listPurchases()（回傳「尚未消耗」的購買清單）語意不同：
-// capacitor-native-purchases 的 purchasesUpdatedListener 在原生端會對 INAPP 商品
-// 自動 consume（見檔頭說明），consume 後就從「目前有效購買」查詢中消失，沒有一個
-// 對應 API 能列出「已購買過但已消耗」的全部紀錄。改成針對每個已知 SKU 個別呼叫
-// getLatestTransaction()（查購買*歷史*，consume 後紀錄仍在），逐一檢查有沒有還沒
-// 對過帳的 purchaseToken——涵蓋「付款成功但 App 在送出 Edge Function 前就被系統
-// 砍掉」這種孤兒交易。
+// 客戶端從不 consume/acknowledge（見檔頭說明，一律交給後端），所以 getPurchases()
+// 撈到的「目前有效購買」正好就是「還沒被後端處理完的訂單」——鑽石包後端驗證成功後
+// 會呼叫 Google :consume，Billing 8.x 消耗過的商品查不到了會自然從下次結果消失
+// （外掛文件本身也這樣寫）；remove_ads_forever 後端只 acknowledge 不 consume，
+// 會永遠留在清單裡，靠本地 RECONCILED_KEY 避免每次進車庫都重送一次。
 async function reconcilePurchasesNative(): Promise<{ diamonds?: number; adsRemoved?: boolean } | null> {
   const done = getReconciledTokens();
   const result: { diamonds?: number; adsRemoved?: boolean } = {};
   let changed = false;
-  const allSkus = [...DIAMOND_PACKS.map((p) => p.sku), REMOVE_ADS_SKU];
+  const allSkus = new Set([...DIAMOND_PACKS.map((p) => p.sku), REMOVE_ADS_SKU]);
 
-  for (const sku of allSkus) {
-    try {
-      await Purchases.getProductDetails({ productIdentifier: sku }); // 確保類型已快取
-      const tx = await Purchases.getLatestTransaction({ productIdentifier: sku });
-      if (tx.responseCode !== 0 || !tx.data?.purchaseToken) continue;
-      if (done.has(tx.data.purchaseToken)) continue;
-      const data = await submitPurchaseToken(sku, tx.data.purchaseToken);
-      if (!data) {
-        // ⚠️ 2026-07-10 真機實測發現：getLatestTransaction() 查的是購買*歷史*（見上方
-        // 檔案說明），本來就會撈到早就失效/退款過的舊紀錄（例如開發過程中的舊測試
-        // 購買），Google 驗證回「purchase not valid」是這種情況的預期結果，不是
-        // 「使用者剛付款但發放失敗」——那種真正該讓玩家知道的錯誤（grant error／
-        // consume pending／acknowledge pending）Google 那邊會回真的驗證通過。
-        // 每次進車庫都把這種舊噪音當警告跳出來會嚇到玩家，這裡靜默清掉，只留下
-        // 真正代表「有效購買但我們這邊沒處理成功」的錯誤讓上層顯示。
-        if (_lastPurchaseError.includes("purchase not valid")) _lastPurchaseError = "";
-        continue;
-      }
-      markReconciled(tx.data.purchaseToken);
-      if (typeof data.diamonds === "number") { result.diamonds = data.diamonds; changed = true; }
-      if (typeof data.adsRemoved === "boolean") { result.adsRemoved = data.adsRemoved; changed = true; }
-    } catch (e) {
-      console.warn(`[billing] 原生對帳 ${sku} 失敗：`, e);
+  let purchases: Transaction[];
+  try {
+    const res = await NativePurchases.getPurchases({ productType: PURCHASE_TYPE.INAPP });
+    purchases = res.purchases;
+  } catch (e) {
+    console.warn("[billing] getPurchases() 失敗（無法對帳）：", e);
+    return null;
+  }
+
+  for (const tx of purchases) {
+    if (!tx.purchaseToken || !allSkus.has(tx.productIdentifier)) continue;
+    if (done.has(tx.purchaseToken)) continue;
+    const data = await submitPurchaseToken(tx.productIdentifier, tx.purchaseToken);
+    if (!data) {
+      // 「purchase not valid」代表這筆在 Google 端本來就不是有效購買（例如舊測試
+      // 帳號留下的紀錄），不是「剛付款但發放失敗」，不用嚇玩家；真正該讓玩家看到的
+      // 錯誤（grant error／consume pending／acknowledge pending）不會落到這個分支。
+      if (_lastPurchaseError.includes("purchase not valid")) _lastPurchaseError = "";
+      continue;
     }
+    markReconciled(tx.purchaseToken);
+    if (typeof data.diamonds === "number") { result.diamonds = data.diamonds; changed = true; }
+    if (typeof data.adsRemoved === "boolean") { result.adsRemoved = data.adsRemoved; changed = true; }
   }
 
   return changed ? result : null;

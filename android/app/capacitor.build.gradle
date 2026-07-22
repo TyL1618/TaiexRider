@@ -17,7 +17,7 @@ dependencies {
     implementation project(':capacitor-share')
     implementation project(':capacitor-splash-screen')
     implementation project(':capgo-capacitor-social-login')
-    implementation project(':capacitor-native-purchases')
+    implementation project(':capgo-native-purchases')
 
 }
 

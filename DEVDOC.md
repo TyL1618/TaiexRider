@@ -191,6 +191,30 @@ log 一起回滾，前端又慣例把 RPC 失敗靜默吞掉 → 玩家只是「
   部署成功，這個缺口結案。
 - 🟠 退款後無收回機制（封測期接受，正式上架後視退款率決定是否接 Voided Purchases API）。
 
+**2026-07-22：Android 原生購買外掛換成 `@capgo/native-purchases`（Billing 8.3.0+）**——
+Google Play 政策要求 2026-08-31 起一律要用 Billing Library 8.0.0+，原本的
+`capacitor-native-purchases`（jokio 維護，最後更新 2026-02，內部寫死 7.1.1）沒有跟進，
+不換套件的話 8/31 後就無法發布更新。改用 Cap-go 維護中、大版號跟安裝的 Capacitor 8
+對齊的替代品。API 從「responseCode 數字模式」（`getProductDetails`/`purchaseProduct`/
+`getLatestTransaction` 都回傳 `{responseCode, data}`）整個換成「Promise resolve/reject +
+`Transaction`/`Product` 物件直接回傳」（`getProduct`/`purchaseProduct`/`getPurchases`），
+`purchaseProduct()` 直接在回傳的 `Transaction` 裡帶 `purchaseToken`，不用像舊版另外呼叫
+`getLatestTransaction()` 補查。舊版「所有 INAPP 商品自動 consume」（曾讓
+`remove_ads_forever` 被誤判成可重複購買）的問題不會再發生：新外掛用
+`purchaseProduct({isConsumable:false, autoAcknowledgePurchases:false})` 明確關掉客戶端
+consume/acknowledge，一律交給 `verify-iap-purchase` Edge Function 用 Google Play
+Developer API 在伺服器端處理（跟原本架構一致，外掛官方文件也建議這樣做）。
+⚠️ **已知限制**：這版外掛（8.6.4）原生端把「使用者自己取消付款」跟「其他購買失敗」
+共用同一句泛用錯誤訊息（沒有像 jokio 舊版的 `BillingResponseCode` 可以分辨），
+`purchaseProduct()` 失敗時無法可靠分辨兩者，統一當使用者取消靜默處理，真正的購買失敗
+只能靠 `console.warn`／`adb logcat` 除錯（完整細節見 `src/lib/billing.ts` 檔頭註解）。
+`verify-iap-purchase` Edge Function／`AndroidManifest.xml` 的 `BILLING` 權限完全不用改
+（後端驗證邏輯、purchase_token 格式都不受外掛換版影響）。typecheck/build/`cap sync`
+已跑（9 個外掛數不變，1:1 換掉）。**⚠️ 這是原生外掛換版，PWA 網頁版不受影響（網頁版
+本來就不開放購買，走的是 TWA 時代留的 Digital Goods API 分支，這條完全沒動）；Android
+要重新打包簽署版才會生效，且 Play Billing **必須真機測付款流程**（購買鑽石/去廣告各
+測一次，含「使用者按取消」是否真的靜默不跳錯誤），才能確認新外掛真的能用。**
+
 ### 2.8 金幣/鑽石經濟總覽（2026-07-08 大改版定案，v0.12.33 起）
 
 伺服器權威版在 `wallet_earn()`/`claim_weekly_quest()` 等 RPC（前端 `playRewards.ts`/
