@@ -185,6 +185,32 @@ function getBikeImageEntry(src: string): BikeImgEntry {
 }
 getBikeImageEntry(`${import.meta.env.BASE_URL}bike.png`); // 預熱預設車皮
 
+// 鬼影染色剪影快取（模組層級，跨局重用）：key = `圖片URL|色票`。用 source-atop 把
+// 顏色只蓋在車身不透明像素上，離屏烘一次，之後每幀純 drawImage——沿用鬼影去色濾鏡
+// 用過的離屏預渲染技巧（避開 ctx.filter/shadowBlur 這種 Android WebView Canvas2D
+// 已知昂貴的逐像素操作，見 GameCanvas 檔案多處踩雷註解）。2026-07-22 取代原本疊一顆
+// 圓形色塊的做法（使用者反饋：圓形跟車身輪廓對不上，看起來像一坨顏色）。
+interface TintedSpriteEntry { canvas: HTMLCanvasElement }
+const _tintedSpriteCache = new Map<string, TintedSpriteEntry>();
+function getTintedSprite(entry: BikeImgEntry, color: string): TintedSpriteEntry | null {
+  if (!entry.ready) return null;
+  const key = `${entry.img.src}|${color}`;
+  const cached = _tintedSpriteCache.get(key);
+  if (cached) return cached;
+  const canvas = document.createElement("canvas");
+  canvas.width = entry.img.naturalWidth;
+  canvas.height = entry.img.naturalHeight;
+  const c2 = canvas.getContext("2d");
+  if (!c2) return null;
+  c2.drawImage(entry.img, 0, 0);
+  c2.globalCompositeOperation = "source-atop";
+  c2.fillStyle = color;
+  c2.fillRect(0, 0, canvas.width, canvas.height);
+  const out: TintedSpriteEntry = { canvas };
+  _tintedSpriteCache.set(key, out);
+  return out;
+}
+
 export default function GameCanvas({ prices, label, name, subtitle, onExit, onGameOver, hideMinimap = false, revivalEnabled = false, analyticsMode, pbKey, uid = null, dailyRank = null, completedQuests = [], ghostPath = null, ghostSkinId = null, ghostColorId = null }: GameCanvasProps) {
   const stars = difficultyStars(calcDifficulty(prices));
   const cityBuildings = generateCity(prices.length * 31 + Math.round((prices[0] || 0) * 100));
@@ -664,6 +690,9 @@ let crashTimer = 0;
     type TrailParticle = { x: number; y: number; vx: number; vy: number; life: number; size: number };
     let trailParticles: TrailParticle[] = [];
     const TRAIL_FADE_SEC = 0.45;
+    // 鬼影同款尾焰（2026-07-22 方案C）：跟玩家尾焰共用同一顆粒子型別/衰減常數，
+    // 位置由 drawGhost() 依插值路徑自己噴（鬼影沒有物理迴圈可以掛，只能用畫面座標近似）。
+    let ghostTrailParticles: TrailParticle[] = [];
 
     // ---- 死亡動畫狀態 ----
     type DeathParticle = { x: number; y: number; vx: number; vy: number; life: number; color: string; size: number };
@@ -737,6 +766,7 @@ let crashTimer = 0;
       perfectFxFrames = 0;
       perfectFxPts = [];
       trailParticles = [];
+      ghostTrailParticles = [];
       deathParticles = [];
       deathFlashAlpha = 0;
       deathShakeAmp = 0;
@@ -1462,24 +1492,50 @@ let crashTimer = 0;
       if (!Number.isFinite(gx) || !Number.isFinite(gy) || !Number.isFinite(gAngle)) return;
       if (gx > track.finishX) return; // 鬼影已抵達終點，不繼續畫在終點閃爍
       const sx = wx(gx);
+
+      // 鬼影同款尾焰（方案C）：貼地時往後噴同色粒子，跟玩家自己的尾焰共用型別/衰減。
+      // 沒有物理迴圈可以掛（鬼影是純插值），改用「跟地形的垂直距離」近似「貼地」
+      // ——插值路徑本來就含空中拋物線，這個近似在地面附近夠準，空中不會誤觸發。
+      if (ghostTintColor) {
+        const groundY = terrainYAt(track, gx) - BIKE.wheelRadius;
+        if (Math.abs(gy - groundY) < 4) {
+          ghostTrailParticles.push({
+            x: gx - Math.cos(gAngle) * 10,
+            y: gy + (Math.random() - 0.5) * 3,
+            vx: -(0.8 + Math.random() * 0.6),
+            vy: -(0.15 + Math.random() * 0.25),
+            life: 1,
+            size: 1.8 + Math.random() * 1.6,
+          });
+          if (ghostTrailParticles.length > 90) ghostTrailParticles.splice(0, ghostTrailParticles.length - 90);
+        }
+      }
+
       if (sx < -60 || sx > W + 60) return; // 畫面外不畫，省效能
       ctx.save();
       ctx.translate(sx, wy(gy));
       ctx.rotate(gAngle);
       const w = ghostSpriteW;
       const h = w * (ghostBikeEntry.img.naturalHeight / ghostBikeEntry.img.naturalWidth);
-      // 鬼影顏色（LOTTERY_DESIGN.md §4）：疊一圈淡色光暈當色調，不取代真實車皮
-      // （2026-07-15 拍板鬼影要秀出對手真實車款當購買誘因）。用純色 arc + 'lighter'
-      // 疊加，不用 ctx.filter/shadowBlur——那兩個是 2026-07-13 修過的 Android WebView
-      // 已知昂貴逐像素操作，這裡沿用同一個教訓，只用便宜的向量 fill。
-      if (ghostTintColor) {
+      // 鬼影顏色（方案A，2026-07-22 取代圓形色塊）：離屏烘一張染色剪影，用 'lighter'
+      // 疊在真實車身底下、稍微放大當一圈貼合車身輪廓的光暈，不用 ctx.filter/
+      // shadowBlur（Android WebView Canvas2D 已知昂貴逐像素操作，見檔案多處踩雷
+      // 註解）。真實車身仍照舊疊在最上層、半透明可辨識（2026-07-15 拍板鬼影要秀出
+      // 對手真實車款當購買誘因，不能被染色版蓋掉）。
+      const tinted = ghostTintColor ? getTintedSprite(ghostBikeEntry, ghostTintColor) : null;
+      if (tinted) {
         ctx.save();
         ctx.globalCompositeOperation = "lighter";
-        ctx.globalAlpha = 0.28;
-        ctx.fillStyle = ghostTintColor;
-        ctx.beginPath();
-        ctx.arc(0, 0, (w * 0.5) * scale, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.globalAlpha = 0.4;
+        const glowScale = 1.1;
+        const gw = w * glowScale, gh = h * glowScale;
+        ctx.drawImage(
+          tinted.canvas,
+          (-gw / 2 + ghostOffsetX) * scale,
+          (-gh / 2 + ghostOffsetY) * scale,
+          gw * scale,
+          gh * scale,
+        );
         ctx.restore();
       }
       ctx.globalAlpha = 0.32;
@@ -1642,6 +1698,18 @@ let crashTimer = 0;
           }
           ctx.restore();
         }
+        if (ghostTintColor && ghostTrailParticles.length > 0) {
+          ctx.save();
+          ctx.fillStyle = ghostTintColor;
+          for (const p of ghostTrailParticles) {
+            if (p.life <= 0) continue;
+            ctx.globalAlpha = Math.max(0, p.life) * 0.5; // 比玩家自己的尾焰淡一點，避免搶戲
+            ctx.beginPath();
+            ctx.arc(wx(p.x), wy(p.y), Math.max(1, p.size * scale), 0, Math.PI * 2);
+            ctx.fill();
+          }
+          ctx.restore();
+        }
         drawGhost();
         drawBike(alpha);
         drawPerfectFx();
@@ -1728,7 +1796,7 @@ let crashTimer = 0;
 
       // 鏡頭跟隨 / 終點全覽（dying 時鏡頭凍住，等動畫結束再開始縮放）
       // 尾焰粒子衰減（跟死亡特效無關，隨時都在跑，跟 dt 掛鉤不受子步數影響）
-      if (trailParticles.length > 0) {
+      if (trailParticles.length > 0 || ghostTrailParticles.length > 0) {
         const trailDtSec = Math.min(dt, 60) / 1000;
         for (let i = trailParticles.length - 1; i >= 0; i--) {
           const p = trailParticles[i];
@@ -1736,6 +1804,13 @@ let crashTimer = 0;
           p.y += p.vy;
           p.life -= trailDtSec / TRAIL_FADE_SEC;
           if (p.life <= 0) trailParticles.splice(i, 1);
+        }
+        for (let i = ghostTrailParticles.length - 1; i >= 0; i--) {
+          const p = ghostTrailParticles[i];
+          p.x += p.vx;
+          p.y += p.vy;
+          p.life -= trailDtSec / TRAIL_FADE_SEC;
+          if (p.life <= 0) ghostTrailParticles.splice(i, 1);
         }
       }
 
