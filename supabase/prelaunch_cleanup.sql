@@ -64,6 +64,13 @@ truncate table public.events;
 -- 出席紀錄誤發參與獎（見上方 2026-07-14 修正說明）。
 truncate table public.wallet_daily_attempts;
 
+-- 🔒 2026-07-22 新增：每日抽獎免費次數紀錄（migration_20260721.sql，跟
+-- wallet_daily_attempts 同一種結構、同樣有 14 天滾動清理，不清也不會有
+-- settle_daily_diamonds() 那種誤發風險）。這裡清掉純粹是為了「上架當天歸零」
+-- 一致性——封測玩家如果當天已經用過免費抽獎次數，不清的話正式上線同一天
+-- 畫面還會顯示殘留的舊次數，體驗不乾淨。
+truncate table public.wallet_daily_lottery;
+
 commit;
 
 -- ── 執行後可用這幾行快速確認清空成功（皆應回傳 0）───────────────────────────
@@ -73,3 +80,4 @@ commit;
 -- select count(*) from public.daily_diamond_settlement;
 -- select count(*) from public.classic_diamond_settlement;
 -- select count(*) from public.wallet_daily_attempts;
+-- select count(*) from public.wallet_daily_lottery;
