@@ -87,6 +87,9 @@ export default function Garage({ user, onBack }: { user: User | null; onBack: ()
   const [watchingAd, setWatchingAd] = useState(false);
   const [showAdTicketPrompt, setShowAdTicketPrompt] = useState(false);
   const [confirmBuy, setConfirmBuy] = useState<{ kind: CosmeticKind; opt: CosmeticOption } | null>(null);
+  // opt=null 代表點的是「無」（清空該類別裝備），2026-07-22 使用者拍板每次裝備/
+  // 取消裝備都要跳確認彈窗，不再是點擊已擁有項目直接切換。
+  const [confirmEquip, setConfirmEquip] = useState<{ kind: CosmeticKind; opt: CosmeticOption | null } | null>(null);
   const [adClaims, setAdClaims] = useState(() => getAdCoinClaims(dailyKey(), user?.id ?? null));
   const [achvBikes, setAchvBikes] = useState<AchvBikeView[]>(() => getAchievementBikes(0));
   const [achvTitles, setAchvTitles] = useState<AchvTitleView[]>(() => getAchievementTitles(0));
@@ -293,19 +296,24 @@ export default function Garage({ user, onBack }: { user: User | null; onBack: ()
 
   // 個人化裝備：未擁有→跳確認彈窗問要不要花鑽石買（2026-07-21 使用者回報直接扣款
   // 容易手滑誤買，改成先跳 confirmBuy 彈窗，按「確定購買」才真的呼叫 doPurchaseCosmetic）；
-  // 已擁有→點擊切換裝備/取消裝備（同一項再點一次＝取消裝備，回到「無」，跟車皮裝備
-  // 不同——這幾類本來就允許「不裝備任何一個」）。
-  const handleCosmeticClick = async (kind: CosmeticKind, opt: CosmeticOption) => {
-    if (opt.price < 0) return; // 不可購買（黑天鵝專屬贈品）
+  // 已擁有→跳確認彈窗問要不要裝備（2026-07-22 使用者拍板每次裝備都要確認，不再是
+  // 點下去直接切換）。⚠️ price<0（黑天鵝專屬贈品）只在「尚未擁有」時才擋，已擁有的
+  // 要能正常裝備——舊版把這個檢查寫在最前面、對所有點擊一律生效，導致已解鎖的黑天鵝
+  // 稱號/徽章點了沒反應，這裡修正只在購買分支擋。
+  const handleCosmeticClick = (kind: CosmeticKind, opt: CosmeticOption) => {
     if (!isOwned(opt.id)) {
+      if (opt.price < 0) return; // 不可購買（黑天鵝專屬贈品）
       if (diamonds < opt.price) return;
       setConfirmBuy({ kind, opt });
       return;
     }
-    const current = getActiveCosmetic(kind, user?.id ?? null);
-    forceRender((n) => n + 1); // 樂觀先重繪一次（setActiveCosmetic 內部也有本地樂觀寫入）
-    await setActiveCosmetic(kind, current === opt.id ? null : opt.id, user?.id ?? null);
-    forceRender((n) => n + 1);
+    setConfirmEquip({ kind, opt });
+  };
+
+  // 「無」卡片：清空該類別裝備，同樣走確認彈窗（跟一般選項共用同一個 confirmEquip
+  // 狀態，opt=null 代表清空）。
+  const handleNoneClick = (kind: CosmeticKind) => {
+    setConfirmEquip({ kind, opt: null });
   };
 
   const doPurchaseCosmetic = async () => {
@@ -314,6 +322,15 @@ export default function Garage({ user, onBack }: { user: User | null; onBack: ()
     setConfirmBuy(null);
     const ok = await walletSpendItem(opt.id);
     if (ok) { setDiamonds(getDiamonds()); forceRender((n) => n + 1); }
+  };
+
+  const doConfirmEquip = async () => {
+    if (!confirmEquip) return;
+    const { kind, opt } = confirmEquip;
+    setConfirmEquip(null);
+    forceRender((n) => n + 1); // 樂觀先重繪一次（setActiveCosmetic 內部也有本地樂觀寫入）
+    await setActiveCosmetic(kind, opt ? opt.id : null, user?.id ?? null);
+    forceRender((n) => n + 1);
   };
 
   const renderSkinCard = (s: BikeSkin) => {
@@ -409,6 +426,21 @@ export default function Garage({ user, onBack }: { user: User | null; onBack: ()
         </div>
       )}
 
+      {/* 個人化裝備裝備/取消裝備確認彈窗（2026-07-22 使用者拍板每次都要確認） */}
+      {confirmEquip && (
+        <div className="modal-overlay" onClick={() => setConfirmEquip(null)}>
+          <div className="slot-result" onClick={(e) => e.stopPropagation()}>
+            <div className="garage-card-name">
+              {confirmEquip.opt ? `確定要裝備「${confirmEquip.opt.label}」嗎？` : "確定要清空這個裝備欄位嗎？"}
+            </div>
+            <div className="slot-result-actions">
+              <button className="modal-btn" onClick={doConfirmEquip}>確定</button>
+              <button className="modal-link" onClick={() => setConfirmEquip(null)}>取消</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="garage-list">
         {BIKE_SKINS.filter((s) => !s.locked && s.currency !== "diamond").map(renderSkinCard)}
       </div>
@@ -457,7 +489,7 @@ export default function Garage({ user, onBack }: { user: User | null; onBack: ()
                   <button
                     className={`garage-btn${equipped ? " disabled" : ""}`}
                     disabled={equipped}
-                    onClick={() => { setActiveCosmetic("title", t.id, user?.id ?? null).then(() => forceRender((n) => n + 1)); }}
+                    onClick={() => setConfirmEquip({ kind: "title", opt: { id: t.id, label: t.name, price: -1 } })}
                   >
                     {equipped ? "使用中" : "裝備"}
                   </button>
@@ -525,6 +557,14 @@ export default function Garage({ user, onBack }: { user: User | null; onBack: ()
               <div key={kind} className="cosmetic-row">
                 <div className="cosmetic-row-label">{COSMETIC_SECTION_LABEL[kind]}</div>
                 <div className="cosmetic-chip-list">
+                  <button
+                    key="none"
+                    className={`cosmetic-chip${activeId === null ? " equipped" : ""}`}
+                    onClick={() => handleNoneClick(kind)}
+                    title="不裝備，維持預設"
+                  >
+                    <span>無</span>
+                  </button>
                   {COSMETIC_CATALOG[kind].map((opt) => {
                     const owned = isOwned(opt.id);
                     const equipped = activeId === opt.id;
