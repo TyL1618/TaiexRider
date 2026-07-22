@@ -212,6 +212,18 @@ export async function syncWalletFromServer(): Promise<void> {
   writeCollectionCache(row.collection ?? []);
   writeAdsRemovedCache(row.ads_removed ?? false);
   writeTicketsCache(row.tickets ?? 0);
+
+  // 一次性沿用：舊版車皮裝備存在純本地 tr_garage_active_{uid}（2026-07-22 前），伺服器
+  // equipped 還沒有 'skin' 鍵時，把本地舊值搬上伺服器（搬一次即可），避免更新到本版的
+  // 玩家車皮被重置成 default 要重新裝備。owned 快取上面剛寫過，getOwnedSkins() 可用。
+  if (!(row.equipped && row.equipped.skin)) {
+    try {
+      const legacy = localStorage.getItem(activeSkinKey(uid));
+      if (legacy && legacy !== "default" && getOwnedSkins().includes(legacy)) {
+        await setActiveSkin(legacy, uid);
+      }
+    } catch { /* 靜默 */ }
+  }
 }
 
 // 每局結束呼叫（App.tsx handleGameOver，任何模式完賽/摔車都算，跟 Q 系列同一套
@@ -454,22 +466,36 @@ export async function grantDevWallet(): Promise<void> {
   writeStreakCache(row.last_session_key, row.streak_count);
 }
 
+// 目前裝備車皮：2026-07-22 起改伺服器權威（存 player_wallet.equipped 的 'skin' 鍵，
+// 跟稱號/顏色同一套 wallet_set_cosmetic 機制），取代原本純本地 activeSkinKey()。
+// 動機：玩家資料頁要讓「別人」看到你當下騎哪台車（equipped 是唯一跨玩家可讀的伺服器
+// 來源）；順帶修掉 2026-07-15 記錄的「換裝置車皮跑掉」純本地限制。getActiveSkinId 仍
+// 同步讀 equipped 快取（syncWalletFromServer 已寫入），uid 參數保留只為呼叫端簽章相容
+// （equipped 快取本身就是當前登入帳號的伺服器狀態；訪客 equipped 空→回 default）。
 export function getActiveSkinId(uid: string | null = null): string {
-  try {
-    const id = localStorage.getItem(activeSkinKey(uid));
-    return id && isOwned(id) ? id : "default";
-  } catch {
-    return "default";
-  }
+  void uid;
+  const id = getEquippedCache().skin;
+  return id && isOwned(id) ? id : "default";
 }
 
-// 選用：只有已擁有的車皮能選
-export function setActiveSkin(id: string, uid: string | null = null): boolean {
+// 選用：只有已擁有的車皮能選。樂觀先寫本地 equipped 快取（getActiveSkinId 立刻反映），
+// 已登入再背景同步伺服器（比照 setActiveCosmetic）。回傳是否被接受（未擁有＝false）。
+export async function setActiveSkin(id: string, uid: string | null = null): Promise<boolean> {
   if (!isOwned(id)) return false;
-  try {
-    localStorage.setItem(activeSkinKey(uid), id);
-  } catch { /* 靜默 */ }
-  return true;
+  const cur = getEquippedCache();
+  cur.skin = id;
+  writeEquippedCache(cur);
+  // 也寫一份舊版 per-uid 本地 key：純粹當「PWA 已更新、但使用者還沒跑
+  // migration_20260722.sql」這個過渡窗的安全網——那段期間 wallet_set_cosmetic 還不認
+  // 'skin'（伺服器 equipped 存不進去），重開後 syncWalletFromServer 的一次性沿用要能
+  // 讀到「最新選擇」而不是舊值。migration 跑完後伺服器才是權威，這個 key 變冗餘但無害。
+  try { localStorage.setItem(activeSkinKey(uid), id); } catch { /* 靜默 */ }
+  if (!uid) return true; // 訪客純本地（車皮只可能是 default，本來就沒伺服器錢包）
+  const { data, error } = await supabase.rpc("wallet_set_cosmetic", { p_kind: "skin", p_id: id });
+  if (error || !data || !data[0]) return true; // RPC 尚未建立/網路失敗：樂觀值先頂著
+  const row = data[0] as { equipped: Record<string, string> | null; ok: boolean };
+  if (row.ok) writeEquippedCache(row.equipped ?? {});
+  return row.ok;
 }
 
 // GameCanvas 繪車時讀取目前選用的完整車皮設定

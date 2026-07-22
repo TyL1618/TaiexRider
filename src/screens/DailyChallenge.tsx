@@ -13,6 +13,7 @@ import { getWeeklyQuests, syncWeeklyFromServer, weekKey, type WeeklyQuestView } 
 import { getAdsRemoved, syncWalletFromServer, fetchDailyUsage, COSMETIC_LABELS } from "../lib/garage";
 import { requestRewardedAd, preloadRewardedAd } from "../lib/ads";
 import { checkPendingSettlement, ackSettlement, type PendingSettlement } from "../lib/dailyDiamondSettlement";
+import PlayerProfile from "../components/PlayerProfile";
 import CoinIcon from "../components/CoinIcon";
 import type { TrackData } from "../data/tracks";
 import "./DailyChallenge.css";
@@ -85,6 +86,7 @@ export default function DailyChallenge({
   // handleStart 直接用、不用再抓第二次。
   const [ghostAvail, setGhostAvail] = useState<boolean | null>(null);
   const ghostPathRef = useRef<GhostRecord | null>(null);
+  const [profileId, setProfileId] = useState<string | null>(null); // 點排行榜暱稱開玩家資料頁
 
   // 2026-07-07：同裝置切換帳號時，本地次數快取重新從「這個 uid」自己的 key 讀取
   // （見 challengeAttempts.ts 頂部說明），避免沿用前一個使用者當天用掉的次數；
@@ -192,6 +194,8 @@ export default function DailyChallenge({
   return (
     <div className="daily-screen">
       <button className="back-btn" onClick={onBack}>‹ 返回</button>
+
+      {profileId && <PlayerProfile playerId={profileId} onClose={() => setProfileId(null)} />}
 
       {pendingSettlement && (
         <div className="modal-overlay" onClick={handleAckSettlement}>
@@ -414,7 +418,10 @@ export default function DailyChallenge({
                   <span className="rk-pos">{i + 1}</span>
                   <span className="rk-score">{r.score}</span>
                   <span className="rk-time">{fmtMs(r.time_ms)}</span>
-                  <span className="rk-user">
+                  <span
+                    className={`rk-user${r.player_id ? " clickable" : ""}`}
+                    onClick={r.player_id ? () => setProfileId(r.player_id!) : undefined}
+                  >
                     <span className="rk-user-line1">
                       {badgeIcon && <span className="rk-badge">{badgeIcon}</span>}
                       <span style={nickSwatch ? { color: nickSwatch } : undefined}>{r.player_name}</span>

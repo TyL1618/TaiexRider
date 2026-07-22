@@ -130,6 +130,27 @@ export function getAchievementTitles(streakDays: number): AchvTitleView[] {
   ];
 }
 
+// 玩家資料頁（別人看你）用：給定伺服器回傳的原始計數，算出全部 8 個成就（3 個
+// 成就車款 + 5 個成就稱號）的解鎖狀態。門檻常數跟上面 getAchievementTitles/
+// getAchievementBikes 共用同一份，避免前後端／自己看跟別人看各寫一份門檻。
+export interface AchvBadge { id: string; name: string; emoji: string; unlocked: boolean; }
+export function computeAchievements(raw: {
+  bullFinishes: number; bearFinishes: number;
+  totalFlips: number; totalPerfect: number; streakDays: number;
+}): AchvBadge[] {
+  const totalFinishes = raw.bullFinishes + raw.bearFinishes;
+  return [
+    { id: "q1-bull", name: "多頭鬥牛", emoji: "🐂", unlocked: raw.bullFinishes >= Q1_BULL_TARGET },
+    { id: "q2-bear", name: "空頭獵手", emoji: "🐻", unlocked: raw.bearFinishes >= Q2_BEAR_TARGET },
+    { id: "q3-phoenix", name: "火鳳凰", emoji: "🔥", unlocked: raw.streakDays >= Q3_STREAK_TARGET },
+    { id: "title:win-streak", name: "連勝狂魔", emoji: "⚡", unlocked: raw.streakDays >= TITLE_WIN_STREAK_TARGET },
+    { id: "title:leaderboard-regular", name: "排行榜常客", emoji: "🏆", unlocked: totalFinishes >= TITLE_LEADERBOARD_TARGET },
+    { id: "title:air-walker", name: "空中飛人", emoji: "🛫", unlocked: raw.totalFlips >= TITLE_AIR_WALKER_TARGET },
+    { id: "title:gravity-challenger", name: "地心引力挑戰者", emoji: "🪐", unlocked: raw.totalFlips >= TITLE_GRAVITY_TARGET },
+    { id: "title:perfect-landing", name: "完美落地大師", emoji: "🎯", unlocked: raw.totalPerfect >= TITLE_PERFECT_LANDING_TARGET },
+  ];
+}
+
 export interface AchvBikeView {
   id: string;
   name: string;

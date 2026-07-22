@@ -320,6 +320,10 @@
   min-width: 0;
 }
 .rk-user-line1 { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* 有 player_id 的列可點開玩家資料頁：淡下劃線提示可互動 */
+.rk-user.clickable { cursor: pointer; }
+.rk-user.clickable .rk-user-line1 { text-decoration: underline dotted rgba(45, 226, 230, 0.5); text-underline-offset: 2px; }
+.rk-user.clickable:active { transform: scale(0.97); }
 .rk-badge { margin-right: 0.2rem; }
 .rk-title {
   margin-top: 0.2rem;

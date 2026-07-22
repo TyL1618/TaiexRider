@@ -291,7 +291,9 @@ export default function Garage({ user, onBack }: { user: User | null; onBack: ()
   };
 
   const handleEquip = (id: string) => {
-    if (setActiveSkin(id, user?.id ?? null)) setActive(id);
+    if (!isOwned(id)) return;
+    setActive(id);                             // 樂觀 UI（setActiveSkin 內部也已樂觀寫 equipped 快取）
+    void setActiveSkin(id, user?.id ?? null);  // 背景同步伺服器（2026-07-22 起改伺服器權威）
   };
 
   // 個人化裝備：未擁有→跳確認彈窗問要不要花鑽石買（2026-07-21 使用者回報直接扣款

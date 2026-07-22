@@ -19,6 +19,10 @@ export interface ScoreCosmetics {
 }
 
 export interface ScoreRow {
+  // 2026-07-22 起 get_daily_top() 一併回傳 player_id（Supabase auth uuid），供排行榜
+  // 點暱稱開玩家資料頁用（見 playerProfile.ts）。舊快取/舊 RPC 沒有時為 undefined，
+  // 點擊功能自然停用（不影響排行榜本身顯示）。
+  player_id?: string;
   player_name: string;
   score: number;
   time_ms: number;
