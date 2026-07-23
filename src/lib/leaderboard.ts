@@ -125,13 +125,29 @@ export async function submitDailyScore(
         p_skin_id: s.skinId ?? "default",
       }),
     });
-    if (r.ok) {
+    if (!r.ok) {
+      console.warn(`[leaderboard] submit_daily_score HTTP 失敗: ${r.status}`);
+      return false;
+    }
+    // 2026-07-23：RPC 回傳型別從 void 改成 table(ok, reason)——void 時不管是真的
+    // 寫入成功還是被防作弊檢查靜默擋下，HTTP 一律回 200，前端/開發者完全看不出
+    // 差異（曾發生玩家回報「分數沒送出」但完全查不出是哪一關卡住）。現在一律把
+    // 非 'ok' 的 reason 印出來（含合法的 not_improved，跟各種防作弊拒絕碼），
+    // 下次再發生就有線索，不用再憑空猜。
+    const rows = await r.json();
+    const row = Array.isArray(rows) ? rows[0] : rows;
+    const ok = !!row?.ok;
+    const reason = row?.reason ?? "unknown";
+    if (reason !== "ok") {
+      console.info(`[leaderboard] submit_daily_score 未寫入新分數，reason=${reason}`);
+    }
+    if (ok) {
       // 清除快取，讓下次進 DailyChallenge 顯示含本次成績的最新排行榜。
       // ⚠️ key 用「目前這一期」session（= max(map_date)），與讀取端 fetchDailyTop 同源，
       // RPC 寫入也是 max(map_date)，連假整段累積在同一張榜。不可用 toISOString()（UTC）。
       _topCache.delete(await resolveSessionDate(dailyKey()));
     }
-    return r.ok;
+    return ok;
   } catch {
     return false;
   }

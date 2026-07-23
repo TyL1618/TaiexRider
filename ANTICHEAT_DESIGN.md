@@ -129,6 +129,23 @@ press/release 完整合法性狀態機**（成本/風險不成比例，事件數
 - 存放：`daily_scores` 加 `replay jsonb`（沒有另建獨立表——目前規模單日筆數不多，
   加欄位已經夠用，之後量大再評估是否要限制只留前 100 名的 replay）。
 
+## 診斷缺口修補（2026-07-23，`migration_20260723c.sql`）
+
+`submit_daily_score()` 原本回傳 `void`：任何一道檢查沒過都直接靜默 `return`，
+不留記錄；前端只看 HTTP 是否 200，靜默 return 一樣回 200——玩家看不到任何錯誤
+提示，只有回去看排行榜才會發現分數沒被覆蓋，開發者這邊也完全查不出是哪一關卡住
+（實測案例：使用者回報 2100 分沒覆蓋掉舊的 1784，逐一推演六道檢查都排除不了，
+因為沒有任何記錄可查）。
+
+**已修**：函式簽章改成 `returns table(ok boolean, reason text)`，每個提早
+return 的分支都標上明確原因碼（`cooldown`／`score_ceiling`／`flip_rate`／
+`replay_flip_mismatch`…等），成功路徑也拆成 `ok`（真的改善分數寫入）跟
+`not_improved`（新分數沒有比現有紀錄好，正確地不覆蓋——這是既有「分數只增不減」
+設計的正常結果，不是拒絕）兩種，所有既有檢查的條件/順序/數值完全不變，只是
+加上標籤。前端 `leaderboard.ts submitDailyScore()` 同步改成解析回傳的
+`{ok, reason}`，非 `'ok'` 一律 `console.info` 印出來，下次再有人回報「分數沒
+送出」就有實際線索可查，不用再憑空推演排除。
+
 ## 刻意不做
 
 - **完整伺服器端物理重放**：要在 Postgres/Edge Function 跑 Matter.js 重演，工程與成本不成比例。第四層的粗一致性已足夠拉高成本。

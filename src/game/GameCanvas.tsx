@@ -945,9 +945,10 @@ let crashTimer = 0;
       // 超過1圈、逼近2圈的角度(如600°)會觸發「完美落地」卻只用1圈的分數結算，體感矛盾）
       const flips = Math.round(Math.abs(rot) / (2 * Math.PI));
       const realAir = air > RULES.minAirSec;
+      // 2026-07-23：曾短暫改過「落地角度沒對齊打折給分」，使用者實測後回報不想要
+      // 中間值（要就0要就100），已改回二選一，門檻本身放寬到 ~70°（見 constants.ts）
+      // 減少「明明轉夠圈數卻卡在門檻外整包歸零」的誤判機率。
       const uprightAtLand = Math.cos(angle) > RULES.uprightCosThreshold;
-      // 落地角度沒對齊滿分門檻，但車身還算立著(未歪超過~90°)——打折給分而非直接歸零
-      const roughlyUpright = Math.cos(angle) > RULES.roughUprightCosThreshold;
       const landSlope = slopeAt(track, Math.min(x, track.finishX));
       const levelOk = Math.abs(angleDelta(angle, landSlope)) < RULES.perfectLevelRad;
       const isPerfect = realAir && Math.abs(rot) > Math.PI * 1.7 && levelOk;
@@ -967,12 +968,8 @@ let crashTimer = 0;
           { x: bike.rearWheel.position.x, y: bike.rearWheel.position.y },
           { x: bike.frontWheel.position.x, y: bike.frontWheel.position.y },
         ];
-      } else if (flips > 0 && (uprightAtLand || roughlyUpright)) {
-        // 2026-07-23 改「漸進給分」：落地角度沒完全對齊(uprightAtLand)時不再整包歸零，
-        // 只要車身還算立著(roughlyUpright)就打折給分，只有真的落地歪到接近側躺/倒插
-        // 才 0 分——轉夠圈數卻因為落地角度差一點就整趟歸零的挫折感，改成漸進退場。
-        const ratio = uprightAtLand ? 1 : RULES.partialFlipRatio;
-        const gained = Math.round(flipScore(flips) * ratio);
+      } else if (uprightAtLand && flips > 0) {
+        const gained = flipScore(flips);
         bonusPoints += gained;
         totalFlips += flips;
         replayEvents.push([Math.round(raceTimeMs), "f", flips]);
