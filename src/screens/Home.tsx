@@ -361,20 +361,20 @@ export default function Home({
                 <ul className="log-notes">
                   <li>每日排名賽：全台同圖、登入 Google 參加排行榜</li>
                   <li>隨機賽道：拉霸隨機抽一支股票</li>
-                  <li>自選賽道・前次盤勢：從全市場約 1000 支自選</li>
-                  <li>自選賽道・每日長征：5 支股票串接的超長路線</li>
+                  <li>自選賽道・前次盤勢：從全市場約 <b className="log-num">1000</b> 支自選</li>
+                  <li>自選賽道・每日長征：<b className="log-num">5</b> 支股票串接的超長路線</li>
                 </ul>
               </div>
               <div className="log-entry">
                 <div className="log-date">💰 金幣怎麼賺</div>
                 <ul className="log-notes">
-                  <li>自選/隨機賽道：完賽 +5、摔車 +2（每日賽/經典模式不計入）</li>
-                  <li>每日長征（5 支股票串接）：完賽 +30、摔車依跑到的距離比例發放</li>
-                  <li>以上每日合計上限 100 枚，達上限後改玩每日／週任務累積</li>
+                  <li>自選/隨機賽道：完賽 <b className="log-num">+10</b>、摔車 <b className="log-num">+4</b>（每日賽/經典模式不計入）</li>
+                  <li>每日長征（<b className="log-num">5</b> 支股票串接）：完賽 <b className="log-num">+30</b>、摔車依跑到的距離比例發放</li>
+                  <li>以上每日合計上限 <b className="log-num">100</b> 枚，達上限後改玩每日／週任務累積</li>
                   <li>每日任務、每週任務：完成即可到車庫領取，各自獨立額度</li>
-                  <li>車庫「看廣告拿金幣」：每日最多 2 次</li>
+                  <li>車庫「看廣告拿金幣」：每日最多 <b className="log-num">2</b> 次，每次 <b className="log-num">+40</b></li>
                   <li>結算畫面「看廣告 獎勵 ×2」：每局限用一次，把本局金幣翻倍</li>
-                  <li>⚡ 狂暴盤日（大盤漲跌幅 ≥2.5%）：任務金幣加倍</li>
+                  <li>⚡ 狂暴盤日（大盤漲跌幅 ≥<b className="log-num">2.5%</b>）：任務金幣加倍</li>
                 </ul>
               </div>
               <div className="log-entry">
@@ -382,7 +382,32 @@ export default function Home({
                 <ul className="log-notes">
                   <li>每日排名賽：只要參賽即有小額鑽石，名次越前面越多</li>
                   <li>經典模式：每週各關卡前三名額外發放鑽石</li>
+                  <li>幸運轉輪：抽獎獎項本身也有機率直接抽到鑽石</li>
                   <li>車庫可直接付費購買鑽石包，用來解鎖鑽石車款</li>
+                </ul>
+              </div>
+              <div className="log-entry">
+                <div className="log-date">🎫 廣告抵用券怎麼來/怎麼用</div>
+                <ul className="log-notes">
+                  <li>自選/隨機/長征賽道結算時 <b className="log-num">8%</b> 機率獲得，每日最多 <b className="log-num">3</b> 張</li>
+                  <li>幸運轉輪也有機率直接抽到 <b className="log-num">1</b>~<b className="log-num">2</b> 張</li>
+                  <li>可消耗 <b className="log-num">1</b> 張跳過廣告，直接領取「車庫拿金幣」或「結算雙倍獎勵」，也能直接復活</li>
+                </ul>
+              </div>
+              <div className="log-entry">
+                <div className="log-date">🎰 幸運轉輪</div>
+                <ul className="log-notes">
+                  <li>首頁「幸運轉輪」入口，每天 <b className="log-num">2</b> 次免費抽獎（看廣告解鎖；已買永久去廣告則直接免費抽）</li>
+                  <li>免費次數用完可付費抽，每次 <b className="log-num">💎20</b></li>
+                  <li>獎項包含鑽石、廣告抵用券、稀有車款，實際機率見轉輪頁面「查看機率表」</li>
+                </ul>
+              </div>
+              <div className="log-entry">
+                <div className="log-date">🎨 個人化裝備</div>
+                <ul className="log-notes">
+                  <li>車庫「個人化裝備」區塊可用鑽石購買：暱稱顏色、稱號、前綴圖示、尾焰特效顏色、鬼影顏色</li>
+                  <li>純外觀效果，不影響操作手感或分數</li>
+                  <li>買了之後要點擊裝備才會生效，別人在排行榜上也看得到你裝備的東西</li>
                 </ul>
               </div>
             </div>

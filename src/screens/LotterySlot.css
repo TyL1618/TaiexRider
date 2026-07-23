@@ -30,6 +30,65 @@
   background: linear-gradient(135deg, #7dd3ea, var(--neon-cyan));
 }
 
+/* 十連抽：單抽/十連並排雙按鈕 */
+.lottery-btn-row {
+  display: flex;
+  gap: 0.6rem;
+  width: 100%;
+}
+.lottery-btn-row .lottery-spin-btn { flex: 1; margin: 0; }
+.lottery-ten-btn {
+  background: linear-gradient(135deg, #ffd27d, var(--neon-amber));
+  box-shadow: 0 0 24px rgba(255, 179, 0, 0.55);
+  font-weight: 800;
+}
+
+/* 十連抽結果：2 行 x 5 欄小卡，稀有度用邊框/光暈區分（不做跨格放大，固定 10 張避免版面跑掉） */
+.lottery-x10-result { width: min(94vw, 420px); gap: 0.8rem; }
+.lottery-x10-title {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--neon-amber);
+  letter-spacing: 0.03em;
+}
+.lottery-x10-grid {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 0.5rem;
+}
+.lottery-x10-card {
+  aspect-ratio: 1 / 1.05;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.15rem;
+}
+.lottery-x10-card-icon { font-size: 1.3rem; line-height: 1; }
+.lottery-x10-card-label {
+  font-size: 0.56rem;
+  color: var(--text-dim);
+  text-align: center;
+  line-height: 1.15;
+  padding: 0 2px;
+}
+.lottery-x10-card-rare {
+  border-color: var(--neon-amber);
+  background: rgba(255, 179, 0, 0.1);
+  box-shadow: 0 0 12px rgba(255, 179, 0, 0.3);
+}
+.lottery-x10-card-rare .lottery-x10-card-label { color: var(--neon-amber); font-weight: 700; }
+.lottery-x10-card-epic {
+  border-color: #b39ddb;
+  background: linear-gradient(160deg, rgba(20, 10, 30, 0.9), rgba(179, 157, 219, 0.14));
+  box-shadow: 0 0 16px rgba(179, 157, 219, 0.55);
+}
+.lottery-x10-card-epic .lottery-x10-card-label { color: #b39ddb; font-weight: 800; }
+
 .lottery-error {
   margin-top: 0.6rem;
   font-size: 0.8rem;

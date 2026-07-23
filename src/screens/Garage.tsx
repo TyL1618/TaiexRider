@@ -102,6 +102,7 @@ export default function Garage({ user, onBack }: { user: User | null; onBack: ()
   const [priceDiag, setPriceDiag] = useState("");
   const [priceLoading, setPriceLoading] = useState(false);
   const [adNotice, setAdNotice] = useState("");
+  const [showCurrencyInfo, setShowCurrencyInfo] = useState(false);
   const [, forceRender] = useState(0);
 
   // 鑽石購買 + 永久去廣告：只有 Android TWA + 瀏覽器支援 Digital Goods API 才顯示
@@ -379,10 +380,27 @@ export default function Garage({ user, onBack }: { user: User | null; onBack: ()
     <div className="select-screen garage-screen">
       <button className="back-btn" onClick={onBack}>‹ 返回</button>
       <h1 className="select-title">車庫</h1>
-      <p className="garage-coins"><CoinIcon size={22} /> 金幣 {coins}</p>
-      <p className="garage-coins garage-diamonds">💎 鑽石 {diamonds}</p>
-      <p className="garage-coins garage-tickets">🎫 票券 {tickets}</p>
+      <div className="garage-currency-block">
+        <p className="garage-coins"><CoinIcon size={22} /> 金幣 {coins}</p>
+        <p className="garage-coins garage-diamonds">💎 鑽石 {diamonds}</p>
+        <p className="garage-coins garage-tickets">🎫 廣告抵用券 {tickets}</p>
+        <button className="garage-currency-info-btn" onClick={() => setShowCurrencyInfo(true)} aria-label="貨幣說明">?</button>
+      </div>
       <p className="garage-intro">完賽/摔車與每日任務都能賺金幣，解鎖車皮換上場</p>
+
+      {showCurrencyInfo && (
+        <div className="modal-overlay" onClick={() => setShowCurrencyInfo(false)}>
+          <div className="slot-result garage-currency-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="garage-currency-heading"><CoinIcon size={16} /> 金幣</div>
+            <p className="garage-currency-desc">玩自選/隨機賽道、完成每日/每週任務、車庫看廣告賺的日常貨幣，用來解鎖一般車皮。</p>
+            <div className="garage-currency-heading">💎 鑽石</div>
+            <p className="garage-currency-desc">每日排名賽/經典模式的稀有獎勵，或直接付費購買，用來解鎖高階車款、幸運轉輪付費抽獎、個人化裝備（暱稱顏色/稱號/前綴圖示/尾焰/鬼影顏色）。</p>
+            <div className="garage-currency-heading">🎫 廣告抵用券</div>
+            <p className="garage-currency-desc">玩一般/長征賽道結算時有機率獲得，或用幸運轉輪抽到。可以直接消耗 1 張跳過廣告，直接領取「車庫看廣告拿金幣」或「結算雙倍獎勵」，也能用在復活。</p>
+            <button className="modal-btn" onClick={() => setShowCurrencyInfo(false)}>關閉</button>
+          </div>
+        </div>
+      )}
       {!user && (
         <p className="garage-guest-notice">⚠️ 訪客進度僅存於本機，清除資料或換裝置會遺失。登入 Google 可雲端保存</p>
       )}
@@ -404,9 +422,9 @@ export default function Garage({ user, onBack }: { user: User | null; onBack: ()
       {showAdTicketPrompt && (
         <div className="modal-overlay" onClick={() => setShowAdTicketPrompt(false)}>
           <div className="slot-result" onClick={(e) => e.stopPropagation()}>
-            <div className="garage-card-name">🎫 要消耗一張票券，跳過廣告直接領取嗎？</div>
+            <div className="garage-card-name">🎫 要消耗一張廣告抵用券，跳過廣告直接領取嗎？</div>
             <div className="slot-result-actions">
-              <button className="modal-btn" onClick={useTicketForCoins}>消耗票券直接領取</button>
+              <button className="modal-btn" onClick={useTicketForCoins}>消耗廣告抵用券直接領取</button>
               <button className="modal-link" onClick={() => { setShowAdTicketPrompt(false); proceedWithAd(); }}>還是看廣告</button>
             </div>
           </div>

@@ -117,6 +117,13 @@ body {
 }
 .back-btn:hover { color: var(--neon-cyan); border-color: var(--neon-cyan); }
 .back-btn:active { transform: scale(0.94); }
+/* 鎖住返回鍵用（例如抽獎轉輪轉動中）：灰掉暗掉+不可點擊，比跳確認視窗省事 */
+.back-btn:disabled {
+  opacity: 0.35;
+  border-color: rgba(255, 255, 255, 0.12);
+  cursor: not-allowed;
+  pointer-events: none;
+}
 
 /* modal 彈窗 */
 .modal-overlay {
@@ -186,3 +193,5 @@ body {
 .log-date { font-size: 0.72rem; letter-spacing: 0.1em; color: var(--neon-amber); }
 .log-notes { margin: 0; padding-left: 1.1rem; display: flex; flex-direction: column; gap: 0.25rem; }
 .log-notes li { font-size: 0.82rem; color: var(--text); line-height: 1.5; }
+/* 教學內文的數字強調（2026-07-23 使用者回報整篇都白字、數字被文字淹沒） */
+.log-num { color: var(--neon-cyan); font-weight: 800; }

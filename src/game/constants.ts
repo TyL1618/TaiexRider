@@ -105,7 +105,12 @@ export const PHYSICS = {
 
 export const RULES = {
   // 落地判定為「正面朝上」的容許角度（車身上向量與世界上向量夾角內）
-  uprightCosThreshold: 0.55, // cosθ > 此值算正立 (≈ 57°內)，用於後空翻計分
+  uprightCosThreshold: 0.55, // cosθ > 此值算正立 (≈ 57°內)，落地滿分門檻
+  // 2026-07-23 使用者實測回報「轉夠圈數但落地角度沒對齊，整包歸零」很挫折——
+  // uprightCosThreshold 是「滿分」門檻，這裡另開一個較寬鬆的「有給分」門檻(≈90°內，
+  // 車身還算立著沒躺平)，介於兩者之間打折給分(partialFlipRatio)，不再是全有全無。
+  roughUprightCosThreshold: 0, // cosθ > 此值算「還算立著」，落地打折門檻
+  partialFlipRatio: 0.5, // 落地角度在滿分門檻外、打折門檻內時的給分比例
   // 車頂致命判定的傾倒門檻：只有車身真的「翻過 90°」(cos < 0，車頂朝下半球) 才啟動 crashZone
   // 與 uprightCosThreshold 分離 → 爬陡坡前傾(<90°)不再被誤判死亡（discussion 第 1 點）
   crashTipCos: 0,

@@ -15,13 +15,15 @@ export const PLAY_REWARD_DAILY_CAP = 100;
 
 // 完賽/摔車（含長征）的金幣公式，GameCanvas（結算畫面顯示/雙倍按鈕）跟 App.tsx
 // （實際發幣）共用同一份，避免兩邊算出不同數字。
-// 長征模式：完賽固定 30（一般模式 5 的 5 張圖份量 25 + 額外 5 當誘因），摔車依「跑到
+// 長征模式：完賽固定 30（一般模式的 5 張圖份量 + 額外誘因），摔車依「跑到
 // 全程的百分比」等比例給（progressPct 0~1，跟死亡熱點用的 xr 是同一個座標概念）。
+// 2026-07-23 使用者拍板：自選/隨機賽道完賽 5→10、摔車 2→4——隨機賽道抽到的股票
+// 走勢難易不可控，對玩家來說本來就帶點賭注成分，獎勵加碼平衡這個不確定性。
 export function computePlayReward(isLong: boolean, finished: boolean, progressPct: number): number {
   if (isLong) {
     return finished ? 30 : Math.round(30 * Math.max(0, Math.min(1, progressPct)));
   }
-  return finished ? 5 : 2;
+  return finished ? 10 : 4;
 }
 
 // 2026-07-08 晚間修正：key 原本沒帶 uid，同裝置切換帳號（例如開發者測試帳號重度測試後

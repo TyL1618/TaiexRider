@@ -407,10 +407,15 @@ export default function GameCanvas({ prices, label, name, subtitle, onExit, onGa
   // navigator.share() 帶檔案分享常直接失敗，這是 TWA→Capacitor 換殼後的體驗退化，改用官方
   // 原生分享 Intent 修復，恢復系統分享面板＋LINE/FB/IG 捷徑圖示）。網頁/PWA 版邏輯不變。
   const shareScore = async () => {
+    // 分數一律讀 finalScoreRef（每步同步、不節流），不能讀 hud.points——那是每 5 幀才
+    // 節流同步一次，終點/摔車瞬間可能落後真實分數（2026-07-23 使用者回報分享文案
+    // 數字跟排行榜對不上，查出來是這裡沒跟結算畫面用同一份「終點讀 finalScoreRef」
+    // 的既有修法，只有這支函式漏改）。
+    const finalScore = finalScoreRef.current;
     const trackDesc = subtitle ? `${name}（${subtitle}）` : `${label} ${name}`;
     const text = finished
-      ? `我把 ${trackDesc} 的真實走勢騎好騎滿！🏁 ${hud.points} 分・翻轉 ${hud.totalFlips} 圈・完美落地 ${hud.perfectLandings} 次\n你也來挑戰 TAIEX RIDER：把股市走勢騎成霓虹賽道`
-      : `${trackDesc} 的走勢把我摔飛了 🏍️💥 ${hud.points} 分陣亡（翻轉 ${hud.totalFlips} 圈）\n不服來騎 TAIEX RIDER：把股市走勢騎成霓虹賽道`;
+      ? `我把 ${trackDesc} 的真實走勢騎好騎滿！🏁 ${finalScore} 分・翻轉 ${hud.totalFlips} 圈・完美落地 ${hud.perfectLandings} 次\n你也來挑戰 TAIEX RIDER：把股市走勢騎成霓虹賽道`
+      : `${trackDesc} 的走勢把我摔飛了 🏍️💥 ${finalScore} 分陣亡（翻轉 ${hud.totalFlips} 圈）\n不服來騎 TAIEX RIDER：把股市走勢騎成霓虹賽道`;
     const url = "https://taiexrider.pages.dev";
     logEvent("share", analyticsMode, { label, finished });
 
@@ -421,7 +426,7 @@ export default function GameCanvas({ prices, label, name, subtitle, onExit, onGa
       blob = await renderShareCard({
         label, name, subtitle,
         prices,
-        score: hud.points,
+        score: finalScore,
         timer: hud.timer,
         flips: hud.totalFlips,
         perfect: hud.perfectLandings,
@@ -935,10 +940,14 @@ let crashTimer = 0;
     // 結算一趟翻轉（落地當下 or 飛越終點線時強制結算，見下方兩處呼叫）：
     // 給分／toast／音效／震動／特效全部集中在這裡，避免兩處呼叫各寫一份分岔。
     const settleFlip = (rot: number, air: number, angle: number, x: number) => {
-      // 圈數：差 0.3π（85%+）內進位，貼近體感
-      const flips = Math.floor((Math.abs(rot) + 0.3 * Math.PI) / (2 * Math.PI));
+      // 圈數：四捨五入到最近整圈（2026-07-23 改，取代舊版「每多一圈要轉滿85%」的
+      // floor 公式——那個公式跟下面 isPerfect 的判定門檻(1.7π)不同步，玩家轉了明顯
+      // 超過1圈、逼近2圈的角度(如600°)會觸發「完美落地」卻只用1圈的分數結算，體感矛盾）
+      const flips = Math.round(Math.abs(rot) / (2 * Math.PI));
       const realAir = air > RULES.minAirSec;
       const uprightAtLand = Math.cos(angle) > RULES.uprightCosThreshold;
+      // 落地角度沒對齊滿分門檻，但車身還算立著(未歪超過~90°)——打折給分而非直接歸零
+      const roughlyUpright = Math.cos(angle) > RULES.roughUprightCosThreshold;
       const landSlope = slopeAt(track, Math.min(x, track.finishX));
       const levelOk = Math.abs(angleDelta(angle, landSlope)) < RULES.perfectLevelRad;
       const isPerfect = realAir && Math.abs(rot) > Math.PI * 1.7 && levelOk;
@@ -958,8 +967,12 @@ let crashTimer = 0;
           { x: bike.rearWheel.position.x, y: bike.rearWheel.position.y },
           { x: bike.frontWheel.position.x, y: bike.frontWheel.position.y },
         ];
-      } else if (uprightAtLand && flips > 0) {
-        const gained = flipScore(flips);
+      } else if (flips > 0 && (uprightAtLand || roughlyUpright)) {
+        // 2026-07-23 改「漸進給分」：落地角度沒完全對齊(uprightAtLand)時不再整包歸零，
+        // 只要車身還算立著(roughlyUpright)就打折給分，只有真的落地歪到接近側躺/倒插
+        // 才 0 分——轉夠圈數卻因為落地角度差一點就整趟歸零的挫折感，改成漸進退場。
+        const ratio = uprightAtLand ? 1 : RULES.partialFlipRatio;
+        const gained = Math.round(flipScore(flips) * ratio);
         bonusPoints += gained;
         totalFlips += flips;
         replayEvents.push([Math.round(raceTimeMs), "f", flips]);
@@ -2080,14 +2093,14 @@ let crashTimer = 0;
             <div className="modal-overlay" onClick={() => setShowTicketPrompt(null)}>
               <div className="slot-result" onClick={(e) => e.stopPropagation()}>
                 <div className="overlay-play-reward-amount">
-                  🎫 要消耗一張票券，{showTicketPrompt === "revive" ? "直接復活" : "直接領取雙倍獎勵"}嗎？
+                  🎫 要消耗一張廣告抵用券，{showTicketPrompt === "revive" ? "直接復活" : "直接領取雙倍獎勵"}嗎？
                 </div>
                 <div className="slot-result-actions">
                   <button
                     className="modal-btn"
                     onClick={showTicketPrompt === "revive" ? useTicketForRevive : useTicketForDouble}
                   >
-                    消耗票券
+                    消耗廣告抵用券
                   </button>
                   <button
                     className="modal-link"

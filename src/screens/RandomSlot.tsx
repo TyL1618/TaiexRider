@@ -16,6 +16,7 @@ const CENTER_OFFSET = (VIEWPORT_H - ITEM_H) / 2;
 const REPEAT = 8;
 const VISUAL_SIZE = 30; // 每次 spin 的視覺滾輪大小（從 pool 隨機採樣）
 const T1 = 2, T2 = 2;
+const TAP_SPEED_MUL = 3.5; // 2026-07-23 新增：轉動中點擊畫面加速用的倍率
 
 type Phase = "idle" | "spinning" | "loading" | "result";
 
@@ -34,6 +35,7 @@ export default function RandomSlot({
   const stripRef  = useRef<HTMLDivElement>(null);
   const rafRef    = useRef(0);
   const timerRef  = useRef<ReturnType<typeof setTimeout>>();
+  const speedMulRef = useRef(1); // 轉動中點擊畫面 → 調高，讓虛擬經過時間走比較快
 
   useEffect(() => {
     return () => {
@@ -55,6 +57,7 @@ export default function RandomSlot({
     if (phase !== "idle" || !poolLoaded || pool.length === 0) return;
     setResult(null);
     setPhase("spinning");
+    speedMulRef.current = 1;
     if (stripRef.current) stripRef.current.style.transform = "translateY(0px)";
 
     // 從全部 pool 隨機挑 winner
@@ -74,7 +77,10 @@ export default function RandomSlot({
     const targetIndex = (REPEAT - 2) * VISUAL_SIZE + (VISUAL_SIZE - 1);
     const D = targetIndex * ITEM_H - CENTER_OFFSET;
     const v = D / (T1 + T2 / 2);
-    const start = performance.now();
+    // 虛擬經過時間：正常速度下每幀累加真實 dt，點擊加速時 speedMulRef 調高，
+    // 讓同一套緩動曲線（唰唰唰…咖…咖……咖）用更快的節奏跑完，不是瞬間跳結果。
+    let vt = 0;
+    let lastFrame = performance.now();
 
     // 「咖」聲節奏：跨過一格（ITEM_H 整數倍）就 tick 一次，音效節奏自然跟著
     // T1 等速快、T2 減速慢的位移曲線走（唰唰唰…咖…咖……咖）。
@@ -83,7 +89,10 @@ export default function RandomSlot({
     let lastTickAt = 0;
 
     const tick = (now: number) => {
-      const e = (now - start) / 1000;
+      const dt = (now - lastFrame) / 1000;
+      lastFrame = now;
+      vt += dt * speedMulRef.current;
+      const e = vt;
       let off: number;
       if (e <= T1) {
         off = v * e;
@@ -145,13 +154,19 @@ export default function RandomSlot({
     _key: i,
   }));
 
+  // 轉動中點擊畫面加速（不是瞬間跳結果，是把同一套緩動曲線的虛擬時間調快）
+  const handleTapAccelerate = () => {
+    if (phase === "spinning") speedMulRef.current = TAP_SPEED_MUL;
+  };
+
   return (
-    <div className="slot-screen">
+    <div className="slot-screen" onClick={handleTapAccelerate}>
       <button className="back-btn" onClick={onBack}>‹ 返回</button>
       <h1 className="slot-title">隨機賽道</h1>
       {poolLoaded && (
         <p className="slot-pool-hint">{pool.length} 支股票・前次盤中走勢</p>
       )}
+      {phase === "spinning" && <p className="slot-tap-hint">👆 點擊畫面可加速</p>}
 
       <div className="slot-machine">
         <div className="slot-viewport" style={{ height: VIEWPORT_H }}>

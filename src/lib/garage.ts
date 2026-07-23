@@ -519,6 +519,21 @@ export interface LotterySpinResult {
   duplicateOf: string | null; // 非 null＝重複保護觸發，原本抽到的車款 id（見 migration_20260721f.sql）
 }
 
+// 十連抽單筆獎項（沒有 ok/diamonds/tickets/owned 這些整體欄位，那些在外層 X10Result）。
+export interface LotteryPrizeItem {
+  prizeKind: "diamond" | "skin" | "ticket";
+  prizeId: string;
+  duplicateOf: string | null;
+}
+
+export interface LotterySpinX10Result {
+  ok: boolean;
+  prizes: LotteryPrizeItem[];
+  diamonds: number;
+  tickets: number;
+  owned: string[];
+}
+
 // p_paid=false：消耗今日免費額度（上限 2，超過 ok=false）；p_paid=true：扣 20 鑽石抽一次。
 export async function lotterySpin(paid: boolean): Promise<LotterySpinResult | null> {
   const uid = await getUid();
@@ -535,6 +550,31 @@ export async function lotterySpin(paid: boolean): Promise<LotterySpinResult | nu
   return {
     ok: row.ok, prizeKind: row.prize_kind, prizeId: row.prize_id, diamonds: row.diamonds,
     tickets: row.tickets, owned: row.owned, duplicateOf: row.duplicate_of,
+  };
+}
+
+// 十連抽（固定 190 鑽石，沒有免費管道）：伺服器一次抽 10 次、扣款一次，見
+// migration_20260723b.sql lottery_spin_x10()。機率表跟單抽共用同一份，重複保護
+// 在同一次十連內逐抽即時生效（同批連抽到同一台車，第二次算重複）。
+export async function lotterySpinX10(): Promise<LotterySpinX10Result | null> {
+  const uid = await getUid();
+  if (!uid) return null;
+  const { data, error } = await supabase.rpc("lottery_spin_x10");
+  if (error || !data || !data[0]) { console.error("[lottery] lottery_spin_x10 失敗", error); return null; }
+  const row = data[0] as {
+    ok: boolean;
+    prizes: { prize_kind: "diamond" | "skin" | "ticket"; prize_id: string; duplicate_of: string | null }[];
+    diamonds: number; tickets: number; owned: string[];
+  };
+  if (row.ok) {
+    writeDiamondsCache(row.diamonds);
+    writeTicketsCache(row.tickets);
+    writeOwnedCache(row.owned);
+  }
+  return {
+    ok: row.ok,
+    prizes: (row.prizes ?? []).map((p) => ({ prizeKind: p.prize_kind, prizeId: p.prize_id, duplicateOf: p.duplicate_of })),
+    diamonds: row.diamonds, tickets: row.tickets, owned: row.owned,
   };
 }
 

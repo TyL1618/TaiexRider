@@ -54,6 +54,11 @@ export default function App() {
   const confirmLeaveRef = useRef(false);
   confirmLeaveRef.current = confirmLeave; // 每次 render 同步，popstate 閉包讀得到最新值
   const leavingRef = useRef(false); // 觸發離開後設 true，阻止後續 popstate 補哨兵
+  // 子畫面暫時鎖住返回鍵用（例如抽獎轉輪轉動中）：子畫面透過 onLockBack 回報鎖定狀態，
+  // 不用像 GameCanvas 那樣另掛一個 popstate listener——這支 effect 本來就是集中管理
+  // 全站 history 的唯一入口（見下方 176 行註解），子畫面只要能讓這裡的 onPop 提早
+  // return 就夠了，不需要重複一套攔截機制。
+  const screenLockedRef = useRef(false);
 
   // 子頁的「‹返回」鈕：退掉子頁那層 history，由 popstate 統一切回首頁，
   // 讓 app 狀態與 history 深度保持同步（避免殘留 entry 造成返回鍵錯亂）。
@@ -191,6 +196,13 @@ export default function App() {
       }
       // 遊戲進行中：GameCanvas 有自己的 listener，這裡不介入
       if (trackRef.current !== null) return;
+
+      // 子畫面暫時鎖住（例如抽獎轉輪轉動中）：吞掉這次返回，補回哨兵留在原畫面，
+      // 不讓玩家在動畫跑到一半時就被切走、看不到抽獎結果。
+      if (screenLockedRef.current) {
+        window.history.pushState({ taiex: true }, "");
+        return;
+      }
 
       // 確認離開視窗開著時「再按一次返回鍵」= 離開：耗盡 history 讓 TWA 自然 finish()。
       // （改用返回鍵當離開動作，比 window.close() 可靠——TWA 封鎖 window.close()。）
@@ -436,7 +448,7 @@ export default function App() {
   if (screen === "random")  return <RandomSlot    onPick={handleStartTrack} onBack={goHome} />;
   if (screen === "classic") return <ClassicSelect user={user} onPick={handleStartTrack} onBack={goHome} />;
   if (screen === "garage")  return <Garage user={user} onBack={goHome} />;
-  if (screen === "lottery") return <LotterySlot user={user} onBack={goHome} />;
+  if (screen === "lottery") return <LotterySlot user={user} onBack={goHome} onLockBack={(locked) => { screenLockedRef.current = locked; }} />;
   if (screen === "daily")  return (
     <DailyChallenge
       user={user}

@@ -16,6 +16,15 @@
   margin: -0.6rem 0 0.4rem;
 }
 
+/* 轉動中點擊加速提示（RandomSlot/LotterySlot 共用） */
+.slot-tap-hint {
+  font-size: 0.74rem;
+  color: var(--neon-cyan);
+  letter-spacing: 0.04em;
+  margin: 0.2rem 0 0.5rem;
+  opacity: 0.85;
+}
+
 .slot-title {
   font-size: 1.6rem;
   font-weight: 800;
