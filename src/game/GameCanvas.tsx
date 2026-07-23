@@ -322,6 +322,14 @@ export default function GameCanvas({ prices, label, name, subtitle, onExit, onGa
   const reviveSignal = useRef(0);
   const requestRevive = () => { reviveSignal.current++; };
 
+  // 2026-07-23 修復「復活後排行榜分數沒被覆蓋」bug：死亡當下如果玩家還有復活
+  // 機會可以選，不能馬上呼叫 onGameOverRef（那會把「還沒真正結束」的分數提早
+  // 送出去，而且復活後真正結束時會再送第二次——兩次送出間隔太短常常撞到伺服器
+  // 10 秒提交冷卻，導致較高分的第二次被靜默擋掉，排行榜留下較低分的第一次）。
+  // 用 ref 讓外層按鈕/返回鍵（不在遊戲迴圈 closure 內）能呼叫到迴圈內部真正
+  // 判斷「這局真的結束了嗎」的 finalizeCrash()，跟 reviveSignal 是同一種橋接手法。
+  const finalizeCrashRef = useRef<() => void>(() => {});
+
   // 「看廣告復活」按鈕過去點下去就直接免費復活，從沒真的呼叫過廣告——
   // 補上真正的廣告閘門，跟按鈕文字（已購買永久去廣告才顯示「復活」）一致。
   const [reviveWatching, setReviveWatching] = useState(false);
@@ -642,6 +650,11 @@ export default function GameCanvas({ prices, label, name, subtitle, onExit, onGa
     let airborneSteps = 0; // 連續離地 step 數（後翻寬限用）
 let crashTimer = 0;
     let points = 0;
+    // 2026-07-23 修「復活後分數沒被覆蓋」bug：hasRevived 記錄這局是否已經復活過，
+    // gameOverFired 確保 onGameOverRef（觸發排行榜提交+金幣結算）整趟只呼叫一次，
+    // 見下方 finalizeCrash()。
+    let hasRevived = false;
+    let gameOverFired = false;
     let bonusPoints = 0; // 特技分（後翻＋完美落地），行進分另算疊加
     let maxDistScore = 0; // 歷史最大行進分 → 分數只增不減（discussion 第 5 點）
     let totalFlips = 0; // 全程累計後空翻圈數（結算顯示，discussion 第 9 點）
@@ -798,6 +811,7 @@ let crashTimer = 0;
 
     // 復活：在死亡位置上方懸空，保留分數/時間，重置碰撞與特效狀態
     const doRevive = () => {
+      hasRevived = true;
       logEvent("revive", analyticsMode, { label });
       const deathX = bike.chassis.position.x;
       const terrainY = terrainYAt(track, deathX);
@@ -847,6 +861,20 @@ let crashTimer = 0;
       setToast(null);
       setNewPb(false);
     };
+
+    // 這局真的結束了（不會再復活）：結算 PB + 呼叫 onGameOverRef（觸發排行榜提交/
+    // 金幣結算），全程只執行一次。摔車當下如果還有復活機會可以選，不會馬上呼叫
+    // 這支——要等玩家真的決定不救了（離開）或復活後再次結束，才會呼叫到。
+    const finalizeCrash = () => {
+      if (gameOverFired) return;
+      gameOverFired = true;
+      checkPb(points);
+      onGameOverRef.current?.({
+        score: points, timeMs: raceTimeMs, flips: totalFlips, perfect: perfectLandings,
+        finished: false, progressPct: deathProgressRef.current, replay: { events: replayEvents, path: replayPath },
+      });
+    };
+    finalizeCrashRef.current = finalizeCrash;
 
     // ---- 物理步進 ----
     const STEP = 1000 / 60;
@@ -1181,6 +1209,10 @@ let crashTimer = 0;
         logEvent("finish", analyticsMode, {
           label, score: points, timeMs: Math.round(raceTimeMs), flips: totalFlips, perfect: perfectLandings,
         });
+        // 完賽必定是這局真正的終點（不會再復活），gameOverFired 標記跟 finalizeCrash()
+        // 共用同一把鎖：萬一玩家完賽後又點了原本給「復活後離開」用的按鈕，那邊會
+        // 因為看到 gameOverFired 已經是 true 而安全地不重複呼叫。
+        gameOverFired = true;
         checkPb(points);
         onGameOverRef.current?.({ score: points, timeMs: raceTimeMs, flips: totalFlips, perfect: perfectLandings, finished: true, progressPct: 1, replay: { events: replayEvents, path: replayPath } });
       }
@@ -1862,8 +1894,14 @@ let crashTimer = 0;
           dyingRef.current = false;
           setDying(false);
           setCrashed(true);
-          checkPb(points);
-          onGameOverRef.current?.({ score: points, timeMs: raceTimeMs, flips: totalFlips, perfect: perfectLandings, finished: false, progressPct: deathProgressRef.current, replay: { events: replayEvents, path: replayPath } });
+          // 2026-07-23 修復：這裡以前不管三七二十一就呼叫 finalizeCrash()，把「還沒
+          // 真正結束（玩家可能要復活）」的分數提早送出去，復活後真正結束時再送一次，
+          // 兩次間隔太短常撞到伺服器 10 秒提交冷卻，較高分的第二次被靜默擋掉。現在
+          // 死亡當下如果還有復活機會可以選（revivalEnabled 且這局還沒復活過），先不
+          // 結算，等玩家真的復活後再死/完賽，或直接離開時（見 onExit 呼叫點）才觸發。
+          if (!(revivalEnabled && !hasRevived)) {
+            finalizeCrash();
+          }
         }
       }
       // 鏡頭震動（暫時偏移，渲染後還原，不汙染 camX/camY 平滑狀態）
@@ -1919,6 +1957,7 @@ let crashTimer = 0;
     window.history.pushState({ taiexGame: true }, "");
     const onPop = () => {
       if (overRef.current) {
+        finalizeCrashRef.current?.(); // 復活決定中就離開＝真的結束了，補結算（見宣告處說明）
         onExit(); // 已結算畫面：返回直接回主選單
         return;
       }
@@ -2156,7 +2195,10 @@ let crashTimer = 0;
                   </button>
                 )}
                 <button className="overlay-btn share-btn" onClick={shareScore}>📤 分享成績</button>
-                <button className="overlay-btn ghost" onClick={onExit}>
+                <button
+                  className="overlay-btn ghost"
+                  onClick={() => { finalizeCrashRef.current?.(); onExit(); }}
+                >
                   返回排名賽
                 </button>
               </>

@@ -426,6 +426,19 @@ y[i] = baselineY - (price[i] - min) / (max - min) × scaledHeight
 - 復活邏輯（`doRevive()`）：讀死亡時的 `chassis.position.x`，`terrainYAt()` 算地形高度，在正上方 `HOVER_HEIGHT` 重新 setPosition + setVelocity(0) + setStatic(true) → 進入懸空等待狀態。分數、計時、翻轉紀錄保留（不呼叫 `doReset()`）。
 - 實作：`reviveSignal` ref（與 `resetSignal` 平行），frame loop 偵測 signal 變化觸發 `doRevive()`。
 - 每次 `handleStartTrack` 讓 `gameKeyRef.current++`，作為 `<GameCanvas key>` 確保新局重建（`revivalUsed` 重置）。
+- **🔴✅ 2026-07-23 修過的真實 bug：死亡當下不管有沒有復活機會，`onGameOverRef`
+  （觸發 `App.tsx handleGameOver`——排行榜提交/金幣結算/成就記錄的唯一入口）
+  舊版一律立刻呼叫，但「看廣告復活」按鈕就長在同一張死亡結算畫面上。玩家死掉→
+  分數提早送出→點復活→繼續玩到更高分→真正結束再送一次——兩次提交間隔太短
+  （尤其網頁版 `requestRewardedAd` 對 web 環境是 `Promise.resolve(true)` 直接
+  過關，復活幾乎瞬間）常撞到 `submit_daily_score()` 的 10 秒提交冷卻，較高分
+  的第二次被靜默擋掉，排行榜留下復活前較低的分數（外加金幣/成就等也被同一個
+  回呼重複結算一次的疑慮）。**已修**：新增 `hasRevived`/`gameOverFired` 兩個
+  closure 旗標 + `finalizeCrash()`（透過 `finalizeCrashRef` 橋接給遊戲迴圈
+  外的按鈕/返回鍵用，跟 `reviveSignal` 同一種手法）。死亡時若
+  `revivalEnabled && !hasRevived`（還有復活機會沒決定），**不會**立刻呼叫
+  `onGameOverRef`，改成等玩家真的離開（點「返回排名賽」／實體返回鍵）或用掉
+  復活後再次死亡/完賽時才觸發，`gameOverFired` 確保整趟賽局只呼叫一次。
 
 ### 5.4 物理踩雷
 
