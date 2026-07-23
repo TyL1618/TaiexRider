@@ -22,11 +22,31 @@
   font-size: clamp(2.4rem, 11vw, 3.6rem);
   font-weight: 800;
   letter-spacing: 0.05em;
-  color: var(--neon-cyan);
-  text-shadow: 0 0 8px var(--neon-cyan), 0 0 28px rgba(45, 226, 230, 0.5);
   /* 2026-07-11 移除 .home-sub 副標語（slogan 只留 boot splash）——原本標題與下方
      內容的間距由副標語的 margin 撐出，改由標題自己補上，版面節奏不變。 */
   margin-bottom: 1.1rem;
+  /* 2026-07-23 使用者覺得首頁太無聊：漸層文字緩慢橫向流動（青→白→琥珀→青循環）
+     疊加呼吸光暈，兩個動畫週期刻意錯開且都放很慢，避免「一直在閃」的躁動感
+     （使用者原話：動態但不要太刺眼或虛華過分）。底色維持原本的青色主調不變。 */
+  background: linear-gradient(
+    100deg,
+    var(--neon-cyan) 0%, #eafdfd 18%, var(--neon-cyan) 36%,
+    var(--neon-amber) 55%, var(--neon-cyan) 75%, #eafdfd 90%, var(--neon-cyan) 100%
+  );
+  background-size: 260% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  animation: home-title-flow 9s linear infinite, home-title-breathe 4.5s ease-in-out infinite;
+}
+@keyframes home-title-flow { to { background-position: 260% 0; } }
+@keyframes home-title-breathe {
+  0%, 100% { filter: drop-shadow(0 0 6px rgba(45, 226, 230, 0.35)); }
+  50% { filter: drop-shadow(0 0 14px rgba(45, 226, 230, 0.55)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .home-title { animation: none; filter: drop-shadow(0 0 8px rgba(45, 226, 230, 0.4)); }
 }
 
 .home-entry-row {

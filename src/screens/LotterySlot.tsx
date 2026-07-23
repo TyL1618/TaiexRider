@@ -345,6 +345,17 @@ export default function LotterySlot({
     if (phase === "spinning") speedMulRef.current = TAP_SPEED_MUL;
   };
 
+  // 按鈕按下去的顏色互閃感（2026-07-23 使用者要求）：純視覺效果，直接操作 DOM
+  // classList 短暫加 .flash 再移除，不用另開 React state（跟結果無關，不需要
+  // 觸發重繪）。stopPropagation 避免同時觸發外層 handleTapAccelerate。
+  const flashPress = (e: React.MouseEvent<HTMLButtonElement>) => {
+    const el = e.currentTarget;
+    el.classList.remove("flash");
+    void el.offsetWidth; // 強制 reflow，讓連續點擊也能重新觸發動畫
+    el.classList.add("flash");
+    window.setTimeout(() => el.classList.remove("flash"), 380);
+  };
+
   // 抽獎需要伺服器錢包才能進行（跟鑽石一樣，訪客沒有伺服器錢包可寫入）。
   if (!user) {
     return (
@@ -363,7 +374,7 @@ export default function LotterySlot({
     >
       <button className="back-btn" onClick={onBack} disabled={backLocked}>‹ 返回</button>
       <h1 className="slot-title lottery-title">🎰 幸運轉輪</h1>
-      <p className="slot-pool-hint">💎 目前鑽石 {diamonds}</p>
+      <p className="slot-pool-hint lottery-diamond-chip">💎 {diamonds}</p>
       {phase === "spinning" && <p className="slot-tap-hint">👆 點擊畫面可加速</p>}
 
       <div className="slot-machine lottery-machine">
@@ -392,25 +403,32 @@ export default function LotterySlot({
       {phase === "idle" && (
         <div className="lottery-btn-row">
           {!showPaidBtn && (
-            <button className="slot-spin-btn lottery-spin-btn" onClick={startFreeSpin} disabled={!canFreeSpin}>
+            <button
+              className="slot-spin-btn lottery-spin-btn"
+              onClick={(e) => { flashPress(e); startFreeSpin(); }}
+              disabled={!canFreeSpin}
+            >
               {spinLabel}
             </button>
           )}
           {showPaidBtn && (
             <button
               className="slot-spin-btn lottery-spin-btn lottery-paid-btn"
-              onClick={startPaidSpin}
+              onClick={(e) => { flashPress(e); startPaidSpin(); }}
               disabled={diamonds < PAID_SPIN_COST}
             >
-              🎲 單抽・💎 {PAID_SPIN_COST}
+              <span className="lottery-btn-main">🎲 單抽</span>
+              <span className="lottery-btn-price">💎 {PAID_SPIN_COST}<span className="unit">/次</span></span>
             </button>
           )}
           <button
             className="slot-spin-btn lottery-spin-btn lottery-ten-btn"
-            onClick={runSpinX10}
+            onClick={(e) => { flashPress(e); runSpinX10(); }}
             disabled={diamonds < TEN_SPIN_COST}
           >
-            ✨ 十連抽・💎 {TEN_SPIN_COST}
+            <span className="lottery-ten-tag">省10</span>
+            <span className="lottery-btn-main">✨ 十連抽</span>
+            <span className="lottery-btn-price">💎 {TEN_SPIN_COST}<span className="unit">/次</span></span>
           </button>
         </div>
       )}

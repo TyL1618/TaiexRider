@@ -1,14 +1,60 @@
-/* 抽獎轉輪：金色/黑色高級質感，跟 RandomSlot 的青/紅配色做出區隔 */
+/* 抽獎轉輪：cyberpunk 質感——圓角面板 + 流光邊框（conic-gradient 遮罩），跟遊戲
+   既有的圓角語言一致（不是切角/直角），邊框緩慢流動＋按鈕按下去有顏色互閃感。
+   2026-07-23 使用者來回幾輪 mockup 確認的最終方向：全部圓角、拿掉切角/瞄準框
+   裝飾、流光速度刻意放慢（避免太吵），中獎線改青色（原本金色）呼應按鈕主色。 */
+
+@property --lottery-spin { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
+@keyframes lottery-marquee { to { --lottery-spin: 360deg; } }
+@keyframes lottery-press {
+  0% { transform: scale(0.93); }
+  55% { transform: scale(1.035); }
+  100% { transform: scale(1); }
+}
 
 .lottery-title {
   color: var(--neon-amber);
   text-shadow: 0 0 8px var(--neon-amber), 0 0 24px rgba(255, 179, 0, 0.4);
 }
 
+.lottery-diamond-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  background: rgba(45, 226, 230, 0.06);
+  border: 1px solid rgba(45, 226, 230, 0.3);
+  border-radius: 999px;
+  padding: 0.3rem 0.9rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--neon-cyan);
+  font-variant-numeric: tabular-nums;
+  margin: 0 0 0.4rem;
+  letter-spacing: 0;
+}
+
+/* 轉輪面板：拿掉原本的實色金框，改成緩慢旋轉的流光圓角邊框 */
 .lottery-machine {
-  background: linear-gradient(160deg, rgba(255, 179, 0, 0.14), rgba(10, 10, 14, 0.4));
-  border: 2px solid rgba(255, 179, 0, 0.45);
-  box-shadow: 0 0 34px rgba(255, 179, 0, 0.25), inset 0 0 26px rgba(0, 0, 0, 0.65);
+  position: relative;
+  background: linear-gradient(165deg, rgba(45, 226, 230, 0.05), rgba(6, 8, 13, 0.97) 55%);
+  border: none;
+  box-shadow: none;
+}
+.lottery-machine::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: conic-gradient(
+    from var(--lottery-spin),
+    transparent 0%, var(--neon-cyan) 10%, transparent 25%,
+    transparent 60%, var(--neon-amber) 75%, transparent 90%
+  );
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: lottery-marquee 11s linear infinite;
+  pointer-events: none;
 }
 
 .lottery-item-icon {
@@ -16,18 +62,84 @@
   line-height: 1;
 }
 
+/* 中獎線：拿掉原本的金色實色框，改青色圓角光帶，跟按鈕主色互相呼應 */
 .lottery-winline {
-  border-top: 2px solid var(--neon-amber);
-  border-bottom: 2px solid var(--neon-amber);
-  box-shadow: 0 0 18px rgba(255, 179, 0, 0.55), inset 0 0 24px rgba(255, 179, 0, 0.14);
+  border-top: 2px solid var(--neon-cyan);
+  border-bottom: 2px solid var(--neon-cyan);
+  border-radius: 8px;
+  box-shadow: 0 0 16px rgba(45, 226, 230, 0.45), inset 0 0 20px rgba(45, 226, 230, 0.1);
 }
 
+/* ── 按鈕：圓角面板 + 流光邊框 + 按下去顏色互閃（--lc 決定主色，預設青色） ── */
 .lottery-spin-btn {
-  background: var(--neon-amber);
-  box-shadow: 0 0 24px rgba(255, 179, 0, 0.55);
+  position: relative;
+  --lc: var(--neon-cyan);
+  margin: 0;
+  background: linear-gradient(160deg, rgba(10, 14, 22, 0.95), rgba(6, 8, 13, 0.98));
+  border-radius: 14px;
+  box-shadow: 0 0 16px rgba(45, 226, 230, 0.45), inset 0 0 18px rgba(45, 226, 230, 0.1);
+  color: var(--neon-cyan);
+  text-shadow: 0 0 8px rgba(45, 226, 230, 0.6);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.15rem;
+  padding: 0.65rem 0.5rem;
+  font-size: 0.85rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  transition: transform 0.12s ease, box-shadow 0.18s ease;
 }
-.lottery-paid-btn {
-  background: linear-gradient(135deg, #7dd3ea, var(--neon-cyan));
+.lottery-spin-btn::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: conic-gradient(
+    from var(--lottery-spin),
+    transparent 0%, var(--lc) 14%, transparent 30%,
+    transparent 70%, var(--lc) 86%, transparent 100%
+  );
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  animation: lottery-marquee 5s linear infinite;
+}
+.lottery-spin-btn:disabled { opacity: 0.4; cursor: default; box-shadow: none; }
+.lottery-spin-btn:disabled::before { animation-play-state: paused; opacity: 0.4; }
+.lottery-spin-btn.flash {
+  animation: lottery-press 0.38s ease-out;
+  box-shadow: 0 0 30px rgba(45, 226, 230, 0.85), inset 0 0 26px rgba(45, 226, 230, 0.35);
+}
+.lottery-spin-btn.flash .lottery-btn-main,
+.lottery-spin-btn.flash .lottery-btn-price { color: #fff; }
+
+.lottery-btn-main { font-size: 0.78rem; }
+.lottery-btn-price { font-size: 0.92rem; font-variant-numeric: tabular-nums; }
+.lottery-btn-price .unit { font-size: 0.62rem; opacity: 0.75; margin-left: 0.15rem; }
+
+.lottery-ten-btn {
+  --lc: var(--neon-amber);
+  color: var(--neon-amber);
+  text-shadow: 0 0 8px rgba(255, 179, 0, 0.6);
+  box-shadow: 0 0 16px rgba(255, 179, 0, 0.45), inset 0 0 18px rgba(255, 179, 0, 0.1);
+}
+.lottery-ten-btn.flash {
+  box-shadow: 0 0 30px rgba(255, 179, 0, 0.85), inset 0 0 26px rgba(255, 179, 0, 0.35);
+}
+.lottery-ten-tag {
+  position: absolute;
+  top: -8px;
+  right: 8px;
+  background: #ff2d55;
+  color: #fff;
+  font-size: 0.56rem;
+  font-weight: 800;
+  padding: 1px 7px;
+  border-radius: 999px;
 }
 
 /* 十連抽：單抽/十連並排雙按鈕 */
@@ -36,12 +148,7 @@
   gap: 0.6rem;
   width: 100%;
 }
-.lottery-btn-row .lottery-spin-btn { flex: 1; margin: 0; }
-.lottery-ten-btn {
-  background: linear-gradient(135deg, #ffd27d, var(--neon-amber));
-  box-shadow: 0 0 24px rgba(255, 179, 0, 0.55);
-  font-weight: 800;
-}
+.lottery-btn-row .lottery-spin-btn { flex: 1; }
 
 /* 十連抽結果：2 行 x 5 欄小卡，稀有度用邊框/光暈區分（不做跨格放大，固定 10 張避免版面跑掉） */
 .lottery-x10-result { width: min(94vw, 420px); gap: 0.8rem; }
@@ -143,7 +250,8 @@
   white-space: nowrap;
 }
 
-/* 稀有中獎特效：畫面震動 + 對應主題色暈染，rare=P系列金色、epic=黑天鵝黑金 */
+/* 稀有中獎特效：畫面震動，rare=P系列金色、epic=黑天鵝紫金（用 --lc 換流光顏色，
+   不再依賴 border-color——彈窗邊框已經改成流光遮罩，沒有真正的 border 可以蓋色） */
 @keyframes lottery-shake {
   0%, 100% { transform: translate(0, 0); }
   20% { transform: translate(-6px, 3px); }
@@ -154,12 +262,34 @@
 .lottery-shake-rare { animation: lottery-shake 0.4s ease-in-out 2; }
 .lottery-shake-epic { animation: lottery-shake 0.4s ease-in-out 3; }
 
-.lottery-result-rare {
-  border-color: var(--neon-amber) !important;
-  box-shadow: 0 0 40px rgba(255, 179, 0, 0.55) !important;
+/* 中獎結果彈窗（單抽/十連共用）：同一套流光圓角語言，紫色系呼應稀有車款配色 */
+.lottery-result,
+.lottery-x10-result {
+  position: relative;
+  --lc: #b39ddb;
+  background: linear-gradient(165deg, rgba(179, 157, 219, 0.08), rgba(6, 8, 13, 0.97) 55%) !important;
+  border: none !important;
 }
+.lottery-result::before,
+.lottery-x10-result::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: conic-gradient(
+    from var(--lottery-spin),
+    transparent 0%, var(--lc) 10%, transparent 25%,
+    transparent 60%, var(--neon-amber) 75%, transparent 90%
+  );
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: lottery-marquee 7s linear infinite;
+  pointer-events: none;
+}
+.lottery-result-rare { --lc: var(--neon-amber) !important; }
 .lottery-result-epic {
-  border-color: #b39ddb !important;
+  --lc: #b39ddb !important;
   background: linear-gradient(160deg, rgba(10, 10, 14, 0.96), rgba(40, 20, 50, 0.9)) !important;
-  box-shadow: 0 0 50px rgba(179, 157, 219, 0.6), 0 0 90px rgba(255, 179, 0, 0.25) !important;
 }
