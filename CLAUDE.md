@@ -113,6 +113,15 @@ vite-plugin-pwa (Workbox) ・ idb (IndexedDB 快取) ・ Supabase（Phase 4 起�
 > 平板電腦等裝置」，「應用程式更新已發布」。**TaiexRider 現在任何人都能在 Google
 > Play 商店搜尋/安裝，正式對外公開**。
 >
+> **✅ 2026-07-27 追加：新增 `public/app-ads.txt`**——AdMob 把 App 連結到 Play 商店
+> listing 時卡在「無法驗證」，查證發現 Play Console 的「應用程式支援」區塊**沒有
+> 填「網站」欄位**，只有「隱私權政策」連結指向 `taiexrider.pages.dev/privacy`——
+> 這是 Google 目前唯一登記在這個 App 上的網域，AdMob 驗證 app-ads.txt 就是查這裡。
+> 已新增 `public/app-ads.txt`（內容為 AdMob 畫面提供的
+> `google.com, pub-8981745966447649, DIRECT, f08c47fec0942fa0`），commit+push
+> 後隨 Cloudflare Pages 自動部署生效於 `https://taiexrider.pages.dev/app-ads.txt`。
+> 使用者待辦：等部署生效後（通常幾分鐘）回 AdMob 點「檢查更新」重新驗證。
+>
 > **下一步（釐清正確順序）**：AdMob 真實廣告單元 ID（`src/lib/ads.ts
 > NATIVE_AD_UNIT_IDS`，revive/coin 兩組真實 ID 已存在於程式碼註解，見該檔案
 > 221~222 行）現在才能去 AdMob 連結公開商店 listing（連結本身不會重新產生 ID，
