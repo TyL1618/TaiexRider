@@ -97,6 +97,31 @@ vite-plugin-pwa (Workbox) ・ idb (IndexedDB 快取) ・ Supabase（Phase 4 起�
 
 ## 目前進度
 
+> ## 🚀 2026-07-27：Google Play 正式版發布權限已核准 + versionCode 推進到 43 準備上正式版
+>
+> **2026-07-21 送出的正式版權限申請已核准**（比預估 7/28 提早），Play Console 顯示
+> 「恭喜！您的遊戲已獲得 Google Play 正式版發布權限」——可以發布給一般使用者、也能
+> 執行公開測試了。**封測/審查階段徹底結案。**
+>
+> 使用者確認 vc42 已用於封測（已上傳過），**準備直接把這個已測過的 build 用 Play
+> Console「推廣發布 (Promote release)」推到正式版軌道**（同一顆 AAB，不用重新打包）。
+> 同時要求把 `versionCode` 推進到 43 備用（供之後有新改動要上正式版更新時使用）：
+> `android/app/build.gradle` `versionCode 42→43`／`versionName "1.42"→"1.43"`，
+> typecheck／`npm run build`／`npx cap sync android`（9 個外掛都在）全過，已 commit+push。
+>
+> **釐清一個重要順序**：AdMob 真實廣告單元 ID（`src/lib/ads.ts NATIVE_AD_UNIT_IDS`）
+> **必須等正式發布、商店頁面公開之後才能去 AdMob 連結**（AdMob 連結 Play 商店 listing
+> 要查詢公開頁面，封測軌道查不到），且連結後可能還有一次性的 Google 政策合規審查，
+> 這段期間廣告可能只是「有限度放送」。**正確順序：① 先把 vc42 推廣上正式版軌道（不用
+> 等 vc43）→ ② 去 AdMob 連結商店 listing → ③ 等審查 → ④ 審查過後才把真實 ID 換進
+> `ads.ts`，那次才用到 vc43 重新打包上傳。** vc43 目前只是版號預留，內容跟 vc42
+> 完全一樣（沒有其他改動），**不是這次要上正式版用的那顆 build**。
+>
+> **使用者待辦**：① Play Console 決定要用「推廣 vc42」還是重新打包 vc43 上正式版
+> （目前建議前者，vc42 已測過風險較低）；② 上正式版後才去 AdMob 連結；③ 正式上架
+> 也是執行 [prelaunch_cleanup.sql](supabase/prelaunch_cleanup.sql) 清測試期資料的
+> 自然時機，待使用者自行決定何時手動跑。
+
 > ## 🐛 2026-07-23（第五輪，vc41 打包後追加）：修「復活後排行榜分數沒被覆蓋」真實 bug
 >
 > 使用者實測回報：玩到 1570 死掉、看廣告復活、繼續玩到 2300，結果排行榜留下的是
