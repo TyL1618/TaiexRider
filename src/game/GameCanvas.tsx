@@ -248,6 +248,7 @@ export default function GameCanvas({ prices, label, name, subtitle, onExit, onGa
   // 摔車當下走到賽道的比例（0~1），長征模式摔車金幣按比例、雙倍時也照這個比例算。
   const deathProgressRef = useRef(0);
   const [adDoubleState, setAdDoubleState] = useState<"idle" | "watching" | "claimed">("idle");
+  const [doubleAdNotice, setDoubleAdNotice] = useState("");
   const [tickets, setTickets] = useState(() => getTickets());
   const [showTicketPrompt, setShowTicketPrompt] = useState<"revive" | "double" | null>(null);
   const coinRewardEligible = analyticsMode !== "daily" && analyticsMode !== "classic";
@@ -280,9 +281,11 @@ export default function GameCanvas({ prices, label, name, subtitle, onExit, onGa
       return;
     }
     setAdDoubleState("watching");
+    setDoubleAdNotice("");
     requestRewardedAd("coin").then((ok) => {
       setAdDoubleState(ok ? "claimed" : "idle");
       if (ok) grantDouble();
+      else setDoubleAdNotice("廣告目前無法載入，請稍後再試");
     });
   };
 
@@ -333,6 +336,7 @@ export default function GameCanvas({ prices, label, name, subtitle, onExit, onGa
   // 「看廣告復活」按鈕過去點下去就直接免費復活，從沒真的呼叫過廣告——
   // 補上真正的廣告閘門，跟按鈕文字（已購買永久去廣告才顯示「復活」）一致。
   const [reviveWatching, setReviveWatching] = useState(false);
+  const [reviveAdNotice, setReviveAdNotice] = useState("");
   const handleWatchAdRevive = () => {
     if (reviveWatching) return;
     if (adsRemoved) {
@@ -346,11 +350,14 @@ export default function GameCanvas({ prices, label, name, subtitle, onExit, onGa
       return;
     }
     setReviveWatching(true);
+    setReviveAdNotice("");
     requestRewardedAd("revive").then((ok) => {
       setReviveWatching(false);
       if (ok) {
         setRevivalUsed(true);
         requestRevive();
+      } else {
+        setReviveAdNotice("廣告目前無法載入，請稍後再試");
       }
     });
   };
@@ -2121,6 +2128,7 @@ let crashTimer = 0;
                           : "📺 觀看廣告 獎勵 ×2"}
                     </button>
                   )}
+                  {doubleAdNotice && <span className="overlay-ad-notice">{doubleAdNotice}</span>}
                 </div>
               );
             })()}
@@ -2145,12 +2153,15 @@ let crashTimer = 0;
                       setShowTicketPrompt(null);
                       if (kind === "revive") {
                         setReviveWatching(true);
+                        setReviveAdNotice("");
                         requestRewardedAd("revive").then((ok) => {
                           setReviveWatching(false);
                           if (ok) { setRevivalUsed(true); requestRevive(); }
+                          else setReviveAdNotice("廣告目前無法載入，請稍後再試");
                         });
                       } else {
                         setAdDoubleState("watching");
+                        setDoubleAdNotice("");
                         requestRewardedAd("coin").then((ok) => {
                           setAdDoubleState(ok ? "claimed" : "idle");
                           if (ok) {
@@ -2158,6 +2169,8 @@ let crashTimer = 0;
                             grantDoubleLocal(amount);
                             const k = doubleKind();
                             earnCoins(k, k === "long_crash" ? amount : undefined);
+                          } else {
+                            setDoubleAdNotice("廣告目前無法載入，請稍後再試");
                           }
                         });
                       }
@@ -2186,13 +2199,16 @@ let crashTimer = 0;
             {revivalEnabled ? (
               <>
                 {crashed && !revivalUsed && (
-                  <button
-                    className="overlay-btn ad-btn"
-                    disabled={reviveWatching}
-                    onClick={handleWatchAdRevive}
-                  >
-                    {adsRemoved ? "復活" : reviveWatching ? "廣告播放中…" : "看廣告復活"}
-                  </button>
+                  <>
+                    <button
+                      className="overlay-btn ad-btn"
+                      disabled={reviveWatching}
+                      onClick={handleWatchAdRevive}
+                    >
+                      {adsRemoved ? "復活" : reviveWatching ? "廣告播放中…" : "看廣告復活"}
+                    </button>
+                    {reviveAdNotice && <span className="overlay-ad-notice">{reviveAdNotice}</span>}
+                  </>
                 )}
                 <button className="overlay-btn share-btn" onClick={shareScore}>📤 分享成績</button>
                 <button

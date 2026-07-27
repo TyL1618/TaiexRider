@@ -72,6 +72,7 @@ export default function DailyChallenge({
   const [serverMaxed, setServerMaxed] = useState(false); // 伺服器判定今日已達上限（優先於本地計數，防清 localStorage 繞過）
   const [checkingStart, setCheckingStart] = useState(false);
   const [watchingAd, setWatchingAd] = useState(false); // 第 3~5 次挑戰：看廣告中，看完才消耗次數
+  const [adNotice, setAdNotice] = useState("");
   const [streak, setStreak] = useState(0);
   const [streakLive, setStreakLive] = useState(false); // 本期已參賽（🔥 實心）或待延續（提示）
   const [heat, setHeat] = useState<HeatBucket[]>([]); // 今日全服死亡熱點（20 等分）
@@ -305,9 +306,10 @@ export default function DailyChallenge({
             if (!track) return;
             if (showAd) {
               setWatchingAd(true);
+              setAdNotice("");
               const granted = await requestRewardedAd("coin");
               setWatchingAd(false);
-              if (!granted) return;
+              if (!granted) { setAdNotice("廣告目前無法載入，請稍後再試"); return; }
             }
             setCheckingStart(true);
             const result = await consumeAttemptServer();
@@ -367,6 +369,7 @@ export default function DailyChallenge({
                           ? `看廣告開始 (${num}/5)`
                           : `開始挑戰 (${num}/5)`}
               </button>
+              {adNotice && <p className="daily-ad-notice">{adNotice}</p>}
             </>
           );
         })()}

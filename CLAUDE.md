@@ -97,6 +97,34 @@ vite-plugin-pwa (Workbox) ・ idb (IndexedDB 快取) ・ Supabase（Phase 4 起�
 
 ## 目前進度
 
+> ## 📺 2026-07-27（追加）：AdMob 換真實廣告 ID + 補「廣告載入失敗無提示」缺口 → versionCode 44
+>
+> AdMob 連結 Play 商店 listing 卡在 app-ads.txt 驗證（見上一則），但驗證/一次性政策
+> 審查都不影響換 code——已直接動工：
+>
+> 1. **`src/lib/ads.ts` 換真實廣告單元 ID**：`NATIVE_AD_UNIT_IDS` 的 revive/coin 兩組
+>    測試 ID 換成正式 ID（`.../1679422480`／`.../2170377077`），`prepareRewardVideoAd()`
+>    拿掉 `isTesting: true`。lottery 繼續沿用 coin 那組（原設計本來就共用）。
+> 2. **🔴 順手修一個真的存在的體驗缺口**：查證發現 `Garage.tsx`／`GameCanvas.tsx`
+>    （復活/雙倍金幣兩處按鈕、含票券彈窗內的「還是看廣告」分支）廣告**載入失敗時
+>    畫面完全沒有任何提示**——玩家點下去、按鈕轉一下、然後什麼都沒發生，容易誤以為
+>    卡住。這個缺口本來就存在（測試廣告一樣會踩到），只是接下來這幾天用真實 ID＋
+>    還在 AdMob 審查期，「沒廣告可放」的機率比平常高，值得先補。已在這幾處加上
+>    「廣告目前無法載入，請稍後再試」提示（`Garage.tsx`/`GameCanvas.tsx` 新增
+>    `adNotice`/`doubleAdNotice`/`reviveAdNotice` state；`DailyChallenge.tsx` 新增
+>    `adNotice`）。`LotterySlot.tsx` 本來就有等效提示（「廣告未完整觀看，未消耗
+>    次數」），這次沒有動它。
+>
+> `versionCode` 43→44／`versionName "1.43"→"1.44"`。typecheck／`npm run build`／
+> `npx cap sync android`（9 個外掛都在）全過，preview 首頁（訪客視角）渲染正常、
+> 無 console error。**廣告失敗提示文字實際觸發效果、真實廣告是否正常播放，都需要
+> 真機驗證**（preview 網頁環境的 `requestRewardedAd` 走的是「直接發獎勵」分支，
+> 不會真的呼叫 AdMob，測不到原生廣告載入/失敗路徑，屬本檔記錄過的既有環境限制）。
+> **使用者待辦**：① 下次打包 Android vc44；② 真機測試看廣告復活/雙倍金幣/排名賽
+> 廣告開始/幸運轉輪抽獎，確認能正常播放真實廣告，且真的無法載入時能看到新提示
+> 文字（不會安靜卡住）；③ 持續留意 AdMob 那邊 app-ads.txt 驗證與應用程式審查何時
+> 通過。
+
 > ## 🚀🎉 2026-07-27：正式版權限核准 → versionCode 43 → 已通過審核，TaiexRider 正式公開上線
 >
 > **2026-07-21 送出的正式版權限申請已核准**（比預估 7/28 提早），Play Console 顯示

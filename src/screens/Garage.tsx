@@ -255,9 +255,11 @@ export default function Garage({ user, onBack }: { user: User | null; onBack: ()
 
   const proceedWithAd = () => {
     setWatchingAd(true);
+    setAdNotice("");
     requestRewardedAd("coin").then((ok) => {
       setWatchingAd(false);
       if (ok) grantAdCoins();
+      else setAdNotice("廣告目前無法載入，請稍後再試");
     });
   };
 

@@ -216,17 +216,17 @@ async function pollAdResult(): Promise<boolean> {
 // 不需要 TWA 那套 loopback server + 自訂 scheme 導轉——AdMob SDK 直接跑在同一個
 // WebView 所在的原生行程裡，官方 API 就有 prepare/show，不用自己土炮繞背景服務。
 //
-// ⚠️ 廣告單元 ID 目前用 Google 官方測試單元（不受 AdMob 帳戶審核/廣告單元啟用狀態
-// 影響，先把橋接跑通），跟 TWA 版 AdActivity.kt 目前的作法一致。上架前才換成真實
-// 單元 ID（revive_reward: ca-app-pub-8981745966447649/1679422480；coin_reward:
-// ca-app-pub-8981745966447649/2170377077，依 kind 分流；同時 isTesting 記得拿掉）。
-const NATIVE_TEST_REWARD_AD_UNIT_ID = "ca-app-pub-3940256099942544/5224354917";
+// ✅ 2026-07-27 正式上線後換成真實廣告單元 ID（revive_reward / coin_reward，依 kind
+// 分流）。抽獎轉輪的免費抽獎（LOTTERY_DESIGN.md）沿用 coin_reward 這組廣告單元，
+// 不另外在 AdMob 開新單元——都是「看廣告換遊戲內獎勵」的同類型版位。
+const NATIVE_REWARD_AD_UNIT_IDS = {
+  revive: "ca-app-pub-8981745966447649/1679422480",
+  coin: "ca-app-pub-8981745966447649/2170377077",
+} as const;
 const NATIVE_AD_UNIT_IDS: Record<RewardedAdKind, string> = {
-  coin: NATIVE_TEST_REWARD_AD_UNIT_ID,
-  revive: NATIVE_TEST_REWARD_AD_UNIT_ID,
-  // 抽獎轉輪的免費抽獎（LOTTERY_DESIGN.md）沿用 coin_reward 這組廣告單元，不另外
-  // 在 AdMob 開新單元——都是「看廣告換遊戲內獎勵」的同類型版位。
-  lottery: NATIVE_TEST_REWARD_AD_UNIT_ID,
+  coin: NATIVE_REWARD_AD_UNIT_IDS.coin,
+  revive: NATIVE_REWARD_AD_UNIT_IDS.revive,
+  lottery: NATIVE_REWARD_AD_UNIT_IDS.coin,
 };
 
 let admobInitPromise: Promise<void> | null = null;
@@ -253,7 +253,6 @@ function prepareNativeAd(kind: RewardedAdKind): Promise<void> {
   const p = ensureAdMobInit().then(() =>
     AdMob.prepareRewardVideoAd({
       adId: NATIVE_AD_UNIT_IDS[kind],
-      isTesting: true,
       // immersiveMode:true 讓外掛顯示廣告當下自己套用沉浸式全螢幕，避免底部被系統三鍵
       // 導覽列蓋住（MainActivity 的沉浸式只套在自己的 window，AdMob 另開 Activity）。
       immersiveMode: true,

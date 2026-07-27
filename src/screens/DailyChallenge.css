@@ -255,6 +255,13 @@
   box-shadow: none;
 }
 
+.daily-ad-notice {
+  margin: 0.4rem 0 0;
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.55);
+  text-align: center;
+}
+
 /* ---- 排行榜 ---- */
 .rank-section {
   width: 100%;

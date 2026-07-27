@@ -459,6 +459,13 @@
 .overlay-ad-coins-btn:disabled { opacity: 0.5; }
 .overlay-ad-coins-btn:not(:disabled):active { transform: scale(0.96); }
 
+.overlay-ad-notice {
+  display: block;
+  margin-top: 0.35rem;
+  font-size: 0.68rem;
+  color: rgba(255, 255, 255, 0.55);
+}
+
 .overlay-btn {
   margin-top: 0.5rem;
   padding: 0.7rem 1.6rem;
