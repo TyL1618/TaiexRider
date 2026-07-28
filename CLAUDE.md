@@ -97,6 +97,26 @@ vite-plugin-pwa (Workbox) ・ idb (IndexedDB 快取) ・ Supabase（Phase 4 起�
 
 ## 目前進度
 
+> ## 🤖 2026-07-28（追加）：robots.txt 補上 Google 官方指定的 Google-adstxt 專屬寫法
+>
+> 使用者拿 AdMob 官方說明文件截圖來核對——官方教的修法是幫 `Google-adstxt` 開一個
+> 專屬 `User-agent` 群組直接 `Disallow:`（空值＝完全放行），跟上一則我用的
+> `User-agent: * / Allow: /app-ads.txt`（靠 Google robots.txt 解析裡「路徑越具體
+> 優先」的隱含規則）是不同機制。兩者理論上都該有效，但官方明講的寫法不用依賴
+> 規則優先權的推論，更保險、消除解讀空間。已改成**兩者並存**：
+> ```
+> User-agent: Google-adstxt
+> Disallow:
+>
+> User-agent: *
+> Disallow: /
+> Allow: /app-ads.txt
+> ```
+> 前段是 Google 官方精準指定的寫法，後段保留給其他沒有專屬 User-Agent 名稱、走
+> `*` 群組的廣告網路爬蟲當保險。純靜態檔案改動，commit+push 後隨 Cloudflare Pages
+> 自動部署生效。**教訓**：遇到官方文件明確給出的修法時，優先照抄官方原文，不要
+> 只靠自己對規範的推論解讀，兩者有出入時以官方文件為準。
+>
 > ## 🤖 2026-07-28：找到 app-ads.txt 驗證卡住的真正原因——robots.txt 全站擋爬蟲
 >
 > 使用者回報 app-ads.txt 已放上去超過 24 小時，AdMob 仍驗證不過。逐項排查：
