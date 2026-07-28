@@ -1,4 +1,6 @@
 # TaiexRider — 不希望網頁版被搜尋引擎索引（discussion #7）
 # 主要入口為 Google Play 的 TWA App；網頁版僅為技術載體，不主動宣傳、不索引。
+# 例外：/app-ads.txt 需開放給 AdMob 等廣告驗證爬蟲讀取，否則廣告單元連結 Play 商店 listing 的驗證永遠讀不到檔案。
 User-agent: *
 Disallow: /
+Allow: /app-ads.txt
