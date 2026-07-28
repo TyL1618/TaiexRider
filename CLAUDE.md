@@ -97,6 +97,26 @@ vite-plugin-pwa (Workbox) ・ idb (IndexedDB 快取) ・ Supabase（Phase 4 起�
 
 ## 目前進度
 
+> ## 🤖 2026-07-28：找到 app-ads.txt 驗證卡住的真正原因——robots.txt 全站擋爬蟲
+>
+> 使用者回報 app-ads.txt 已放上去超過 24 小時，AdMob 仍驗證不過。逐項排查：
+> 檔案本身用瀏覽器直接開／查 response header 完全正常（200、
+> `content-type: text/plain; charset=utf-8`，內容正確）；Play Console「商店資訊
+> 詳細聯絡資料→網站」欄位也確認填的就是 `https://taiexrider.pages.dev/`，跟
+> app-ads.txt 所在網域一致——兩邊表面看起來都沒問題。
+>
+> **🔴✅ 真正的根因：`public/robots.txt` 全站 `Disallow: /`**（2026-07-13 之前為了
+> 「PWA 網頁版不想被搜尋引擎索引，主要入口是 Play 商店 App」刻意設的）連帶擋住了
+> AdMob 驗證用的爬蟲——瀏覽器手動開網址不受 robots.txt 限制所以看起來正常，但
+> 遵守 robots.txt 的爬蟲一看到全站 `Disallow: /` 就不會去讀 `/app-ads.txt`，
+> 導致驗證不管等多久都不會過。已修：加一行 `Allow: /app-ads.txt` 例外，不影響
+> 原本「網頁版不被搜尋引擎索引」的設計（一般搜尋引擎仍然收不到）。
+>
+> 純靜態檔案改動，commit+push 後隨 Cloudflare Pages 自動部署生效。**使用者待辦**：
+> 等部署生效（幾分鐘）後回 AdMob 點「檢查更新」重新觸發驗證；如果之後又有類似
+> 「檔案存在但爬蟲讀不到」的怪異情況，**先查 robots.txt 是不是把新加的公開路徑
+> 一起擋掉了**，這是本次教訓。
+>
 > ## 📺 2026-07-27（追加）：AdMob 換真實廣告 ID + 補「廣告載入失敗無提示」缺口 → versionCode 44
 >
 > AdMob 連結 Play 商店 listing 卡在 app-ads.txt 驗證（見上一則），但驗證/一次性政策
