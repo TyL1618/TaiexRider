@@ -14,4 +14,9 @@ export interface TrackData {
   prices: number[];
   subtitle?: string;     // 遊戲內 HUD 副標（經典模式用：期間・標的）
   classicId?: string;    // 經典關卡 id（用於提交紀錄保持者）
+  // 伺服器算好的難度分數（daily_map.difficulty，見 scripts/fetchDailyMap.ts calcDifficulty）。
+  // 賽道列表的星星就是讀這個值——GameCanvas 務必沿用同一個數字算 HUD 星星，
+  // 不可自己重新用簡化公式算一次，否則列表跟進場後顯示的星等會對不起來（曾發生過真實 bug）。
+  // 經典/長征模式沒有這個值（undefined），GameCanvas 會 fallback 本地簡化公式。
+  difficulty?: number;
 }

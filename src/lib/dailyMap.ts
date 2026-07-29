@@ -15,6 +15,7 @@ export interface DailyMapRow {
   stock_code: string;
   stock_name: string;
   prices: number[];
+  difficulty: number;
 }
 
 export interface DailyMapMeta {
@@ -104,7 +105,7 @@ async function _fetchHardest(date: string): Promise<DailyMapRow | null> {
   try {
     const d = await resolveSessionDate(date);
     const r = await fetch(
-      `${URL}/rest/v1/daily_map?map_date=eq.${d}&order=difficulty.desc&limit=1&select=stock_code,stock_name,prices`,
+      `${URL}/rest/v1/daily_map?map_date=eq.${d}&order=difficulty.desc&limit=1&select=stock_code,stock_name,prices,difficulty`,
       { headers: headers() },
     );
     if (!r.ok) return null;
@@ -127,7 +128,7 @@ async function _fetchStock(date: string, code: string): Promise<DailyMapRow | nu
   try {
     const d = await resolveSessionDate(date);
     const r = await fetch(
-      `${URL}/rest/v1/daily_map?map_date=eq.${d}&stock_code=eq.${code}&limit=1&select=stock_code,stock_name,prices`,
+      `${URL}/rest/v1/daily_map?map_date=eq.${d}&stock_code=eq.${code}&limit=1&select=stock_code,stock_name,prices,difficulty`,
       { headers: headers() },
     );
     if (!r.ok) return null;

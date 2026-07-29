@@ -105,7 +105,7 @@ export default function TrackSelect({
     const row = await fetchStockDailyMap(dailyKey(), item.stock_code);
     setPicking(false);
     if (!row) return;
-    onPick({ label: row.stock_code, name: row.stock_name, kind: "stock", mode: "intraday", desc: "前次盤中走勢", prices: row.prices });
+    onPick({ label: row.stock_code, name: row.stock_name, kind: "stock", mode: "intraday", desc: "前次盤中走勢", prices: row.prices, difficulty: row.difficulty });
   }, [picking, onPick]);
 
   const handlePickLong = useCallback(async () => {

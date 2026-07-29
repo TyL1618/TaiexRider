@@ -48,6 +48,11 @@ interface GameCanvasProps {
   label: string;
   name: string;
   subtitle?: string;   // HUD 副標（經典模式：期間・標的）
+  // 伺服器算好的難度分數（TrackData.difficulty，見 data/tracks.ts 註解）。
+  // 有值就直接拿來算 HUD 星星，不可再用 calcDifficulty(prices) 自己重算一次，
+  // 否則會跟賽道列表的星等對不起來（曾發生真實 bug：友達列表 5 星、進場 2 星）。
+  // 經典/長征模式沒有這個值時 fallback 本地簡化公式。
+  difficulty?: number | null;
   onExit: () => void;
   onGameOver?: (stats: GameOverStats) => void;
   hideMinimap?: boolean;
@@ -211,8 +216,8 @@ function getTintedSprite(entry: BikeImgEntry, color: string): TintedSpriteEntry 
   return out;
 }
 
-export default function GameCanvas({ prices, label, name, subtitle, onExit, onGameOver, hideMinimap = false, revivalEnabled = false, analyticsMode, pbKey, uid = null, dailyRank = null, completedQuests = [], ghostPath = null, ghostSkinId = null, ghostColorId = null }: GameCanvasProps) {
-  const stars = difficultyStars(calcDifficulty(prices));
+export default function GameCanvas({ prices, label, name, subtitle, difficulty = null, onExit, onGameOver, hideMinimap = false, revivalEnabled = false, analyticsMode, pbKey, uid = null, dailyRank = null, completedQuests = [], ghostPath = null, ghostSkinId = null, ghostColorId = null }: GameCanvasProps) {
+  const stars = difficultyStars(difficulty ?? calcDifficulty(prices));
   const cityBuildings = generateCity(prices.length * 31 + Math.round((prices[0] || 0) * 100));
   const canvasRef = useRef<HTMLCanvasElement>(null);
   // 結算畫面滾動動畫的真正終點分數（見下方 useEffect）：hud.points 每 5 幀才節流同步一次

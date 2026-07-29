@@ -132,7 +132,7 @@ export default function DailyChallenge({
     fetchHardestDailyMap(dailyKey()).then((row) => {
       if (!alive) return;
       if (row) {
-        setTrack({ label: row.stock_code, name: row.stock_name, kind: "taiex", mode: "intraday", desc: "前一交易日走勢", prices: row.prices });
+        setTrack({ label: row.stock_code, name: row.stock_name, kind: "taiex", mode: "intraday", desc: "前一交易日走勢", prices: row.prices, difficulty: row.difficulty });
       }
     });
     // 排行榜第 3~5 次「看廣告開始」會用到廣告，進畫面就在背景先備好，點下去幾乎瞬開。

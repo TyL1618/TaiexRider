@@ -97,6 +97,33 @@ vite-plugin-pwa (Workbox) ・ idb (IndexedDB 快取) ・ Supabase（Phase 4 起�
 
 ## 目前進度
 
+> ## 🐛 2026-07-29：修「賽道列表星等跟進場後 HUD 星等對不上」真實 bug——vc45
+>
+> 使用者實測回報：友達當天賽道列表顯示 5 星，點進去玩地圖左上角 HUD 卻只顯示 2 星。
+> 查證發現**兩套完全獨立的難度公式各自算各的**：列表星等讀 Supabase `daily_map.
+> difficulty`（由 [scripts/fetchDailyMap.ts](scripts/fetchDailyMap.ts) 用「振幅×
+> (1+折返次數)」算好存進資料庫），但 `GameCanvas.tsx` 進場時完全沒用這個值，自己另外
+> 用「當日降採樣後相鄰兩點最大單步漲跌幅」重算一次——兩套公式門檻雖然相同，數值來源
+> 卻天差地遠，愛震盪但單步跳動不大的股票（友達當天正是這種走勢）就會出現列表跟 HUD
+> 星等不一致。DEVDOC §3.1 原本文件描述的公式其實寫錯成 GameCanvas 那套簡化版，代表
+> 這個落差存在已久，只是這次才被實際玩到並回報。
+>
+> **✅ 已修**：`TrackData`（[tracks.ts](src/data/tracks.ts)）新增 `difficulty?: number`
+> 欄位；`DailyMapRow`（[dailyMap.ts](src/lib/dailyMap.ts)）的 `_fetchHardest`/
+> `_fetchStock` 查詢補上 `difficulty` 欄位（資料庫本來就有，只是沒 select）；
+> `TrackSelect.tsx`（自選賽道）/`RandomSlot.tsx`（隨機拉霸）/`DailyChallenge.tsx`
+> （每日排名賽）三處建立 `TrackData` 時一併帶入 `row.difficulty`；`GameCanvas.tsx`
+> 新增 `difficulty` prop，HUD 星等改成`difficulty ?? calcDifficulty(prices)`——有伺服器
+> 算好的值就直接用，經典/長征模式（本來就沒有列表星等可比較，`difficulty` 會是
+> `undefined`）才 fallback 本地簡化公式，不影響這兩個模式的既有行為。`App.tsx` 補上
+> `difficulty={track.difficulty}` 傳遞。
+>
+> typecheck/build/`npx cap sync android`（9 個外掛都在）全過。**這是純資料流修正
+> （多帶一個已存在的資料庫欄位到前端），不是改難度計算邏輯本身，理論上零風險**，但
+> 星等顯示效果建議下次真機/PWA 開賽道列表對照進場後 HUD 確認兩邊一致。**versionCode
+> 已推進到 45／versionName "1.45"，`dist/`+`android/` 都已同步到可直接在 Android
+> Studio 打包簽署版 AAB 的狀態**，等使用者打包上傳。
+>
 > ## 🎉 2026-07-29：AdMob 廣告放送審核已通過——TaiexRider 完全就緒，無任何待辦阻塞項
 >
 > 使用者截圖確認 AdMob 後台「所有應用程式」列表：TAIEX RIDER 台股騎士（Android）

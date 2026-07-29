@@ -263,7 +263,14 @@ Developer API 在伺服器端處理（跟原本架構一致，外掛官方文件
    拉真實資料驗證：1368 支裡有 278 支非純 4 位數——ETF 4/5/6 位數、槓桿反向 K/L/R/T/U 字母尾、
    多幣別計價 A~I 字母尾，舊版 `/^\d{4}$/` 全部濾掉；新 regex 僅 1 支特別股例外「2887Z1」不處理）。
 3. 對每支股票抓當日盤中走勢：Yahoo `{code}.TW`（5 分 K、`range=1d`），降採樣至 ~110 點。
-4. 計算 `difficulty`（盤中最大單步漲跌幅）。
+4. 計算 `difficulty` = 振幅 `(高-低)/開盤` × (1 + 折返次數)（相對上次顯著價位變動
+   >0.3% 才算一次轉折，過濾噪音；讓漲停/跌停板股不再靠單純振幅壟斷難度排行）。
+   ⚠️ **2026-07-29 前這裡文件寫錯成「盤中最大單步漲跌幅」**——那其實是 `GameCanvas.tsx`
+   曾經獨立重算 HUD 星星用的另一套簡化公式，兩邊長期不同步導致真實 bug（賽道列表
+   顯示 5 星、進場後 HUD 顯示 2 星）。已修：`TrackData` 新增 `difficulty` 欄位，
+   從 `daily_map.difficulty` 一路帶到 GameCanvas，HUD 星星直接沿用同一個數字，
+   不再自己重算；經典/長征模式沒有伺服器難度值，仍 fallback 本地簡化公式（這兩個
+   模式從未有列表星等可比較，無風險）。
 5. Upsert 至 Supabase `daily_map`（`Prefer: resolution=merge-duplicates`，衝突鍵 `(map_date, stock_code)`），清除舊資料。⚠️ **cutoff 錨定剛寫入的 `mapDate − 7 天`，不可錨「執行當下 now − 7 天」**：長連假（過年/長颱風假 > 7 天）map_date 凍住但 now 一直走，用 now-7 會追過當前唯一在用的 map_date 把它刪掉（甚至同一次跑剛寫又刪）→ 掉回靜態盤。錨 mapDate 則任意長度連假當前盤永遠保留。
 6. **股票圖鑑登記表**（2026-07-07 新增）：拿第 2 步已經抓到的官方上市清單，`upsertStockRegistry()` 順手 upsert 進 `stock_registry`（不重複打一次 TWSE API），再呼叫 `mark_delisted_stocks()` RPC 比對維護「絕版」狀態，詳見 §2.6。
 

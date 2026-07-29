@@ -121,7 +121,7 @@ export default function RandomSlot({
         timerRef.current = setTimeout(async () => {
           const row = await fetchStockDailyMap(dailyKey(), winner.stock_code);
           if (row) {
-            setResult({ label: row.stock_code, name: row.stock_name, kind: "stock", mode: "intraday", desc: "前次盤中走勢", prices: row.prices });
+            setResult({ label: row.stock_code, name: row.stock_name, kind: "stock", mode: "intraday", desc: "前次盤中走勢", prices: row.prices, difficulty: row.difficulty });
             setPhase("result");
           } else {
             setPhase("idle"); // fetch 失敗，靜默回到待機

@@ -419,6 +419,7 @@ export default function App() {
           label={track.label}
           name={track.name}
           subtitle={track.subtitle}
+          difficulty={track.difficulty}
           onExit={handleExitTrack}
           onGameOver={handleGameOver}
           hideMinimap={track.mode === "long"}
