@@ -24,8 +24,10 @@
    - **每次開工第一件事：`git pull`**；收工前確認已 `git push`。
    - 換機器接手時，讀 CLAUDE.md「目前進度」即可無縫接續。
 
-4. **不要污染上層 repo**：本資料夾是獨立 git repo，遠端 = `TyL1618/TaiexRider`。
-   上層 `Coding/Project` 是 VictoryMatrix 的 repo，與本專案無關。
+4. **不要污染上層資料夾**：本資料夾是獨立 git repo，遠端 = `TyL1618/TaiexRider`。
+   上層 `Coding/Project` **本身不是 repo**（2026-10-11 已把誤建的外層 `.git` 改名停用；
+   VictoryMatrix 有自己獨立的 repo，在 `Project/VictoryMatrix`），與本專案無關。
+   `Project` 底下各專案都各自獨立，在非 repo 的子資料夾下跑 git 指令不會再誤落到外層。
 
 ---
 
