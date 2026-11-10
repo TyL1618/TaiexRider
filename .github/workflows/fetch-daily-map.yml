@@ -6,6 +6,11 @@ on:
                           # 提早跑 + map_date 錨定交易日，避免 GitHub 延遲跨午夜造成日期錯位
   workflow_dispatch:        # 允許手動觸發測試
 
+# actions: write 只給最後的 Keepalive 步驟用（呼叫 workflow enable API）
+permissions:
+  contents: read
+  actions: write
+
 jobs:
   fetch:
     runs-on: ubuntu-latest
@@ -22,3 +27,16 @@ jobs:
           SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: node scripts/fetchDailyMap.ts
+
+      # ⚠️ 勿刪：GitHub 對「repo 連續 60 天沒有 commit」的排程 workflow 會自動停用
+      # （state=disabled_inactivity，不會自己恢復）。2026-09-28 兩支排程就是這樣被停掉，
+      # 遊戲地圖/排行榜凍結一個半月（見 DEVDOC §3.1c）。每次執行都對兩支排程重打一次
+      # enable API 重置 60 天計時器，兩支互相保活；if: always() 讓抓資料失敗也照樣續命。
+      - name: Keepalive（防 60 天無 commit 自動停用排程）
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for wf in fetch-daily-map.yml settle-daily-rewards.yml; do
+            gh api -X PUT "repos/${{ github.repository }}/actions/workflows/$wf/enable"
+          done

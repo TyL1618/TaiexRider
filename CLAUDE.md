@@ -99,6 +99,23 @@ vite-plugin-pwa (Workbox) ・ idb (IndexedDB 快取) ・ Supabase（Phase 4 起�
 
 ## 目前進度
 
+> ## 🚨 2026-11-10：修「遊戲日期卡在 9/24、排行榜凍結一個半月」——排程被 GitHub 自動停用
+>
+> 使用者發現上架中的 App 日期一直停在 2026/09/24、每日排行榜只有自己 10/15 玩的那筆
+> 1400 分。**原因不在 App**：GitHub 對「連續 60 天沒有 commit」的 repo 會自動停用排程
+> workflow（`disabled_inactivity`），7/29 後 60 天沒 commit → 9/28 起 `Fetch Daily Map`
+> 與 `Settle Daily Rewards` 同時停擺，之後再 commit 也不會自己恢復。`daily_map` 凍在
+> `map_date=9/25`，榜的 key 跟著凍住。
+>
+> **✅ 已修**：① 兩支排程重新 enable 並手動補抓（11/09 盤 → `map_date=11/10`）；
+> ② 兩支 workflow 尾端加 **Keepalive 步驟**（每次執行重打 enable API 重置 60 天計時、
+> 互相保活，**不可刪**）。純 CI 變更，不需重 build AAB、不需跑 migration。
+> 完整事故紀錄/診斷指令/手動補抓時間限制見 **DEVDOC §3.1c**。
+>
+> **未補發**：凍結那一期（`challenge_date=2026-09-25`）不會被結算（只有開發者自己一筆）。
+> **待觀察**：Keepalive 靠 enable API 重置計時器是社群通用做法，但要到 60 天後（約
+> 2027-01 上旬）排程仍在跑才算實證；地圖日期又不動時先跑 DEVDOC §3.1c 的診斷指令。
+
 > ## 🐛 2026-07-29：修「賽道列表星等跟進場後 HUD 星等對不上」真實 bug——vc45
 >
 > 使用者實測回報：友達當天賽道列表顯示 5 星，點進去玩地圖左上角 HUD 卻只顯示 2 星。

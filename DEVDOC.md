@@ -301,6 +301,39 @@ Developer API 在伺服器端處理（跟原本架構一致，外掛官方文件
   整段成績累積在同一張榜，午夜才換新榜。**schema 改完要手動在 Supabase SQL Editor 跑
   `create or replace function submit_daily_score`，push 不會更新 RPC。**
 
+### 3.1c 排程保活（GitHub 60 天無 commit 會自動停用排程）
+
+**事故（2026-09-28 ～ 2026-11-10）**：GitHub 對 repo **連續 60 天沒有 commit** 的排程
+workflow 會自動停用（`state = disabled_inactivity`），而且**之後再有 commit 也不會自己
+恢復**，必須手動 enable。本 repo 7/29 之後 60 天沒 commit，9/27 跑完最後一次、9/28 起
+`Fetch Daily Map` 與 `Settle Daily Rewards` 兩支同時被停（10/11、10/25 的 commit 沒有救回來）。
+結果：`daily_map` 凍在 `map_date=9/25`（9/24 盤），app 一個半月都顯示 9/24、排行榜
+key 也凍在同一期、每日鑽石結算全停。**App 端完全沒有壞**，是資料沒人餵。
+
+**修法**：
+1. `gh workflow enable fetch-daily-map.yml` / `settle-daily-rewards.yml` 重新啟用，
+   手動 `gh workflow run fetch-daily-map.yml` 補抓。
+2. 兩支 workflow 最後各加一個 **Keepalive 步驟**（`if: always()`）：每次執行都對兩支排程
+   呼叫 `PUT /repos/{repo}/actions/workflows/{file}/enable`，重置 60 天計時器、兩支互相保活
+   （不必塞假 commit）。需要 `permissions: actions: write`。**這個步驟不可刪。**
+
+**診斷速查**（地圖日期不動時第一件事）：
+
+```bash
+gh api repos/TyL1618/TaiexRider/actions/workflows --jq '.workflows[] | .name + " | " + .state'
+gh run list -R TyL1618/TaiexRider --limit 5
+```
+
+**手動補抓的時間限制**：`fetchTaiexSession()` 把「≥20 根 5 分 K」就當完整 session，盤中
+10:40 之後手動觸發會把**當天未收盤的半天盤**當成完整盤寫入（16:00 排程會再覆寫成完整盤，
+但中間幾小時 `map_date=明天` 那筆是殘缺的——不影響當天顯示，只是別誤會）。要「立刻補回
+昨天的盤」請在 **10:30 前**觸發（會走 5d fallback 抓前一交易日），或 14:00 收盤後觸發。
+
+**停擺期間那一期的結算不會補發**：補抓寫入新 `map_date` 後，腳本會清掉 7 天前的舊
+`daily_map`，`settle_daily_diamonds()` 找「前一期」是查 `daily_map`，所以凍結的那一期
+（本次是 `challenge_date=2026-09-25`）永遠不會被結算。本次該期只有開發者自己一筆成績，
+未補發。
+
 ### 3.2 資料源端點
 
 | 用途 | 端點 | 備註 |

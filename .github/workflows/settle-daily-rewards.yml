@@ -5,6 +5,11 @@ on:
     - cron: '0 16 * * *'  # 00:00 台灣時間（UTC+8）：排行榜前一期鑽石結算 + 經典模式週結算
   workflow_dispatch:        # 允許手動觸發測試
 
+# actions: write 只給最後的 Keepalive 步驟用（呼叫 workflow enable API）
+permissions:
+  contents: read
+  actions: write
+
 jobs:
   settle:
     runs-on: ubuntu-latest
@@ -21,3 +26,14 @@ jobs:
           SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: node scripts/settleDailyRewards.ts
+
+      # ⚠️ 勿刪：防 GitHub「60 天無 commit 自動停用排程」，說明見 fetch-daily-map.yml 同名步驟
+      # 與 DEVDOC §3.1c。兩支排程互相保活。
+      - name: Keepalive（防 60 天無 commit 自動停用排程）
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for wf in fetch-daily-map.yml settle-daily-rewards.yml; do
+            gh api -X PUT "repos/${{ github.repository }}/actions/workflows/$wf/enable"
+          done
